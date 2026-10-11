@@ -1,0 +1,41 @@
+name: Windows foundation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      VCPKG_DISABLE_METRICS: 1
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: .cache/vcpkg
+          key: windows-2022-x64-msvc-${{ hashFiles('vcpkg.json') }}
+      - name: Prepare pinned vcpkg
+        shell: pwsh
+        run: |
+          ./scripts/Bootstrap.ps1
+          "VCPKG_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
+      - name: Inspect build prerequisites
+        shell: pwsh
+        run: ./scripts/Test-Environment.ps1
+      - name: Configure Windows x64
+        run: cmake --preset windows-msvc
+      - name: Build Release
+        run: cmake --build --preset release --parallel 2
+      - name: Test Release
+        run: ctest --preset release
+      - name: Build Debug
+        run: cmake --build --preset debug --parallel 2
+      - name: Test Debug
+        run: ctest --preset debug

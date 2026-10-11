@@ -1,0 +1,21 @@
+{
+  "name": "downshift",
+  "version-semver": "0.1.0",
+  "description": "Downshift native Windows download manager",
+  "license": "MIT",
+  "supports": "windows & x64 & !uwp",
+  "builtin-baseline": "e456309491fd875487bf02b8a0dca76c1b1b00cc",
+  "dependencies": [
+    {
+      "name": "qtbase",
+      "default-features": false,
+      "features": ["widgets", "thread"]
+    },
+    {
+      "name": "curl",
+      "default-features": false,
+      "features": ["ssl", "http2"]
+    },
+    { "name": "sqlite3", "default-features": false }
+  ]
+}

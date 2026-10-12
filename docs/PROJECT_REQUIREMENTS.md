@@ -2,6 +2,14 @@
 
 Product name: Downshift. The original phase-gated requirements follow.
 
+## Direct user instructions overriding the original attachment (2026-10-12)
+
+- Develop locally in `C:\Users\HP\Desktop\Projects\Downshift`.
+- The assistant implements, builds, tests, fixes, and documents one approved phase at a time.
+- At the end of each verified phase, report results and ask for approval before starting the next phase.
+- The user handles Git commits and GitHub pushes. Do not commit or push automatically.
+- The original prompt below remains a technical requirements reference. Its automatic commit/push requirements are superseded by these direct user instructions.
+
 # CODEX MASTER PROMPT
 # High-Performance C++ Download Manager — Phase-Gated Development
 

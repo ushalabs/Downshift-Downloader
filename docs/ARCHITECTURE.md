@@ -8,7 +8,7 @@
 
 `src/gui/MainWindow.*` contains the minimal Qt Widgets shell. Qt owns child widgets. Networking workers do not exist yet. Startup checks perform only bounded local operations.
 
-`tests/FoundationTests.cpp` checks linked dependency functionality and repeated initialization/cleanup. CTest also launches the actual executable using offscreen and Windows platform plugins. Both Debug and Release are intended to run in Windows CI.
+`tests/FoundationTests.cpp` checks linked dependency functionality and repeated initialization/cleanup. CTest also launches the actual executable using minimal and Windows platform plugins. Both Debug and Release are intended to run in Windows CI. The minimal plugin is included in the selected Qt build; the offscreen plugin is not assumed to be available.
 
 ## Dependency and build decisions
 
@@ -18,7 +18,7 @@
 - SQLite through its C API, avoiding a second Qt SQL persistence abstraction.
 - One vcpkg commit pins the tool checkout and the complete baseline dependency set. No arbitrary dependency upgrades during configure.
 - CMake's Visual Studio 2022 generator locates MSVC without requiring a developer shell. CMake 3.25 is the minimum supported version, not a claim of bit-for-bit compiler reproducibility.
-- Qt Windows and offscreen plugins are copied beside the development executable. Installer/portable packaging belongs to Phase 9.
+- Qt Windows and minimal plugins are copied beside the development executable. Installer/portable packaging belongs to Phase 9.
 
 ## Planned module boundaries
 

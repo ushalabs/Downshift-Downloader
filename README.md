@@ -2,7 +2,7 @@
 
 Downshift is a free, open-source native Windows download manager being developed in ten approved phases. The product name is **Downshift**; the executable is `Downshift.exe`.
 
-**Current status: Phase 1 foundation checkpoint; compilation and startup verification pending.** This skeleton does not download files yet. No throughput measurements or IDM comparisons have been performed.
+**Current status: Phase 1 foundation completed and verified locally.** Windows x64 Release and Debug builds passed, with all three foundation tests passing in each configuration. This skeleton does not download files yet. Phase 2 requires the user's approval. No throughput measurements or IDM comparisons have been performed.
 
 ## Foundation
 
@@ -10,8 +10,8 @@ Downshift is a free, open-source native Windows download manager being developed
 - libcurl process lifetime management and multi-handle capability check.
 - SQLite integration with an in-memory 64-bit write/read check.
 - Windows x64 MSVC CMake presets and pinned vcpkg dependency baseline.
-- Dependency and Qt startup smoke tests, including the Windows platform plugin.
-- Windows build workflow for Debug and Release; CI results must be verified before declaring Phase 1 complete.
+- Dependency and Qt startup smoke tests, using the Windows and minimal platform plugins.
+- Windows build workflow for Debug and Release; the corrected workflow awaits the user's commit/push and a new CI run. Local verification is recorded in the development progress document.
 
 ## Build
 
@@ -28,11 +28,11 @@ ctest --preset release
 ./build/windows-msvc/Release/Downshift.exe
 ```
 
-The first configure builds the dependency set from source and can take substantial time and disk space. Run bootstrap and configure in the same PowerShell session so `VCPKG_ROOT` remains available.
+The first configure builds the dependency set from source and can take substantial time and disk space. Run bootstrap and configure in the same PowerShell session so `VCPKG_ROOT` remains available. Bootstrap also finds Visual Studio's bundled CMake when it is absent from PATH.
 
 ## Roadmap and phase gate
 
-1. Native C++ foundation (currently approved).
+1. Native C++ foundation (completed locally).
 2. Segmented download engine.
 3. Adaptive performance engine.
 4. Resume and recovery.
@@ -43,7 +43,9 @@ The first configure builds the dependency set from source and can take substanti
 9. Windows packaging.
 10. GitHub release.
 
-Each phase must be implemented, built, tested, documented, committed, and pushed before completion. The next phase requires explicit user approval. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
+Each phase is implemented, built, tested, and documented locally, then reported for explicit approval of the next phase. The user handles commits and GitHub pushes; the assistant does not publish automatically. This direct user instruction overrides the automatic Git workflow in the original attached prompt. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
+
+Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 
 ## Documentation
 

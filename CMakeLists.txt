@@ -48,7 +48,7 @@ add_custom_command(TARGET downshift POST_BUILD
         "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"
         "$<TARGET_FILE_DIR:downshift>/platforms/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+        "$<TARGET_FILE:Qt6::QMinimalIntegrationPlugin>"
         "$<TARGET_FILE_DIR:downshift>/platforms/"
     VERBATIM
 )
@@ -59,8 +59,8 @@ if(BUILD_TESTING)
     target_link_libraries(downshift_foundation_tests PRIVATE downshift_foundation)
     target_compile_options(downshift_foundation_tests PRIVATE /W4 /permissive- /utf-8)
     add_test(NAME foundation.dependencies COMMAND downshift_foundation_tests)
-    add_test(NAME foundation.gui.offscreen COMMAND downshift --smoke-test -platform offscreen)
+    add_test(NAME foundation.gui.minimal COMMAND downshift --smoke-test -platform minimal)
     add_test(NAME foundation.gui.windows COMMAND downshift --smoke-test)
     set_tests_properties(foundation.dependencies PROPERTIES TIMEOUT 15)
-    set_tests_properties(foundation.gui.offscreen foundation.gui.windows PROPERTIES TIMEOUT 20)
+    set_tests_properties(foundation.gui.minimal foundation.gui.windows PROPERTIES TIMEOUT 20)
 endif()

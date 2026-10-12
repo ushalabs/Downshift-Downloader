@@ -9,10 +9,12 @@ No installer, portable package, or verified release binary is available yet. Sta
 - Windows 10/11 x64.
 - Visual Studio 2022 or Build Tools 2022, MSVC v143, Desktop development with C++, and a Windows SDK.
 - Git.
-- CMake 3.25 or newer on PATH.
+- CMake 3.25 or newer, either on PATH or bundled with Visual Studio's C++ CMake tools.
 - Internet access and sufficient disk space for a Qt source build and its dependencies.
 
 Use Microsoft's official [Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) and the official [CMake downloads](https://cmake.org/download/). Installing tools may require administrator permission. The project bootstrap does not install system software.
+
+You can run `./scripts/Install-BuildTools.ps1` from your own PowerShell window to download Microsoft's official installer, verify its Microsoft signature, and request Windows administrator approval for the C++ workload and recommended SDK components. Install CMake or select Visual Studio's C++ CMake tools component, and make CMake available on PATH.
 
 ## Configure and build
 
@@ -28,12 +30,12 @@ cmake --build --preset debug --parallel 2
 ctest --preset debug
 ```
 
-Bootstrap clones vcpkg into `.tools/vcpkg`, checks out the manifest's exact baseline, disables vcpkg metrics, and sets `VCPKG_ROOT` for the current session. It refuses to change an existing checkout at a different revision. The configure step installs dependencies through manifest mode.
+Bootstrap clones vcpkg into `.tools/windows/vcpkg`, checks out the manifest's exact baseline, disables vcpkg metrics, and sets `VCPKG_ROOT` for the current session. It also finds Visual Studio's bundled CMake when CMake is absent from PATH. It refuses to change an existing checkout at a different revision. The configure step installs dependencies through manifest mode.
 
 In a new PowerShell session, set the checkout location before configuring:
 
 ```powershell
-$env:VCPKG_ROOT = (Resolve-Path ./.tools/vcpkg).Path
+./scripts/Bootstrap.ps1
 ```
 
 For an external tools location, pass `-ToolsDirectory 'C:\your\tools'` to bootstrap. Keep vcpkg checkout history available for manifest version resolution.
@@ -44,7 +46,13 @@ For an external tools location, pass `-ToolsDirectory 'C:\your\tools'` to bootst
 ./build/windows-msvc/Release/Downshift.exe
 ```
 
-The window should show Downshift and the linked Qt, libcurl, and SQLite versions. It has no download controls in Phase 1. CTest launches that executable, checks its rendering and event loop, and returns failure if startup fails. The Windows smoke test exercises `qwindows`; the offscreen test exercises `qoffscreen`.
+The window should show Downshift and the linked Qt, libcurl, and SQLite versions. It has no download controls in Phase 1. CTest launches that executable, checks its rendering and event loop, and returns failure if startup fails. The Windows smoke test exercises `qwindows`; the headless minimal test exercises `qminimal`.
+
+### Verified local build (2026-10-12)
+
+Windows x64 builds passed with MSVC 19.44.35229.0 (v143 toolset 14.44.35207), Windows SDK 10.0.26100.0, and Visual Studio's CMake 3.31.6-msvc6. All three CTest checks passed in Release and Debug. Qt 6.11.2, libcurl 8.22.0, and SQLite 3.53.4 were built through the pinned vcpkg manifest. Detailed evidence and the separate CI status are in [development progress](DEVELOPMENT_PROGRESS.md).
+
+On the active development machine, the Release executable is `C:\Users\HP\Desktop\Projects\Downshift\build\windows-msvc\Release\Downshift.exe`. Keep it beside the copied DLLs and `platforms` folder. This is a development build; installer and portable distribution are later-phase work.
 
 ## Pinned dependency set
 

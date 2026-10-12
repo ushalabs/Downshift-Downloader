@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <stop_token>
@@ -27,8 +28,36 @@ struct DownloadOptions {
     std::filesystem::path caBundle; // Optional explicit trust bundle; TLS verification stays enabled.
     long connectTimeoutMs = 10'000;
     long transferTimeoutMs = 0; // Zero uses the stall timeout instead of a whole-transfer deadline.
-    std::uint32_t maxConnections = 4;
+    std::uint32_t maxConnections = 16;
     std::uint64_t chunkBytes = 4 * 1024 * 1024;
+    bool automaticConnections = true;
+    bool adaptiveChunks = true;
+    // Runs on the owning worker at most four times/second, plus stage boundaries.
+    // Observer exceptions disable further notifications without failing the download.
+    std::function<void(const struct DownloadProgress&)> onProgress;
+};
+
+enum class DownloadStage { Probe, Downloading, Finalizing, Completed };
+struct DownloadProgress {
+    DownloadStage stage = DownloadStage::Probe;
+    std::uint64_t downloadedBytes = 0, networkBytes = 0, verifiedBytes = 0;
+    std::optional<std::uint64_t> totalBytes;
+    double elapsedSeconds = 0, instantaneousBytesPerSecond = 0, smoothedBytesPerSecond = 0;
+    double averageBytesPerSecond = 0;
+    std::optional<double> etaSeconds;
+    std::uint32_t activeRanges = 0, targetConnections = 1;
+    std::uint64_t chunkBytes = 0;
+};
+
+struct DownloadMetrics {
+    double totalSeconds = 0, transferSeconds = 0, averageBytesPerSecond = 0, peakBytesPerSecond = 0;
+    double cpuSeconds = 0, writeSeconds = 0, allocationSeconds = 0, checksumSeconds = 0, flushSeconds = 0;
+    double connectionSetupSeconds = 0, firstByteSeconds = 0;
+    std::uint64_t peakWorkingSetBytes = 0, networkBytes = 0, writeBytes = 0, connectionsOpened = 0;
+    std::uint64_t smallestRangeBytes = 0, largestRangeBytes = 0;
+    std::uint32_t peakActiveRanges = 0, initialConnections = 1, finalConnections = 1, tuningChanges = 0;
+    bool observerFailed = false;
+    bool resourceMetricsAvailable = false;
 };
 
 struct DownloadResult {
@@ -37,6 +66,7 @@ struct DownloadResult {
     bool segmented = false;
     bool fellBack = false;
     std::string suggestedFilename;
+    DownloadMetrics metrics;
 };
 
 class DownloadEngine final {

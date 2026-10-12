@@ -1,13 +1,17 @@
 #include "DownloadEngine.h"
 #include "HttpResponse.h"
+#include "core/ConnectionManager/AdaptiveController.h"
+#include "core/ConnectionManager/SpeedTracker.h"
 #include "core/FileWriter/FileWriter.h"
 #include "core/SegmentScheduler/SegmentScheduler.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <curl/curl.h>
+#include <Psapi.h>
 
 #include <algorithm>
+#include <chrono>
 #include <exception>
 #include <limits>
 #include <memory>
@@ -63,6 +67,108 @@ bool identity(const HttpResponse& response) {
         !response.contentType.starts_with("multipart/byteranges");
 }
 
+using Clock = std::chrono::steady_clock;
+double processCpu(bool& available) noexcept {
+    FILETIME created{}, exited{}, kernel{}, user{};
+    available = GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user) != 0;
+    auto ticks = [](FILETIME value) { return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32) | value.dwLowDateTime; };
+    return static_cast<double>(ticks(kernel) + ticks(user)) / 10'000'000.0;
+}
+class Telemetry final {
+public:
+    Telemetry(const DownloadOptions& options, FileWriter& writer) : options_(options), writer_(writer) {
+        cpuStart_ = processCpu(cpuAvailable_);
+    }
+    [[nodiscard]] double seconds() const noexcept { return std::chrono::duration<double>(Clock::now() - start_).count(); }
+    DownloadProgress progress;
+    DownloadMetrics metrics;
+    SpeedTracker speed;
+    double rateHint = 0, latency = 0;
+
+    void update(std::size_t active, bool force = false) {
+        progress.activeRanges = static_cast<std::uint32_t>(active);
+        metrics.peakActiveRanges = std::max(metrics.peakActiveRanges, progress.activeRanges);
+        const auto time = seconds();
+        const auto sample = speed.sample(writer_.metrics().writeBytes, time, force);
+        if (!sample && !force) return;
+        progress.elapsedSeconds = time;
+        progress.networkBytes = writer_.metrics().writeBytes;
+        if (sample) {
+            progress.instantaneousBytesPerSecond = sample->instantaneous;
+            progress.smoothedBytesPerSecond = sample->smoothed;
+            progress.averageBytesPerSecond = sample->average;
+        }
+        progress.etaSeconds.reset();
+        if (progress.totalBytes && progress.downloadedBytes <= *progress.totalBytes && progress.smoothedBytesPerSecond > 0)
+            progress.etaSeconds = static_cast<double>(*progress.totalBytes - progress.downloadedBytes) / progress.smoothedBytesPerSecond;
+        if (options_.onProgress && !metrics.observerFailed) {
+            try { options_.onProgress(progress); }
+            catch (...) { metrics.observerFailed = true; }
+        }
+    }
+    void record(CURL* easy, std::uint64_t bytes) noexcept {
+        long connections = 0;
+        curl_off_t connect = 0, tls = 0, first = 0, total = 0;
+        curl_easy_getinfo(easy, CURLINFO_NUM_CONNECTS, &connections);
+        curl_easy_getinfo(easy, CURLINFO_CONNECT_TIME_T, &connect);
+        curl_easy_getinfo(easy, CURLINFO_APPCONNECT_TIME_T, &tls);
+        curl_easy_getinfo(easy, CURLINFO_STARTTRANSFER_TIME_T, &first);
+        curl_easy_getinfo(easy, CURLINFO_TOTAL_TIME_T, &total);
+        if (connections > 0) {
+            metrics.connectionsOpened += static_cast<std::uint64_t>(connections);
+            metrics.connectionSetupSeconds += static_cast<double>(std::max(connect, tls)) / 1'000'000.0;
+        }
+        if (first > 0) {
+            const auto value = static_cast<double>(first) / 1'000'000.0;
+            firstSum_ += value; ++firstCount_;
+            latency = latency == 0 ? value : latency * 0.8 + value * 0.2;
+        }
+        if (bytes > 0 && total > 0) {
+            const auto rate = static_cast<double>(bytes) * 1'000'000.0 / static_cast<double>(total) * progress.targetConnections;
+            rateHint = rateHint == 0 ? rate : rateHint * 0.8 + rate * 0.2;
+        }
+    }
+    void range(std::uint64_t bytes) noexcept {
+        metrics.smallestRangeBytes = metrics.smallestRangeBytes == 0 ? bytes : std::min(metrics.smallestRangeBytes, bytes);
+        metrics.largestRangeBytes = std::max(metrics.largestRangeBytes, bytes);
+    }
+    void networkDone() {
+        metrics.transferSeconds = seconds();
+        progress.stage = DownloadStage::Finalizing;
+        update(0, true);
+    }
+    DownloadMetrics finish(std::uint64_t bytes) {
+        metrics.totalSeconds = seconds();
+        metrics.averageBytesPerSecond = metrics.transferSeconds > 0 ? static_cast<double>(bytes) / metrics.transferSeconds : 0;
+        metrics.peakBytesPerSecond = speed.peak();
+        bool cpuEndAvailable = false;
+        const auto cpuEnd = processCpu(cpuEndAvailable);
+        PROCESS_MEMORY_COUNTERS memory{};
+        memory.cb = sizeof(memory);
+        metrics.resourceMetricsAvailable = cpuAvailable_ && cpuEndAvailable &&
+            GetProcessMemoryInfo(GetCurrentProcess(), &memory, sizeof(memory)) != 0;
+        if (metrics.resourceMetricsAvailable) {
+            metrics.cpuSeconds = std::max(0.0, cpuEnd - cpuStart_);
+            metrics.peakWorkingSetBytes = memory.PeakWorkingSetSize;
+        }
+        const auto& file = writer_.metrics();
+        metrics.writeBytes = file.writeBytes; metrics.networkBytes = file.writeBytes;
+        metrics.writeSeconds = file.writeSeconds; metrics.allocationSeconds = file.allocationSeconds;
+        metrics.checksumSeconds = file.checksumSeconds; metrics.flushSeconds = file.flushSeconds;
+        metrics.firstByteSeconds = firstCount_ ? firstSum_ / static_cast<double>(firstCount_) : 0;
+        progress.stage = DownloadStage::Completed;
+        update(0, true);
+        return metrics;
+    }
+private:
+    const DownloadOptions& options_;
+    FileWriter& writer_;
+    Clock::time_point start_ = Clock::now();
+    double cpuStart_ = 0, firstSum_ = 0;
+    std::uint64_t firstCount_ = 0;
+    bool cpuAvailable_ = false;
+};
+
 enum class Kind { Probe, Segment, Stream };
 struct Transfer {
     Easy easy{curl_easy_init()};
@@ -70,6 +176,7 @@ struct Transfer {
     HeaderCollector collector;
     Kind kind;
     FileWriter* writer;
+    Telemetry* telemetry;
     std::optional<ByteRange> assigned;
     std::optional<std::uint64_t> expectedTotal;
     std::string etag;
@@ -81,7 +188,8 @@ struct Transfer {
     CURLcode result = CURLE_OK;
     std::stop_token stop;
 
-    Transfer(Kind value, FileWriter* file, std::stop_token token) : kind(value), writer(file), stop(token) {
+    Transfer(Kind value, FileWriter* file, std::stop_token token, Telemetry* observer = nullptr)
+        : kind(value), writer(file), telemetry(observer), stop(token) {
         if (!easy) fail(DownloadErrorCode::Network, "Unable to create a transfer handle.");
     }
 
@@ -110,6 +218,7 @@ struct Transfer {
             if (h.status != 200) httpFailure(h.status);
             if (!identity(h) || h.rangePresent) fail(DownloadErrorCode::Protocol, "A complete, untransformed response is required for streaming.");
             if (!etag.empty() && h.etag != etag) fail(DownloadErrorCode::Integrity, "The remote file changed before streaming.");
+            if (telemetry) telemetry->progress.totalBytes = h.length;
         }
         accepted = true;
     }
@@ -140,7 +249,10 @@ struct Transfer {
                 self.kind == Kind::Segment ? std::optional<std::uint64_t>(self.assigned->size()) : h.length;
             if ((bound && (self.received > *bound || bytes > *bound - self.received)) ||
                 bytes > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - self.received) fail(DownloadErrorCode::Integrity, "The response exceeded its expected byte count.");
-            if (self.writer) self.writer->writeAt((self.assigned ? self.assigned->first : 0) + self.received, data, bytes);
+            if (self.writer) {
+                self.writer->writeAt((self.assigned ? self.assigned->first : 0) + self.received, data, bytes);
+                if (self.telemetry) self.telemetry->progress.downloadedBytes += bytes;
+            }
             self.received += bytes;
             return bytes;
         } catch (...) { self.exception = std::current_exception(); return CURL_WRITEFUNC_ERROR; }
@@ -228,8 +340,11 @@ public:
         try { multiCheck(curl_multi_add_handle(handle_, active_.back()->easy.get())); }
         catch (...) { active_.pop_back(); throw; }
     }
-    void clear() noexcept {
-        for (const auto& transfer : active_) curl_multi_remove_handle(handle_, transfer->easy.get());
+    void clear(Telemetry* telemetry = nullptr) noexcept {
+        for (const auto& transfer : active_) {
+            if (telemetry) telemetry->record(transfer->easy.get(), transfer->received);
+            curl_multi_remove_handle(handle_, transfer->easy.get());
+        }
         active_.clear();
         int queued = 0;
         while (curl_multi_info_read(handle_, &queued)) {} // Remove obsolete completion messages.
@@ -257,10 +372,11 @@ public:
         }
         return result;
     }
-    std::unique_ptr<Transfer> run(std::unique_ptr<Transfer> transfer, std::stop_token stop) {
+    std::unique_ptr<Transfer> run(std::unique_ptr<Transfer> transfer, std::stop_token stop, Telemetry* telemetry = nullptr) {
         add(std::move(transfer));
         for (;;) {
             perform(stop);
+            if (telemetry) telemetry->update(count());
             auto done = completed();
             if (!done.empty()) { done.front()->verify(); return std::move(done.front()); }
             poll();
@@ -288,10 +404,13 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
     }
     if (stop.stop_requested()) fail(DownloadErrorCode::Cancelled, "The download was cancelled.");
     FileWriter writer(options.destination);
+    Telemetry telemetry(options, writer);
+    telemetry.update(0, true);
     MultiSession session(options.maxConnections);
     auto probe = std::make_unique<Transfer>(Kind::Probe, nullptr, stop);
     probe->configure(options, options.url, true);
-    probe = session.run(std::move(probe), stop);
+    probe = session.run(std::move(probe), stop, &telemetry);
+    telemetry.record(probe->easy.get(), 0);
     char* effective = nullptr;
     if (curl_easy_getinfo(probe->easy.get(), CURLINFO_EFFECTIVE_URL, &effective) != CURLE_OK || !effective) fail(DownloadErrorCode::Network, "Unable to resolve the download URL.");
     const std::string resolved(effective);
@@ -303,13 +422,28 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
 
     if (!probe->probeRejected && metadata.status == 206 && !etag.empty()) {
         const auto total = metadata.range->total;
+        telemetry.progress.stage = DownloadStage::Downloading;
+        telemetry.progress.totalBytes = total;
+        AdaptiveController controller(total, options.maxConnections, options.automaticConnections);
+        telemetry.progress.targetConnections = controller.target();
+        telemetry.metrics.initialConnections = controller.target();
         writer.preallocate(total);
+        controller.observe(telemetry.seconds(), 0, false);
         SegmentScheduler scheduler(total, options.chunkBytes);
+        telemetry.progress.chunkBytes = options.chunkBytes;
         auto fill = [&] {
-            while (session.count() < options.maxConnections) {
+            while (session.count() < controller.target()) {
+                if (options.adaptiveChunks) {
+                    auto chunk = controller.chunkSize(telemetry.speed.smoothed() > 0 ? telemetry.speed.smoothed() : telemetry.rateHint, telemetry.latency);
+                    const auto balanced = scheduler.remaining() / controller.target() + (scheduler.remaining() % controller.target() ? 1 : 0);
+                    chunk = std::min(chunk, std::max<std::uint64_t>(256 * 1024, balanced));
+                    scheduler.setChunkSize(chunk);
+                    telemetry.progress.chunkBytes = chunk;
+                }
                 const auto range = scheduler.next();
                 if (!range) break;
-                auto transfer = std::make_unique<Transfer>(Kind::Segment, &writer, stop);
+                telemetry.range(range->size());
+                auto transfer = std::make_unique<Transfer>(Kind::Segment, &writer, stop, &telemetry);
                 transfer->assigned = range;
                 transfer->expectedTotal = total;
                 transfer->etag = etag;
@@ -318,41 +452,73 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             }
         };
         fill();
+        telemetry.update(session.count(), true);
         bool unsupported = false;
         std::uint64_t verifiedBytes = 0;
+        double sampleTime = telemetry.seconds(), sampleWriteSeconds = writer.metrics().writeSeconds;
         while (session.count() != 0) {
             session.perform(stop);
             auto done = session.completed();
             for (const auto& transfer : done) {
+                telemetry.record(transfer->easy.get(), transfer->received);
                 transfer->verify();
                 if (transfer->rangeUnsupported) { unsupported = true; continue; }
                 verifiedBytes += transfer->received;
+                telemetry.progress.verifiedBytes = verifiedBytes;
                 ++result.completedRanges;
             }
-            if (unsupported) { session.clear(); break; }
+            if (unsupported) { session.clear(&telemetry); break; }
             fill();
+            const auto now = telemetry.seconds();
+            const auto elapsed = now - sampleTime;
+            if (elapsed >= 0.25) {
+                const auto writeSeconds = writer.metrics().writeSeconds;
+                const auto enoughWork = scheduler.remaining() > static_cast<std::uint64_t>(controller.target()) * 512 * 1024;
+                controller.observe(now, writer.metrics().writeBytes, session.count() == controller.target() && enoughWork,
+                    (writeSeconds - sampleWriteSeconds) / elapsed > 0.65);
+                sampleTime = now; sampleWriteSeconds = writeSeconds;
+                telemetry.progress.targetConnections = controller.target();
+                fill();
+            }
+            telemetry.update(session.count());
             if (session.count() != 0 && done.empty()) session.poll();
         }
         if (!unsupported) {
             if (verifiedBytes != total) fail(DownloadErrorCode::Integrity, "Not all assigned ranges completed.");
+            telemetry.metrics.finalConnections = controller.target();
+            telemetry.metrics.tuningChanges = controller.changes();
+            telemetry.networkDone();
             writer.commit(total, expectedHash);
             result.bytes = total;
             result.segmented = true;
+            result.metrics = telemetry.finish(total);
             return result;
         }
         // All easy handles are detached before truncating previously written ranges.
         writer.reset();
+        telemetry.progress.downloadedBytes = telemetry.progress.verifiedBytes = 0;
+        telemetry.metrics.tuningChanges = controller.changes();
         result.completedRanges = 0;
         result.fellBack = true;
     }
 
-    auto stream = std::make_unique<Transfer>(Kind::Stream, &writer, stop);
+    telemetry.progress.stage = DownloadStage::Downloading;
+    telemetry.progress.targetConnections = 1;
+    telemetry.metrics.finalConnections = 1;
+    // The probe's Content-Length can be one byte. Wait for full response headers.
+    telemetry.progress.totalBytes.reset();
+    auto stream = std::make_unique<Transfer>(Kind::Stream, &writer, stop, &telemetry);
     stream->etag = etag;
     stream->configure(options, resolved, true);
-    stream = session.run(std::move(stream), stop);
+    stream = session.run(std::move(stream), stop, &telemetry);
+    telemetry.record(stream->easy.get(), stream->received);
+    telemetry.progress.totalBytes = stream->received;
+    telemetry.progress.verifiedBytes = stream->received;
+    telemetry.networkDone();
     writer.commit(stream->received, expectedHash);
     result.bytes = stream->received;
     result.suggestedFilename = suggestedFilename(stream->collector.response.disposition);
+    result.metrics = telemetry.finish(stream->received);
     return result;
 }
 

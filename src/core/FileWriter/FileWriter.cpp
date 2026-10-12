@@ -9,12 +9,18 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstring>
 #include <limits>
 #include <vector>
 
 namespace downshift {
 namespace {
+struct Timer {
+    double& seconds;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ~Timer() { seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(); }
+};
 [[noreturn]] void fileError(const char* message) {
     throw DownloadError(DownloadErrorCode::File, message);
 }
@@ -65,6 +71,7 @@ FileWriter::FileWriter(const std::filesystem::path& destination) {
 FileWriter::~FileWriter() { if (handle_) CloseHandle(handle_); }
 
 void FileWriter::preallocate(std::uint64_t bytes, bool sparse) {
+    Timer timer{metrics_.allocationSeconds};
     if (!handle_) fileError("The partial file is closed.");
     seek(handle_, bytes);
     if (sparse) {
@@ -85,6 +92,7 @@ void FileWriter::reset() {
 }
 
 void FileWriter::writeAt(std::uint64_t offset, const char* data, std::size_t bytes) {
+    Timer timer{metrics_.writeSeconds};
     if (!handle_) fileError("The partial file is closed.");
     const auto maximum = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
     if (offset > maximum || bytes > maximum - offset) fileError("File write exceeds the supported 64-bit size.");
@@ -95,6 +103,7 @@ void FileWriter::writeAt(std::uint64_t offset, const char* data, std::size_t byt
         if (!WriteFile(handle_, data, count, &written, nullptr) || written == 0) fileError("Partial-file write failed. Check disk space and permissions.");
         data += written;
         bytes -= written;
+        metrics_.writeBytes += written;
     }
 }
 
@@ -105,6 +114,7 @@ std::uint64_t FileWriter::size() const {
 }
 
 std::string FileWriter::sha256() {
+    Timer timer{metrics_.checksumSeconds};
     Sha256 state;
     cryptoCheck(BCryptOpenAlgorithmProvider(&state.algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0));
     DWORD objectBytes = 0, returned = 0;
@@ -132,7 +142,10 @@ std::string FileWriter::sha256() {
 void FileWriter::commit(std::uint64_t expectedSize, const std::optional<std::string>& expectedSha256) {
     if (size() != expectedSize) throw DownloadError(DownloadErrorCode::Integrity, "The completed file size does not match the transfer.");
     if (expectedSha256 && sha256() != *expectedSha256) throw DownloadError(DownloadErrorCode::Integrity, "SHA-256 verification failed; the partial file was not finalized.");
-    if (!FlushFileBuffers(handle_)) fileError("Unable to flush the completed data to disk.");
+    {
+        Timer timer{metrics_.flushSeconds};
+        if (!FlushFileBuffers(handle_)) fileError("Unable to flush the completed data to disk.");
+    }
     const auto name = destination_.wstring();
     const auto nameBytes = name.size() * sizeof(wchar_t);
     std::vector<unsigned char> buffer(sizeof(FILE_RENAME_INFO) + nameBytes, 0);

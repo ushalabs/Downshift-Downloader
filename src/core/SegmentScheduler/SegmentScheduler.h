@@ -11,13 +11,18 @@ struct ByteRange {
     [[nodiscard]] std::uint64_t size() const noexcept { return last - first + 1; }
 };
 
-// Fixed chunk policy for Phase 2. Lazy allocation bounds memory independently of file size.
+// Lazy allocation bounds memory independently of file size; sizing affects only unassigned bytes.
 // The engine assigns each range once; completed handles take the next range.
 class SegmentScheduler final {
 public:
     SegmentScheduler(std::uint64_t total, std::uint64_t chunk) : total_(total), chunk_(chunk) {
         if (chunk == 0) throw std::invalid_argument("Chunk size must be positive.");
     }
+    void setChunkSize(std::uint64_t chunk) {
+        if (chunk == 0) throw std::invalid_argument("Chunk size must be positive.");
+        chunk_ = chunk;
+    }
+    [[nodiscard]] std::uint64_t remaining() const noexcept { return total_ - next_; }
     [[nodiscard]] std::optional<ByteRange> next() noexcept {
         if (next_ == total_) return std::nullopt;
         const auto count = (total_ - next_ < chunk_) ? total_ - next_ : chunk_;

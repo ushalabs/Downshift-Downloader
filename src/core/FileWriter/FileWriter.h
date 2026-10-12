@@ -7,6 +7,10 @@
 #include <string>
 
 namespace downshift {
+struct FileMetrics {
+    std::uint64_t writeBytes = 0;
+    double writeSeconds = 0, allocationSeconds = 0, checksumSeconds = 0, flushSeconds = 0;
+};
 
 // Owned by one engine worker; positional writes are serialized on that worker.
 class FileWriter final {
@@ -20,11 +24,13 @@ public:
     void writeAt(std::uint64_t offset, const char* data, std::size_t bytes);
     [[nodiscard]] std::uint64_t size() const;
     [[nodiscard]] std::string sha256();
+    [[nodiscard]] const FileMetrics& metrics() const noexcept { return metrics_; }
     // Flush and rename the open file by handle, without replacing an existing destination.
     void commit(std::uint64_t expectedSize, const std::optional<std::string>& expectedSha256 = {});
 private:
     void* handle_ = nullptr;
     std::filesystem::path destination_;
+    FileMetrics metrics_;
 };
 
 } // namespace downshift

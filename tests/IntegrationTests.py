@@ -221,7 +221,7 @@ def main():
                 nonlocal count
                 count += 1
                 output = directory / f"{count}-{case}.bin"
-                command = [str(cli), url or f"http://127.0.0.1:{http.server_port}/{case}", str(output), *extra]
+                command = [str(cli), url or f"http://127.0.0.1:{http.server_port}/{case}", str(output), "--connections", "4", "--chunk-kib", "4096", *extra]
                 if checksum: command += ["--sha256", hashlib.sha256(body).hexdigest().upper()]
                 result = subprocess.run(command, capture_output=True, text=True, timeout=15, env=local_environment if environment is None else environment)
                 if success:

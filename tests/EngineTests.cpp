@@ -4,6 +4,8 @@
 
 #include "core/DownloadEngine/DownloadEngine.h"
 #include "core/DownloadEngine/HttpResponse.h"
+#include "core/ConnectionManager/AdaptiveController.h"
+#include "core/ConnectionManager/SpeedTracker.h"
 #include "core/FileWriter/FileWriter.h"
 #include "core/Runtime.h"
 #include "core/SegmentScheduler/SegmentScheduler.h"
@@ -77,6 +79,56 @@ void scheduling() {
         }
         require(cursor == total && !scheduler.next(), "Range coverage incomplete.");
     }
+    SegmentScheduler dynamic(8'589'934'621ULL, 1);
+    std::uint64_t cursor = 0, count = 0;
+    while (dynamic.remaining()) {
+        dynamic.setChunkSize(++count % 2 ? 257 * 1024 : 4 * 1024 * 1024);
+        const auto range = dynamic.next();
+        require(range && range->first == cursor, "Adaptive sizing introduced a gap/overlap.");
+        cursor += range->size();
+    }
+    require(cursor == 8'589'934'621ULL, "Adaptive 64-bit coverage failed.");
+}
+void performance() {
+    SpeedTracker speed;
+    require(!speed.sample(100, 0.1), "Progress refresh was not bounded.");
+    auto sample = speed.sample(500, 0.5);
+    require(sample && sample->instantaneous == 1000 && sample->average == 1000, "Speed calculation failed.");
+    sample = speed.sample(500, 0.75);
+    require(sample && sample->instantaneous == 0 && sample->smoothed > 0 && sample->smoothed < 1000 && sample->peak == 1000, "Stall smoothing failed.");
+    sample = speed.sample(501, 0.750001, true);
+    require(sample && sample->peak == 1000, "Short final sample inflated the peak.");
+    try { (void)speed.sample(499, 1); throw std::runtime_error("Byte counter regression accepted."); }
+    catch (const std::invalid_argument&) { ++checks; }
+    try { (void)speed.sample(600, 0.7); throw std::runtime_error("Time regression accepted."); }
+    catch (const std::invalid_argument&) { ++checks; }
+    AdaptiveController gain(100 * 1024 * 1024, 16, true);
+    require(gain.target() == 4, "Large-file startup policy failed.");
+    gain.observe(1, 100, true); require(gain.target() == 8, "Expansion trial missing.");
+    gain.observe(2, 300, true); require(gain.target() == 8, "Warmup was not respected.");
+    gain.observe(3, 500, true); require(gain.target() == 16, "Measured gain was not retained.");
+    gain.observe(4, 900, true); gain.observe(5, 1300, true);
+    require(gain.target() == 16, "Maximum connection limit failed.");
+    gain.observe(6, 1400, true); gain.observe(7, 1500, true);
+    require(gain.target() == 8, "Sustained throughput loss did not back off.");
+    AdaptiveController plateau(100 * 1024 * 1024, 16, true);
+    plateau.observe(1, 100, true); plateau.observe(2, 200, true); plateau.observe(3, 300, true);
+    require(plateau.target() == 4 && plateau.changes() == 2, "Unhelpful expansion was not rolled back.");
+    plateau.observe(4, 400, true); plateau.observe(5, 500, true);
+    require(plateau.target() == 4, "Plateau caused connection oscillation.");
+    plateau.observe(100, 10000, false);
+    require(plateau.target() == 4, "Tail changed connection policy.");
+    plateau.observe(101, 10200, true);
+    require(plateau.target() == 8, "Changed capacity did not permit a new trial.");
+    AdaptiveController resource(100 * 1024 * 1024, 16, true);
+    resource.observe(1, 100, true, true);
+    require(resource.target() == 2, "Disk pressure did not reduce concurrency.");
+    AdaptiveController fixed(1, 16, false);
+    fixed.observe(1, 0, true, true);
+    require(fixed.target() == 16 && fixed.changes() == 0, "Manual mode was modified.");
+    require(AdaptiveController(1, 16, true).target() == 1, "Tiny file opened excess connections.");
+    require(gain.chunkSize(1, 0) == 256 * 1024 && gain.chunkSize(1e12, 1) == 16 * 1024 * 1024, "Chunk limits failed.");
+    require(gain.chunkSize(8 * 1024 * 1024, 0.2) > gain.chunkSize(8 * 1024 * 1024, 0), "Latency was not considered in sizing.");
 }
 void files(const std::filesystem::path& directory) {
     const auto small = directory / "ordered.bin";
@@ -132,8 +184,13 @@ int main(int argc, char** argv) {
             DownloadOptions options; options.url = argv[2]; options.destination = argv[3];
             fails([&] { (void)DownloadEngine{}.download(options, source.get_token()); }, DownloadErrorCode::Cancelled);
             require(!std::filesystem::exists(options.destination), "Cancelled download was finalized.");
+        } else if (argc == 4 && std::string_view(argv[1]) == "--observer-failure") {
+            DownloadOptions options; options.url = argv[2]; options.destination = argv[3];
+            options.onProgress = [](const DownloadProgress&) { throw std::runtime_error("Observer error."); };
+            const auto result = DownloadEngine{}.download(options);
+            require(result.metrics.observerFailed && std::filesystem::exists(options.destination), "Observer exception damaged download.");
         } else {
-            Workspace workspace; headers(); scheduling(); files(workspace.path);
+            Workspace workspace; headers(); scheduling(); performance(); files(workspace.path);
             std::stop_source source; source.request_stop();
             DownloadOptions options; options.url = "http://127.0.0.1:1/file"; options.destination = workspace.path / "cancel.bin";
             fails([&] { (void)DownloadEngine{}.download(options, source.get_token()); }, DownloadErrorCode::Cancelled);

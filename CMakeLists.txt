@@ -79,6 +79,10 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
     set_tests_properties(engine.unit PROPERTIES TIMEOUT 30)
     set_tests_properties(engine.integration PROPERTIES TIMEOUT 180)
+    add_test(NAME engine.adaptive COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/PerformanceTests.py"
+        "$<TARGET_FILE:downshift_download>" "$<TARGET_FILE:downshift_engine_tests>")
+    set_tests_properties(engine.adaptive PROPERTIES TIMEOUT 150)
     add_executable(downshift_foundation_tests tests/FoundationTests.cpp)
     target_link_libraries(downshift_foundation_tests PRIVATE downshift_foundation)
     target_compile_options(downshift_foundation_tests PRIVATE /W4 /permissive- /utf-8)

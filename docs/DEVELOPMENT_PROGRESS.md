@@ -2,16 +2,16 @@
 
 ## Phase gate
 
-- Current phase: 2 - Segmented Download Engine.
-- Last approved phase: 2, explicitly approved by the user's "Go ahead" on 2026-10-12.
-- Last completed phase: 2 - Segmented Download Engine (2026-10-12).
-- Status: Phase 2 completed and verified locally; awaiting Phase 3 approval.
+- Current phase: 3 - Adaptive Performance Engine.
+- Last approved phase: 3, explicitly approved by "Start with phase 3" on 2026-10-12.
+- Last completed phase: 3 - Adaptive Performance Engine (2026-10-12).
+- Status: Phase 3 completed locally; stopped for Phase 4 approval.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
 - Git workflow: the user commits and pushes; the assistant must not commit or push automatically.
 - Authorized repository: https://github.com/ushalabs/Downshift-Download-Manager.
-- Phase 2 authorization: granted. Phase 3 authorization: not granted.
+- Phase 3 authorization: granted. Phase 4 authorization: not granted.
 
 ## Completed work
 
@@ -79,7 +79,7 @@ The vcpkg baseline and tool checkout are pinned to `e456309491fd875487bf02b8a0dc
 
 ## Phase handoff
 
-Phase 2 implementation, builds, tests, fixes, and documentation are complete locally. The user reviews, commits, and pushes these working-tree changes. The assistant stops here until the user explicitly approves Phase 3: adaptive connection/chunk tuning, speed calculations, and initial performance benchmarks. No Phase 3 implementation or performance claim is included.
+Phase 3 implementation, local Debug/Release acceptance checks, benchmarks, and documentation are complete. Changes remain in the Desktop project for the user's commit/push. Phase 4 resume/recovery remains unapproved; no retries, reopening partials, or persistence are added in this phase. Await explicit approval before beginning Phase 4.
 
 ## Phase 2 acceptance (2026-10-12)
 
@@ -105,14 +105,44 @@ Development client: `build/windows-msvc/Release/DownshiftDownload.exe` (and Debu
 
 Acceptance: correct HTTP/HTTPS files from range and non-range servers, verified by checksums, with safe partials/finalization and passing Debug/Release checks. No local Phase 2 acceptance blocker remains. HTTP/2 capability is enabled but the fixture tests HTTP/1.1 wire behavior; throughput/IDM comparisons, retry/resume, persistent queues, and full GUI are future phases. Phase 2 CI has not been run or claimed successful; publication remains the user's action.
 
+## Phase 3 acceptance (2026-10-12)
+
+Approved explicitly by "Start with phase 3". Implemented dynamic future chunk sizing, default automatic connection tuning, fixed 1-16 limits including 1/4/8/16, speed smoothing/ETA, safe worker progress callbacks, and structured CPU/memory/file/network timing measurements. Completed ranges remain immutable; fast workers receive new ranges as they finish. Automatic throughput trials retain useful expansions, roll back plateaus, and reduce future assignments under sustained loss or write pressure. Streaming retains one transfer when segmentation is unsafe.
+
+Same verified Windows/MSVC/SDK/pinned dependency environment as earlier phases. Both configurations built without compiler warnings/errors; no additional system installation or dependency revision changes.
+
+| Check | Release | Debug |
+|---|---|---|
+| GUI, client, engine, and test compilation | Passed | Passed |
+| `engine.unit` (8,040 assertions) | Passed (0.07 s) | Passed (0.19 s) |
+| `engine.integration` (52 HTTP/HTTPS scenarios) | Passed (5.95 s) | Passed (6.17 s) |
+| `engine.adaptive` (12 scenarios) | Passed (18.31 s) | Passed (18.16 s) |
+| `foundation.dependencies` | Passed (0.04 s) | Passed (0.05 s) |
+| `foundation.gui.minimal` | Passed (0.32 s) | Passed (0.36 s) |
+| `foundation.gui.windows` | Passed (0.45 s) | Passed (0.55 s) |
+| CTest summary | 6 passed, 0 failed; 25.16 s | 6 passed, 0 failed; 25.52 s |
+
+Tests independently verify file SHA-256 and size, exact contiguous range coverage, hard concurrency limits, manual stability, automatic growth and rollback, heterogeneous worker scheduling, progress/rate/ETA values, and observer exception isolation. Deterministic native units cover sustained loss/resource-pressure reductions, latency/chunk bounds, and repeated scheduling changes beyond 8 GB. Existing Phase 2 protocol/TLS checks retain their fixed 4-slot/4 MiB baseline.
+
+Final review corrected pending-header streaming progress: the range probe's one-byte Content-Length is never exposed as the full file size. Its first regression assertion was too strict about a zero-byte snapshot after full headers arrived; corrected the expectation to allow the verified full size at that point. The final 12-scenario adaptive group passed in both configurations.
+
+Benchmark acceptance: 90 samples in `benchmarks/results/phase3-local-20261012.{json,csv,md}`, covering 100 MB/1 GB/5 GB, fixed 1/4/8/16, automatic and streaming, with three repetitions per group. The 100 MB cases also cover per-connection and shared caps with delayed headers. All native checksums, independent reread checksums/sizes, range coverage, and hard-limit checks passed. The main matrix predates only the pending-header display correction; exact source bytes are preserved and hash-verified in `phase3-local-20261012-source.json`. The final Release executable separately passed 18 verified 100 MB unlimited samples in `phase3-final-progress-20261012.{json,csv,md}`. Total: 108 accepted benchmark samples. The supplement's source and executable fingerprints match the final local files.
+
+Main results: automatic mode's 100 MB per-connection-capped median was 23.44 MiB/s end-to-end versus fixed 4 at 13.58 MiB/s; fixed 16 was faster at 36.01 MiB/s. Shared-cap rates plateaued near 14.8 MiB/s. Automatic was slower than fixed 4 on 1 GB unlimited loopback (213.87 versus 289.35 MiB/s), and the uncapped repetitions varied substantially. Maximum native-client peak working set was 7.51 MiB in the main matrix. Full results, raw CPU/write/setup measurements, source provenance, and interpretation limits are in [benchmarks](BENCHMARKS.md).
+
+Acceptance: correct adaptive scheduling with measured throughput and no missing/overlapping segments. No local Phase 3 acceptance blocker remains. Automatic mode is a conservative heuristic rather than a globally optimal policy. Timing measures cache-enabled HTTP/1.1 loopback with a server on the same machine; no physical disk bandwidth, Internet/HTTP2 wire performance, or IDM superiority is claimed. Full desktop controls remain Phase 6. Phase 3 CI has not been run; manual publication remains separate.
+
+Native builds and verbose logs remain under `build/windows-msvc` and `build/phase3-{release,debug}-{build,tests}.log`; benchmark logs and transient payloads are ignored. Verified benchmark reports and the measured-source archive are intentionally retained as source-review evidence. No commits/pushes were made by the assistant.
+
 ## Git checkpoint
 
-- Latest user-created commit: `8dddb3c47d0c21ed729ac8c165eff1d197612dc0` (`Phase 1`); working tree was clean at Phase 2 start.
+- Latest user-created commit: `b70626c5931be10f5555c9de8183b69c961a78c2` (`Phase 2`); working tree was clean at Phase 3 start.
+- Earlier user-created commit: `8dddb3c47d0c21ed729ac8c165eff1d197612dc0` (`Phase 1`).
 - Published WIP checkpoint: `935f1e33e7033c866872a375abf5b8c5c0afbd06`.
 - Remote push: verified on `dev/phase-01-foundation` by matching the remote ref.
 - Earlier inspected CI result: failed; https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38165976115. The user subsequently committed Phase 1 locally. No Phase 2 CI run has been executed by the assistant.
 - The WIP commit and push occurred before the user changed the workflow. No further automatic commits or pushes are authorized.
-- Phase 2 changes: left uncommitted and unpushed for the user. No assistant Git commits/pushes were made during Phase 2.
-- Next action: the user reviews/publishes Phase 2 and explicitly approves Phase 3 when ready. The assistant must not commit/push automatically or start Phase 3 before approval. Current local tests passed; no successful CI run is claimed.
+- Phase 2 changes were left uncommitted at its handoff; the user subsequently committed them. No assistant commits/pushes were made during Phase 2 or Phase 3.
+- Next action: the user commits/pushes Phase 3 changes and explicitly approves Phase 4 when ready. Phase 4 will add pause/resume, range metadata, retries, remote revalidation, and crash recovery. No Phase 3 CI run is claimed.
 
 Use Git history to resolve the current document's containing commit; a commit cannot embed its own hash. Record earlier verified commit IDs here once available.

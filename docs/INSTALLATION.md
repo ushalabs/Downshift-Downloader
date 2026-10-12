@@ -58,7 +58,7 @@ The window shows Downshift and the linked dependency versions. Full desktop down
 
 Arguments: URL, explicit destination, optional `--sha256 HEX`, `--ca-bundle FILE`, and `--timeout-ms N`. Automatic tuning is the default. Use `--connections 1`, `4`, `8`, or `16` for a fixed limit (other values from 1-16 are accepted), or `--connections auto`. `--chunk-kib N` fixes chunk size instead of adapting. `--progress` shows live speed/ETA; `--json` produces final measurements and `--progress-json` emits structured snapshots on stderr. Rates use bytes/second in JSON and MiB/s in human output.
 
-The destination parent must exist; existing destinations/partials are never overwritten. The trust bundle preserves peer/hostname verification. Do not use the public test key/certificate for real downloads. Failures leave `.part`; choose a new name or review/remove the partial yourself before a fresh attempt. Resume is Phase 4.
+The destination parent must exist; completed destinations are never overwritten. A fresh request refuses existing partial/metadata files. Ctrl+C pauses, `--resume` reuses verified ranges after local/remote validation, and `--restart` archives the old partial/ledger before starting again. `--retries 0..10` defaults to three retries for eligible transient failures. Recovery details, console exit codes, and unsupported cases are in [pause/resume and recovery](RECOVERY.md). The trust bundle preserves peer/hostname verification. Do not use the public test key/certificate for real downloads.
 
 ### Verified local build (2026-10-12)
 

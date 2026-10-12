@@ -2,7 +2,7 @@
 
 Downshift is a free, open-source native Windows download manager being developed in ten approved phases. The product name is **Downshift**; the executable is `Downshift.exe`.
 
-**Current status: Phase 3 completed locally.** Downshift downloads HTTP/HTTPS files through the development console client, with adaptive ranges/concurrency, live speed/ETA, verified content, and streaming fallback. Debug and Release each passed six test groups, including 52 protocol scenarios and 12 adaptive scenarios. Repeated local benchmarks accepted 108 checksum-verified samples, including 5 GB files. The desktop window remains the foundation shell; the full interface is Phase 6. See [development progress](docs/DEVELOPMENT_PROGRESS.md). No direct IDM comparison has been performed.
+**Current status: Phase 4 completed locally.** Downshift downloads HTTP/HTTPS files through the development console client, with adaptive ranges/concurrency, live speed/ETA, pause/resume, bounded retries, verified crash recovery, and streaming fallback. Debug and Release each passed seven test groups, including 52 protocol, 12 adaptive, and 36 recovery scenarios. Phase 3 recorded 108 checksum-verified benchmark samples, including 5 GB files; Phase 4 adds a separate 100 MB performance check. The desktop window remains the foundation shell; the full interface is Phase 6. See [development progress](docs/DEVELOPMENT_PROGRESS.md). No direct IDM comparison has been performed.
 
 ## Implemented features
 
@@ -18,6 +18,8 @@ Downshift is a free, open-source native Windows download manager being developed
 - 64-bit file writes, exclusive `.part` files, optional SHA-256 verification, and finalization without overwriting an existing file.
 - Controlled loopback HTTP/HTTPS integration tests and native file/protocol tests.
 - Live speed/ETA, structured measurements, process CPU/memory and file-call timings.
+- Console pause/resume, encrypted range checkpoints, local/remote revalidation, and recovery after forced termination.
+- Bounded transient retries with jitter/Retry-After and explicit archival restart when safe resume is unavailable.
 - Reproducible loopback benchmarks for 100 MB, 1 GB, and 5 GB files; SHA-256 verification before accepting samples.
 
 ## Build
@@ -42,7 +44,7 @@ The first configure builds the dependency set from source and can take substanti
 1. Native C++ foundation (completed locally).
 2. Segmented download engine (completed locally).
 3. Adaptive performance engine (completed locally).
-4. Resume and recovery.
+4. Resume and recovery (completed locally).
 5. Queue and persistence.
 6. Modern desktop GUI.
 7. Chrome integration.
@@ -62,6 +64,7 @@ Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 - [Benchmark status and methodology](docs/BENCHMARKS.md)
 - [Third-party licensing](docs/THIRD_PARTY_NOTICES.md)
 - [Engine tests](docs/TESTING.md)
+- [Pause/resume and recovery](docs/RECOVERY.md)
 
 ## Download a file during development
 
@@ -71,13 +74,13 @@ From the project folder, replace the URL and destination with your own values:
 ./build/windows-msvc/Release/DownshiftDownload.exe 'https://example.com/file.zip' "$env:USERPROFILE\Downloads\file.zip" --progress
 ```
 
-Use `--sha256` followed by a known digest for independent integrity verification. `--help` lists the options. The destination directory must exist, and both the destination and its `.part` sibling must be absent. The engine checks response headers and byte counts, then flushes and renames the partial file. Failed transfers leave `.part` files for inspection; resume belongs to Phase 4.
+Use `--sha256` followed by a known digest for independent integrity verification. `--help` lists the options. The destination directory must exist. A fresh request requires absent destination/partial/recovery files. Press Ctrl+C to pause; use the identical URL/destination with `--resume` to reuse verified ranges. `--restart` archives old partials before downloading again. See [recovery](docs/RECOVERY.md) for validator requirements and unsupported cases. Completed destinations are never overwritten.
 
 Automatic mode adjusts future assignments after throughput trials; existing ranges drain safely. Use `--connections 4 --chunk-kib 4096` for the previous fixed baseline or `--connections 1`, `8`, or `16` for other limits. `--json` returns measured results. Benchmark reproduction and limitations are in [benchmarks](docs/BENCHMARKS.md).
 
 ## Limitations
 
-Pause/resume, retries, recovery, a persistent queue, desktop download controls, Chrome interception, themes, installers, and release binaries belong to later phases. Automatic tuning is a conservative heuristic and cannot guarantee the best throughput on every server. HTTP/3 is optional and is not enabled. An unframed response ending at EOF cannot independently prove its intended length; use a trusted SHA-256 when available. No download is executed automatically.
+A persistent queue, desktop download controls, Chrome interception, themes, installers, and release binaries belong to later phases. Partial resume requires actual range support and an unchanged strong ETag; streaming and unverifiable partials need an explicit restart. Recovery records normally require the same Windows user/profile. Automatic tuning cannot guarantee the best throughput on every server. HTTP/3 is not enabled. An unframed response ending at EOF cannot independently prove its intended length; use a trusted SHA-256 when available. No download is executed automatically.
 
 ## License
 

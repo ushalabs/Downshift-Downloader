@@ -1,6 +1,6 @@
 # Engine verification
 
-Run `ctest --preset release` and `ctest --preset debug` after their corresponding builds. The six groups cover dependency lifecycle, two Qt startup/rendering checks, engine units, HTTP/HTTPS integration, and real adaptive-policy checks. Python 3.10+ is needed only for integration/benchmark servers, not either native executable. Test output/timing are correctness evidence; separate repeated runs provide benchmarks.
+Run `ctest --preset release` and `ctest --preset debug` after their corresponding builds. The seven groups cover dependency lifecycle, two Qt startup/rendering checks, engine units, HTTP/HTTPS integration, adaptive policy, and cross-process recovery. Python 3.10+ is needed only for integration/benchmark servers, not either native executable. Test output/timing are correctness evidence; separate repeated runs provide benchmarks.
 
 ## Native checks
 
@@ -16,7 +16,7 @@ Scenarios cover advertised/unadvertised ranges; ignored ranges; missing/weak ETa
 
 HTTPS exercises successful segmented/streaming requests with explicit test trust, a restricted loopback CONNECT proxy, untrusted-certificate rejection, hostname mismatch, and prohibited downgrade. Ambient proxy variables are excluded from fixture requests. The fixture uses a self-signed test root as its loopback server certificate. Its public disposable key/certificate are documented in `tests/fixtures/README.md`. Verification is never disabled and no certificate is added to Windows' trust store. Certificates expire in October 2036.
 
-The fixture serves HTTP/1.1, including TLS. HTTP/2 capability is checked by the foundation test and requested by the engine when ALPN permits, but HTTP/2 wire behavior is not exercised here. HTTP/3, public-network throughput, IDM comparisons, retry/resume, crash recovery, disk-full behavior, and GUI downloads are not claimed as verified. Actual results are in [development progress](DEVELOPMENT_PROGRESS.md).
+The fixture serves HTTP/1.1, including TLS. HTTP/2 capability is checked by the foundation test and requested by the engine when ALPN permits, but HTTP/2 wire behavior is not exercised here. HTTP/3, public-network throughput, IDM comparisons, physical power loss, an actual Windows reboot, disk-full behavior, and GUI downloads are not claimed as verified. Actual results are in [development progress](DEVELOPMENT_PROGRESS.md).
 
 ## Adaptive-policy checks
 
@@ -24,4 +24,12 @@ Native units inject explicit times and bytes to check exact rates, smoothing, st
 
 `tests/PerformanceTests.py` runs 12 scenarios: fixed 1/4/8/16 limits, a small automatic file, automatic growth on per-connection caps, rollback on shared-bandwidth limits, heterogeneous fast/slow workers, automatic streaming, delayed streaming headers with a weak validator, observer exceptions, and invalid options. Every completed file has an independent SHA-256 and size check. The fixture records exact network ranges/validators, verifies no overlaps/gaps and hard limits, and validates progress stages/counters/rates/ETA. Delayed headers verify that the one-byte probe length never appears as the full file size. These tests intentionally shape loopback traffic; benchmark throughput values are kept out of correctness assertions.
 
-Phase 2's 52 HTTP/HTTPS scenarios run with explicit fixed 4-connection/4 MiB settings to preserve their regression baseline. The adaptive group checks the new default policy. Benchmark execution and its separate limitations are in [benchmarks](BENCHMARKS.md).
+Phase 2's 52 HTTP/HTTPS scenarios run with explicit fixed 4-connection/4 MiB settings and zero retries to preserve their failure/correctness regression baseline. The adaptive group checks the automatic policy. Benchmark execution and its separate limitations are in [benchmarks](BENCHMARKS.md).
+
+## Recovery checks
+
+`tests/RecoveryTests.py` uses separate native processes and a controlled HTTP/1.1 server. It verifies resumed SHA-256/size independently, combines saved and newly requested intervals to prove complete nonoverlapping coverage, and asserts that saved ranges are never refetched. An actual forced process termination tests recovery from the last durable checkpoint; a competing worker is refused while the first owns the file.
+
+Scenarios cover repeated pause/resume, automatic resumption with changed scheduling settings, ETag/size/Last-Modified/range changes, changes during resume, corrupted bytes, replaced/truncated/hard-linked partials, corrupted ledgers, mismatching URL/checksum, unsupported streaming partial reuse, archival restart of legacy partials, fully saved checkpoints, interruption after rename, and damaged completed destinations. Transient HTTP errors, dropped segment/stream bodies, probe timeout, exhaustion with useful saved work, Retry-After, excessive server delays, permanent HTTP errors, pause during backoff, and TLS failure use the normal retry policy. Native units additionally check DPAPI encryption, invalid/overlapping records, exclusive locks, exponential/jitter bounds, and reopened hashes/gap scheduling above 4 GB.
+
+The fixtures simulate supported interruption states; they do not reboot Windows or disconnect physical storage. Contract and implementation details are in [recovery](RECOVERY.md).

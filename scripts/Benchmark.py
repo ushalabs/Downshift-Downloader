@@ -38,7 +38,10 @@ def metadata(cli):
             processor = winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
     sources = ["src/core/DownloadEngine/DownloadEngine.cpp", "src/core/ConnectionManager/AdaptiveController.h",
         "src/core/ConnectionManager/SpeedTracker.h", "src/core/SegmentScheduler/SegmentScheduler.h",
-        "src/core/FileWriter/FileWriter.cpp", "src/DownloadCli.cpp", "tests/PerformanceServer.py", "scripts/Benchmark.py"]
+        "src/core/FileWriter/FileWriter.cpp", "src/DownloadCli.cpp", "tests/PerformanceServer.py", "scripts/Benchmark.py",
+        "src/core/ResumeManager/ResumeJournal.cpp", "src/core/ResumeManager/ResumeJournal.h",
+        "src/core/ConnectionManager/RetryPolicy.h", "src/core/DownloadEngine/DownloadEngine.h",
+        "src/core/FileWriter/FileWriter.h", "src/core/DownloadEngine/HttpResponse.cpp", "src/core/DownloadEngine/HttpResponse.h"]
     compiler_files = sorted((cli.parent.parent / "CMakeFiles").glob("*/CMakeCXXCompiler.cmake"))
     compiler = None
     if compiler_files:
@@ -68,7 +71,7 @@ def metadata(cli):
         "network": "HTTP/1.1 over IPv4 loopback; Python server shares the machine",
         "cache": "OS caches left enabled; new native process and connections per sample; no cold-cache claim",
         "comparison": "manual modes use fixed 4 MiB chunks; automatic uses adaptive chunks unless requested otherwise",
-        "idm_comparison": "not performed", "retry_recovery": "not implemented (Phase 4)"}
+        "idm_comparison": "not performed", "retry_recovery": "Implemented; this matrix measures fresh downloads. Interrupted/retried performance is not measured here."}
 
 
 def report(document, base):
@@ -80,7 +83,7 @@ def report(document, base):
     with base.with_suffix(".csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader(); writer.writerows(rows)
-    lines = ["# Downshift Phase 3 local benchmarks", "", f"Completed: {document['complete']}. SHA-256 verified samples: {len(rows)}.", "",
+    lines = ["# Downshift local benchmarks", "", f"Completed: {document['complete']}. SHA-256 verified samples: {len(rows)}.", "",
         "Sizes are decimal MB/GB; rates use MiB/s. New client process per run; OS caches stay enabled. Manual modes use fixed 4 MiB chunks; automatic uses adaptive chunks unless the run metadata says otherwise. These are controlled loopback results, not Internet or IDM comparisons.", "",
         "| Size | Server | Mode | Runs | Median client wall s | Median transfer MiB/s | Median end-to-end MiB/s | Peak client working set MiB |",
         "|---|---|---|---:|---:|---:|---:|---:|"]
@@ -92,7 +95,7 @@ def report(document, base):
             f"{statistics.median(r['end_to_end_mib_s'] for r in samples):.2f} | {max(r['peak_working_set_bytes'] for r in samples) / 1048576:.2f} |")
     lines += ["", "Raw JSON/CSV include sampled peak rate, process CPU time/utilization, logical file write bytes/time, checksum/flush/allocation time, connection setup/first-byte time, range sizes, active-request limits, and tuner changes. Write timing measures Windows write calls into its cache, not physical disk throughput. Connection setup times are summed across requests and may overlap.", "",
         "Server shaping reserves 64 KiB blocks on monotonic deadlines. Per-connection cap: 4 MiB/s with 25 ms header delay; shared cap: 16 MiB/s with 25 ms header delay. Large files use only the unlimited profile by default; shaped 1/5 GB cases can be explicitly enabled. Streaming runs do not segment, irrespective of configured connection slots.", "",
-        "Retry/recovery and direct IDM comparisons were not measured. HTTP/2 capability is enabled in the client, but this server speaks HTTP/1.1. A Python server on the same machine, cached writes, and loopback CPU scheduling limit generalization.", ""]
+        "Interrupted/retried throughput and direct IDM comparisons were not measured. HTTP/2 capability is enabled in the client, but this server speaks HTTP/1.1. A Python server on the same machine, cached writes, and loopback CPU scheduling limit generalization.", ""]
     base.with_suffix(".md").write_text("\n".join(lines), encoding="utf-8")
 
 

@@ -149,6 +149,10 @@ void HeaderCollector::accept(std::string_view line) {
     if (colon == std::string_view::npos) malformed();
     const auto key = lower(line.substr(0, colon));
     const auto value = trim(line.substr(colon + 1));
+    if (key == "last-modified") {
+        if (!response.lastModified.empty() && response.lastModified != value) malformed();
+        response.lastModified = value;
+    }
     for (const auto c : value) if (static_cast<unsigned char>(c) < 32 && c != '\t') malformed();
     if (key == "content-length") {
         const auto length = number(value);

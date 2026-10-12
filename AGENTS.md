@@ -4,7 +4,7 @@ The product is **Downshift**, a native Windows C++20 application. Preserve the r
 
 ## Phase gate
 
-Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Implement only the phase explicitly approved by the user. Phases 1-3 are complete locally. Phase 3 was explicitly approved by "Start with phase 3" on 2026-10-12; Phase 4 is not approved. Stop at the Phase 3 handoff until the user approves Phase 4. Silence and previous-phase approval do not authorize advancing.
+Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Implement only the phase explicitly approved by the user. Phases 1-4 are complete locally. Phase 4 was explicitly approved by "Continue with 4" on 2026-10-12; Phase 5 is not approved. Stop at the Phase 4 handoff until the user approves Phase 5. Silence and previous-phase approval do not authorize advancing.
 
 The active local project is `C:\Users\HP\Desktop\Projects\Downshift`. Use this directory for all project source and development artifacts.
 

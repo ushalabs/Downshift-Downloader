@@ -8,6 +8,9 @@
 *.log
 *.dmp
 *.part
+*.part.resume
+*.part.lock
+.downshift-*.tmp
 *.db
 *.db-shm
 *.db-wal

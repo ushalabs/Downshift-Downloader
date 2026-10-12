@@ -2,16 +2,16 @@
 
 ## Phase gate
 
-- Current phase: 3 - Adaptive Performance Engine.
-- Last approved phase: 3, explicitly approved by "Start with phase 3" on 2026-10-12.
-- Last completed phase: 3 - Adaptive Performance Engine (2026-10-12).
-- Status: Phase 3 completed locally; stopped for Phase 4 approval.
+- Current phase: 4 - Resume and Recovery.
+- Last approved phase: 4, explicitly approved by "Continue with 4" on 2026-10-12.
+- Last completed phase: 4 - Resume and Recovery (2026-10-12).
+- Status: Phase 4 completed locally; stopped for Phase 5 approval.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
 - Git workflow: the user commits and pushes; the assistant must not commit or push automatically.
 - Authorized repository: https://github.com/ushalabs/Downshift-Download-Manager.
-- Phase 3 authorization: granted. Phase 4 authorization: not granted.
+- Phase 4 authorization: granted. Phase 5 authorization: not granted.
 
 ## Completed work
 
@@ -79,7 +79,7 @@ The vcpkg baseline and tool checkout are pinned to `e456309491fd875487bf02b8a0dc
 
 ## Phase handoff
 
-Phase 3 implementation, local Debug/Release acceptance checks, benchmarks, and documentation are complete. Changes remain in the Desktop project for the user's commit/push. Phase 4 resume/recovery remains unapproved; no retries, reopening partials, or persistence are added in this phase. Await explicit approval before beginning Phase 4.
+The user committed Phase 3 and explicitly approved Phase 4. Phase 4 implementation, local Debug/Release checks, performance verification, and documentation are complete. Changes remain in the Desktop project for the user's commit/push. Phase 5 queues/history/settings remain unapproved. Await explicit approval before beginning Phase 5.
 
 ## Phase 2 acceptance (2026-10-12)
 
@@ -134,15 +134,48 @@ Acceptance: correct adaptive scheduling with measured throughput and no missing/
 
 Native builds and verbose logs remain under `build/windows-msvc` and `build/phase3-{release,debug}-{build,tests}.log`; benchmark logs and transient payloads are ignored. Verified benchmark reports and the measured-source archive are intentionally retained as source-review evidence. No commits/pushes were made by the assistant.
 
+## Phase 4 acceptance (2026-10-12)
+
+Approved explicitly by "Continue with 4". Implemented worker/console pause, explicit resume/restart, durable encrypted range metadata, local byte/file-identity validation, conditional remote revalidation, bounded transient retries with exponential jitter/Retry-After, and recovery across forced termination and finalization gaps. Ctrl+C/Ctrl+Break requests pause; a new worker/process resumes missing intervals. The GUI remains the foundation shell. No SQLite queue/history/settings or Phase 5 work is implemented.
+
+Recovery ledgers persist IDs, original/resolved source URLs, destination, expected size/checksum, file identity, ETag, Last-Modified, timestamps, capability/status, and completed range digests. User-scoped DPAPI encrypts the whole ledger, including URL query secrets. Completed bytes are flushed before atomically publishing the ledger. Reuse requires matching local identity/size/hashes and remote strong validator/length/location. Invalid or unverifiable partials are preserved; explicit restart archives them under unique names. Completed destinations are never overwritten. Finalization reconciliation verifies a renamed file before clearing a stale ledger.
+
+Same verified Windows/MSVC/SDK/pinned dependency environment as previous phases. Builds passed without compiler warnings/errors, with no new system installation or dependency updates. Python 3.12.14 remains a test/benchmark dependency only.
+
+| Check | Release | Debug |
+|---|---|---|
+| GUI, client, engine, and test compilation | Passed | Passed |
+| `engine.unit` (12,225 assertions) | Passed (0.13 s) | Passed (0.15 s) |
+| `engine.integration` (52 HTTP/HTTPS scenarios) | Passed (5.08 s) | Passed (5.47 s) |
+| `engine.adaptive` (12 scenarios) | Passed (17.66 s) | Passed (17.74 s) |
+| `engine.recovery` (36 scenarios) | Passed (21.64 s) | Passed (23.06 s) |
+| `foundation.dependencies` | Passed (0.02 s) | Passed (0.06 s) |
+| `foundation.gui.minimal` | Passed (0.29 s) | Passed (0.38 s) |
+| `foundation.gui.windows` | Passed (0.36 s) | Passed (0.42 s) |
+| CTest summary | 7 passed, 0 failed; 45.19 s | 7 passed, 0 failed; 47.30 s |
+
+Recovery checks independently verify final size/SHA-256 and combine saved/new request ranges to establish complete nonoverlapping coverage without refetching saved ranges. Actual forced process termination and competing-worker rejection passed. Repeated pauses, changed remote validators/size/Last-Modified/range capability, changes during resume, corrupted/replaced/truncated/hard-linked partials, malformed ledgers, mismatching URL/checksum, streaming restart, and legacy partial archival all passed. Fully saved partials and interruption after rename reconcile without fetching completed ranges; damaged completed destinations are rejected. Native checks reopen a sparse file and verify a range above 4 GB, and schedule gaps around a saved range above that boundary.
+
+Retry checks passed for transient probe/range HTTP failures, probe timeout, dropped segment/stream bodies, useful saved work after exhaustion, Retry-After, excessive server delays, permanent authorization/precondition errors, TLS verification failure, and pause during backoff. Native arithmetic checks bound exponential/jitter delays. Existing Phase 2 integration errors run with zero retries to retain their original regression baseline; the recovery group exercises the normal retry policy.
+
+During verification, corrected the encrypted-fixture mutation to use an existing-file handle (Windows hidden files rejected the test's truncating open), and allowed the console checkpoint aid to pause streaming by written bytes because streaming has no completed range counter. Those initial failures were resolved before both full passing suites. Final review also validates destination paths before any sidecar operations and distinguishes already-renamed file inspection from partial reopening.
+
+Performance check: `benchmarks/results/phase4-local-20261012.{json,csv,md}` contains 18 accepted Release samples: 100 MB unlimited HTTP/1.1 loopback, fixed 1/4/8/16, automatic, and streaming, three repetitions each. Native/independent SHA-256, sizes, coverage, and concurrency limits all passed. Median end-to-end rates: fixed 4 at 232.80 MiB/s, automatic at 221.88 MiB/s, streaming at 396.98 MiB/s. This measures fresh transfers including checkpoint overhead, not interrupted/retried throughput or a controlled cross-phase comparison. Source/executable fingerprints identify this build. An initial identical-size run with stale Phase 3 report labels was retained under ignored `build/phase4-benchmark-initial`; corrected report metadata preceded the final recorded run. Earlier Phase 3 results remain historical evidence.
+
+Acceptance: supported interrupted downloads safely resume without corrupting or combining versions, with bounded retries and verified durable ranges. No local Phase 4 acceptance blocker remains. Weak/missing ETags and streaming partials require explicit restart; same-user DPAPI access, cooperative hashing/flush latency, and bounded ledger sizes are documented in [recovery](RECOVERY.md). Actual Windows reboot, physical power loss, disk-full injection, HTTP/2 wire recovery, full desktop controls, and CI are not claimed as tested.
+
+Logs are `build/phase4-{release,debug}-{build,tests}.log` and `build/phase4-benchmark.log`; generated dependencies, payloads, caches, and logs are ignored. Verified benchmark reports and source changes are ready for the user's manual commit/push. No assistant Git commits or pushes were made.
+
 ## Git checkpoint
 
-- Latest user-created commit: `b70626c5931be10f5555c9de8183b69c961a78c2` (`Phase 2`); working tree was clean at Phase 3 start.
+- Latest user-created commit: `d7d9a1e55320bf4ddb304e58ae6b807775d1a823` (`Phase 3`); working tree was clean at Phase 4 start.
+- Earlier user-created commit: `b70626c5931be10f5555c9de8183b69c961a78c2` (`Phase 2`).
 - Earlier user-created commit: `8dddb3c47d0c21ed729ac8c165eff1d197612dc0` (`Phase 1`).
 - Published WIP checkpoint: `935f1e33e7033c866872a375abf5b8c5c0afbd06`.
 - Remote push: verified on `dev/phase-01-foundation` by matching the remote ref.
 - Earlier inspected CI result: failed; https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38165976115. The user subsequently committed Phase 1 locally. No Phase 2 CI run has been executed by the assistant.
 - The WIP commit and push occurred before the user changed the workflow. No further automatic commits or pushes are authorized.
-- Phase 2 changes were left uncommitted at its handoff; the user subsequently committed them. No assistant commits/pushes were made during Phase 2 or Phase 3.
-- Next action: the user commits/pushes Phase 3 changes and explicitly approves Phase 4 when ready. Phase 4 will add pause/resume, range metadata, retries, remote revalidation, and crash recovery. No Phase 3 CI run is claimed.
+- Phases 2 and 3 were left uncommitted at their handoffs; the user subsequently committed them. No assistant commits/pushes were made during Phases 2-4.
+- Next action: the user commits/pushes Phase 4 changes and explicitly approves Phase 5 when ready. Phase 5 will add persistent queues/history, priorities, simultaneous download management, and settings. No Phase 4 CI run is claimed.
 
 Use Git history to resolve the current document's containing commit; a commit cannot embed its own hash. Record earlier verified commit IDs here once available.

@@ -6,6 +6,8 @@
 #include "core/DownloadEngine/HttpResponse.h"
 #include "core/ConnectionManager/AdaptiveController.h"
 #include "core/ConnectionManager/SpeedTracker.h"
+#include "core/ConnectionManager/RetryPolicy.h"
+#include "core/ResumeManager/ResumeJournal.h"
 #include "core/FileWriter/FileWriter.h"
 #include "core/Runtime.h"
 #include "core/SegmentScheduler/SegmentScheduler.h"
@@ -26,7 +28,7 @@ void require(bool condition, const char* message) {
 template<class F> void fails(F action, DownloadErrorCode expected) {
     try { action(); }
     catch (const DownloadError& error) { require(error.code() == expected, "Unexpected error category."); return; }
-    throw std::runtime_error("Expected rejection did not occur.");
+    throw std::runtime_error("Expected rejection did not occur after " + std::to_string(checks) + " checks.");
 }
 std::string contents(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
@@ -172,11 +174,98 @@ void files(const std::filesystem::path& directory) {
     char tail[3]{}; stream.read(tail, 3);
     require(std::string(tail, 3) == "end", "Write above 4 GB failed.");
 }
+void recovery(const std::filesystem::path& directory) {
+    SegmentScheduler scheduler(100, 13, {{0, 9}, {30, 39}, {90, 99}});
+    require(scheduler.remaining() == 70, "Recovered bytes were not excluded.");
+    std::vector<bool> covered(100, false);
+    for (auto r : {ByteRange{0, 9}, ByteRange{30, 39}, ByteRange{90, 99}})
+        for (auto i = r.first; i <= r.last; ++i) covered[static_cast<std::size_t>(i)] = true;
+    while (auto r = scheduler.next()) {
+        scheduler.setChunkSize(7);
+        for (auto i = r->first; i <= r->last; ++i) {
+            require(!covered[static_cast<std::size_t>(i)], "Recovery overlapped a completed range.");
+            covered[static_cast<std::size_t>(i)] = true;
+        }
+    }
+    require(std::all_of(covered.begin(), covered.end(), [](bool c) { return c; }) && scheduler.remaining() == 0, "Recovery left a hole.");
+    require(*retryDelay(0, 500, 60000, 0, 0) == 250, "Initial retry bound failed.");
+    require(*retryDelay(2, 500, 60000, 0, 1000) == 2000, "Exponential retry bound failed.");
+    require(*retryDelay(0, 500, 60000, 5, 0) == 5000, "Retry-After was ignored.");
+    require(!retryDelay(0, 500, 60000, 61, 0), "Excessive server delay was shortened.");
+    require(*retryDelay(100, 500, 60000, 0, 0) == 30000, "Retry cap failed.");
+    const auto destination = directory / "recovery.bin";
+    RecoveryRecord r;
+    r.id = ResumeJournal::newId(); r.url = "https://example.test/data?token=PRIVATE_TOKEN";
+    r.resolvedUrl = r.url; r.destination = ResumeJournal::pathText(destination);
+    r.etag = "\"v1\""; r.lastModified = "Mon, 12 Oct 2026 00:00:00 GMT";
+    r.resumable = true; r.total = 6;
+    {
+        ResumeJournal journal(destination);
+        fails([&] { ResumeJournal competing(destination); }, DownloadErrorCode::File);
+        { FileWriter writer(destination); writer.preallocate(6); writer.writeAt(3, "def", 3);
+          r.fileIdentity = writer.identity(); r.completed = {{{3, 5}, writer.sha256Range(3, 3)}};
+          writer.flush(); journal.save(r); }
+        const auto loaded = journal.load();
+        require(loaded.url == r.url && loaded.completed[0].sha256 == r.completed[0].sha256 && loaded.updated > 0, "Recovery roundtrip failed.");
+        auto metadata = destination; metadata += ".part.resume";
+        const auto ciphertext = contents(metadata);
+        require(ciphertext.find("PRIVATE_TOKEN") == std::string::npos && ciphertext.find(r.etag) == std::string::npos, "Metadata was plaintext.");
+        { FileWriter reopened(destination, true);
+          require(reopened.identity() == r.fileIdentity && reopened.sha256Range(3, 3) == r.completed[0].sha256, "Reopened bytes/identity changed."); }
+        auto invalid = r; invalid.completed.push_back({{5, 5}, std::string(64, '0')});
+        fails([&] { journal.save(invalid); }, DownloadErrorCode::ResumeUnsafe);
+        { std::fstream broken(metadata, std::ios::binary | std::ios::in | std::ios::out);
+          require(broken.good(), "Unable to open encrypted fixture for mutation."); broken.put(static_cast<char>(0xff)); }
+        fails([&] { (void)journal.load(); }, DownloadErrorCode::ResumeUnsafe);
+        journal.archivePrevious();
+        require(!std::filesystem::exists(destination.string() + ".part") && !journal.exists(), "Explicit restart did not archive old files.");
+    }
+    require(!std::filesystem::exists(destination.string() + ".part.lock"), "Recovery lock was not released.");
+    const auto large = directory / "large-recovery.bin";
+    constexpr std::uint64_t offset = 4294967296ULL + 17;
+    std::string identity, hash;
+    { FileWriter writer(large); writer.preallocate(offset + 3, true); writer.writeAt(offset, "end", 3);
+      writer.flush(); identity = writer.identity(); hash = writer.sha256Range(offset, 3); }
+    { FileWriter reopened(large, true);
+      require(reopened.size() == offset + 3 && reopened.identity() == identity && reopened.sha256Range(offset, 3) == hash, "64-bit reopened range verification failed."); }
+    SegmentScheduler largeScheduler(offset + 3, 1048576, {{offset, offset + 2}});
+    std::uint64_t coveredBytes = 0;
+    while (auto range = largeScheduler.next()) { require(range->last < offset, "64-bit recovery reused a saved range."); coveredBytes += range->size(); }
+    require(coveredBytes == offset, "64-bit recovery lost unassigned bytes.");
+}
 } // namespace
 
 int main(int argc, char** argv) {
     try {
         CurlRuntime runtime;
+        if (argc == 3 && std::string_view(argv[1]) == "--inspect-recovery") {
+            ResumeJournal journal(argv[2]); const auto record = journal.load();
+            std::cout << "{\"total\":" << record.total << ",\"resumable\":" << (record.resumable ? "true" : "false")
+                << ",\"status\":" << static_cast<int>(record.status) << ",\"ranges\":[";
+            bool first = true;
+            for (const auto& saved : record.completed) {
+                if (!first) std::cout << ','; first = false;
+                std::cout << '[' << saved.range.first << ',' << saved.range.last << ']';
+            }
+            std::cout << "]}\n"; return 0;
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "--rename-checkpoint") {
+            ResumeJournal journal(argv[2]); auto record = journal.load();
+            FileWriter writer(argv[2], true);
+            if (!record.resumable) { record.total = writer.size(); record.finalSha256 = writer.sha256(); }
+            record.status = RecoveryStatus::Finalizing; journal.save(record);
+            writer.commit(record.total);
+            return 0; // Simulate termination after rename, before ledger cleanup.
+        }
+        if (argc == 4 && (std::string_view(argv[1]) == "--pause-finalizing" || std::string_view(argv[1]) == "--pause-timer")) {
+            DownloadOptions options; options.url = argv[2]; options.destination = argv[3];
+            DownloadControl control; options.control = &control;
+            options.onProgress = [&](const DownloadProgress& p) { if (p.stage == DownloadStage::Finalizing) control.requestPause(); };
+            std::jthread timer;
+            if (std::string_view(argv[1]) == "--pause-timer") timer = std::jthread([&] { std::this_thread::sleep_for(std::chrono::milliseconds(150)); control.requestPause(); });
+            fails([&] { (void)DownloadEngine{}.download(options); }, DownloadErrorCode::Paused);
+            return 0;
+        }
         // Integration fixture uses this mode to exercise cooperative cancellation on a worker.
         if (argc == 4 && std::string_view(argv[1]) == "--cancel") {
             std::stop_source source;
@@ -190,7 +279,7 @@ int main(int argc, char** argv) {
             const auto result = DownloadEngine{}.download(options);
             require(result.metrics.observerFailed && std::filesystem::exists(options.destination), "Observer exception damaged download.");
         } else {
-            Workspace workspace; headers(); scheduling(); performance(); files(workspace.path);
+            Workspace workspace; headers(); scheduling(); performance(); files(workspace.path); recovery(workspace.path);
             std::stop_source source; source.request_stop();
             DownloadOptions options; options.url = "http://127.0.0.1:1/file"; options.destination = workspace.path / "cancel.bin";
             fails([&] { (void)DownloadEngine{}.download(options, source.get_token()); }, DownloadErrorCode::Cancelled);

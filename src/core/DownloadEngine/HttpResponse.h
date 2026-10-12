@@ -29,6 +29,7 @@ struct HttpResponse {
     std::string transferEncoding;
     std::string contentType;
     std::string disposition;
+    std::string lastModified;
 };
 
 // Handles interim responses/redirects separately and ignores trailers after the body headers.

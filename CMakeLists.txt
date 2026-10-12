@@ -31,8 +31,9 @@ add_library(downshift_engine STATIC
     src/core/DownloadEngine/DownloadEngine.cpp
     src/core/DownloadEngine/HttpResponse.cpp
     src/core/FileWriter/FileWriter.cpp
+    src/core/ResumeManager/ResumeJournal.cpp
 )
-target_link_libraries(downshift_engine PUBLIC downshift_foundation PRIVATE bcrypt)
+target_link_libraries(downshift_engine PUBLIC downshift_foundation PRIVATE bcrypt crypt32)
 target_compile_options(downshift_engine PRIVATE /W4 /permissive- /utf-8)
 
 add_executable(downshift_download src/DownloadCli.cpp)
@@ -83,6 +84,10 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/PerformanceTests.py"
         "$<TARGET_FILE:downshift_download>" "$<TARGET_FILE:downshift_engine_tests>")
     set_tests_properties(engine.adaptive PROPERTIES TIMEOUT 150)
+    add_test(NAME engine.recovery COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/RecoveryTests.py"
+        "$<TARGET_FILE:downshift_download>" "$<TARGET_FILE:downshift_engine_tests>")
+    set_tests_properties(engine.recovery PROPERTIES TIMEOUT 180)
     add_executable(downshift_foundation_tests tests/FoundationTests.cpp)
     target_link_libraries(downshift_foundation_tests PRIVATE downshift_foundation)
     target_compile_options(downshift_foundation_tests PRIVATE /W4 /permissive- /utf-8)

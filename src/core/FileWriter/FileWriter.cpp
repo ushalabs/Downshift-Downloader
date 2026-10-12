@@ -53,19 +53,35 @@ struct Sha256 {
 };
 } // namespace
 
-FileWriter::FileWriter(const std::filesystem::path& destination) {
+FileWriter::FileWriter(const std::filesystem::path& destination, bool reopen)
+    : FileWriter(destination, reopen ? FileOpenMode::ReopenPartial : FileOpenMode::CreatePartial) {}
+
+std::filesystem::path FileWriter::validatedDestination(const std::filesystem::path& destination) {
     if (invalidFilename(destination.filename().wstring())) fileError("Choose a valid Windows destination filename.");
-    try { destination_ = std::filesystem::absolute(destination).lexically_normal(); }
+    std::filesystem::path absolute;
+    try { absolute = std::filesystem::absolute(destination).lexically_normal(); }
     catch (const std::filesystem::filesystem_error&) { fileError("Unable to resolve the destination path."); }
-    const auto path = destination_.wstring();
+    const auto path = absolute.wstring();
     if (path.starts_with(L"\\\\.\\") || path.starts_with(L"\\\\?\\") || path.size() > 240) fileError("Device paths and excessively long destination paths are not supported.");
-    if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES) fileError("The destination already exists; it will not be overwritten.");
+    return absolute;
+}
+
+FileWriter::FileWriter(const std::filesystem::path& destination, FileOpenMode mode) {
+    destination_ = validatedDestination(destination);
+    const auto path = destination_.wstring();
+    if (mode != FileOpenMode::InspectCompleted && GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES) fileError("The destination already exists; it will not be overwritten.");
     auto partial = destination_;
-    partial += L".part";
-    const auto handle = CreateFileW(partial.c_str(), GENERIC_READ | GENERIC_WRITE | DELETE, 0, nullptr,
-        CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (mode != FileOpenMode::InspectCompleted) partial += L".part";
+    const auto handle = CreateFileW(partial.c_str(), mode == FileOpenMode::InspectCompleted ? GENERIC_READ : GENERIC_READ | GENERIC_WRITE | DELETE, 0, nullptr,
+        mode == FileOpenMode::CreatePartial ? CREATE_NEW : OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
     if (handle == INVALID_HANDLE_VALUE) fileError("Cannot create the partial file. Check permissions, disk space, and existing .part files.");
     handle_ = handle;
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!GetFileInformationByHandle(handle, &info) || info.nNumberOfLinks != 1 ||
+        (info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY))) {
+        CloseHandle(handle); handle_ = nullptr;
+        fileError("The partial must be a regular file with no links or reparse points.");
+    }
 }
 
 FileWriter::~FileWriter() { if (handle_) CloseHandle(handle_); }
@@ -114,7 +130,23 @@ std::uint64_t FileWriter::size() const {
 }
 
 std::string FileWriter::sha256() {
+    return sha256Range(0, size());
+}
+
+std::string FileWriter::identity() const {
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!GetFileInformationByHandle(handle_, &info)) fileError("Unable to identify the partial file.");
+    return std::to_string(info.dwVolumeSerialNumber) + ":" + std::to_string(info.nFileIndexHigh) + ":" + std::to_string(info.nFileIndexLow);
+}
+
+void FileWriter::flush() {
+    Timer timer{metrics_.flushSeconds};
+    if (!FlushFileBuffers(handle_)) fileError("Unable to flush the partial data to disk.");
+}
+
+std::string FileWriter::sha256Range(std::uint64_t offset, std::uint64_t bytes) {
     Timer timer{metrics_.checksumSeconds};
+    if (offset > size() || bytes > size() - offset) fileError("Cannot hash bytes outside the partial file.");
     Sha256 state;
     cryptoCheck(BCryptOpenAlgorithmProvider(&state.algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0));
     DWORD objectBytes = 0, returned = 0;
@@ -122,12 +154,12 @@ std::string FileWriter::sha256() {
         reinterpret_cast<PUCHAR>(&objectBytes), sizeof(objectBytes), &returned, 0));
     state.object.resize(objectBytes);
     cryptoCheck(BCryptCreateHash(state.algorithm, &state.hash, state.object.data(), objectBytes, nullptr, 0, 0));
-    seek(handle_, 0);
+    seek(handle_, offset);
     std::array<unsigned char, 64 * 1024> buffer{};
-    for (;;) {
+    while (bytes != 0) {
         DWORD received = 0;
-        if (!ReadFile(handle_, buffer.data(), static_cast<DWORD>(buffer.size()), &received, nullptr)) fileError("Unable to read the partial file for checksum verification.");
-        if (received == 0) break;
+        if (!ReadFile(handle_, buffer.data(), static_cast<DWORD>(std::min<std::uint64_t>(bytes, buffer.size())), &received, nullptr) || received == 0) fileError("Unable to read the partial file for checksum verification.");
+        bytes -= received;
         cryptoCheck(BCryptHashData(state.hash, buffer.data(), received, 0));
     }
     std::array<unsigned char, 32> digest{};
@@ -142,10 +174,7 @@ std::string FileWriter::sha256() {
 void FileWriter::commit(std::uint64_t expectedSize, const std::optional<std::string>& expectedSha256) {
     if (size() != expectedSize) throw DownloadError(DownloadErrorCode::Integrity, "The completed file size does not match the transfer.");
     if (expectedSha256 && sha256() != *expectedSha256) throw DownloadError(DownloadErrorCode::Integrity, "SHA-256 verification failed; the partial file was not finalized.");
-    {
-        Timer timer{metrics_.flushSeconds};
-        if (!FlushFileBuffers(handle_)) fileError("Unable to flush the completed data to disk.");
-    }
+    flush();
     const auto name = destination_.wstring();
     const auto nameBytes = name.size() * sizeof(wchar_t);
     std::vector<unsigned char> buffer(sizeof(FILE_RENAME_INFO) + nameBytes, 0);

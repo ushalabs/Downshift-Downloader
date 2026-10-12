@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -10,7 +11,7 @@
 
 namespace downshift {
 
-enum class DownloadErrorCode { InvalidRequest, Http, Protocol, Integrity, Network, Timeout, Tls, File, Cancelled };
+enum class DownloadErrorCode { InvalidRequest, Http, Protocol, Integrity, Network, Timeout, Tls, File, Cancelled, Paused, ResumeUnsafe };
 
 class DownloadError final : public std::runtime_error {
 public:
@@ -19,6 +20,15 @@ public:
     [[nodiscard]] DownloadErrorCode code() const noexcept { return code_; }
 private:
     DownloadErrorCode code_;
+};
+
+enum class ExistingDownload { New, Resume, Restart };
+class DownloadControl final {
+public:
+    void requestPause() noexcept { paused_.store(true); }
+    [[nodiscard]] bool pauseRequested() const noexcept { return paused_.load(); }
+private:
+    std::atomic_bool paused_ = false;
 };
 
 struct DownloadOptions {
@@ -32,12 +42,16 @@ struct DownloadOptions {
     std::uint64_t chunkBytes = 4 * 1024 * 1024;
     bool automaticConnections = true;
     bool adaptiveChunks = true;
+    ExistingDownload existing = ExistingDownload::New;
+    std::uint32_t maxRetries = 3; // Per request; excludes the initial attempt.
+    std::uint32_t retryBaseMs = 500, retryMaxWaitMs = 60'000;
+    DownloadControl* control = nullptr; // Must outlive the worker call.
     // Runs on the owning worker at most four times/second, plus stage boundaries.
     // Observer exceptions disable further notifications without failing the download.
     std::function<void(const struct DownloadProgress&)> onProgress;
 };
 
-enum class DownloadStage { Probe, Downloading, Finalizing, Completed };
+enum class DownloadStage { Probe, Downloading, Finalizing, Completed, Paused };
 struct DownloadProgress {
     DownloadStage stage = DownloadStage::Probe;
     std::uint64_t downloadedBytes = 0, networkBytes = 0, verifiedBytes = 0;
@@ -47,6 +61,8 @@ struct DownloadProgress {
     std::optional<double> etaSeconds;
     std::uint32_t activeRanges = 0, targetConnections = 1;
     std::uint64_t chunkBytes = 0;
+    std::uint64_t recoveredBytes = 0;
+    bool resumable = false;
 };
 
 struct DownloadMetrics {
@@ -58,6 +74,9 @@ struct DownloadMetrics {
     std::uint32_t peakActiveRanges = 0, initialConnections = 1, finalConnections = 1, tuningChanges = 0;
     bool observerFailed = false;
     bool resourceMetricsAvailable = false;
+    std::uint64_t recoveredBytes = 0;
+    std::uint32_t retries = 0;
+    bool cleanupPending = false;
 };
 
 struct DownloadResult {

@@ -1,6 +1,6 @@
 # Downshift benchmarks
 
-Phase 3 supplies a reproducible Release benchmark suite and measured local results. No direct IDM comparison has been performed. These results describe controlled HTTP/1.1 loopback traffic on the development machine; they do not establish Internet throughput or universal superiority over another application.
+Phase 3 supplies a reproducible Release benchmark suite and measured local results; Phase 4 records a separate fresh-download performance check with recovery enabled. No direct IDM comparison has been performed. These results describe controlled HTTP/1.1 loopback traffic on the development machine; they do not establish Internet throughput or universal superiority over another application.
 
 ## Reproduce
 
@@ -51,6 +51,8 @@ Maximum sampled native-client peak working set was 7.51 MiB in the main matrix a
 
 ## Interpretation and later work
 
+Phase 3's final sources are in the user's `d7d9a1e55320bf4ddb304e58ae6b807775d1a823` commit; those reports describe the earlier engine. Current Phase 4 sources and executable have separate fingerprints in [phase4-local-20261012.md](../benchmarks/results/phase4-local-20261012.md) and its matching JSON/CSV. All 18 Phase 4 samples passed native/independent SHA-256 and coverage/limit checks. This is a 100 MB unlimited matrix with three repetitions of all six modes. Median end-to-end rates were 232.80 MiB/s for fixed 4, 221.88 MiB/s for automatic, and 396.98 MiB/s for streaming. The run measures fresh downloads with recovery/checkpoint overhead; it does not measure interrupted/retried throughput. OS/cache variation prevents treating separate phase runs as an isolated causal comparison.
+
 A conservative automatic policy can improve throughput when each connection is capped, but fixed high concurrency can still finish sooner. When total server bandwidth is shared, extra connections cannot create more capacity. Uncapped loopback results depend on Python scheduling, CPU frequency, OS caching, and storage; three repetitions can still have substantial spread. Inspect individual samples before interpreting medians.
 
-The benchmark server shares the machine with the client; these are warm/cache-enabled runs, not a dedicated physical-network lab. HTTP/2 is enabled in the client but not exercised by this server. Phase 4 must add retry/recovery before those behaviors can be measured. HTTP/2 wire benchmarks, physical-disk characterization, wider repetitions/network conditions, and a fair direct IDM comparison remain later performance work. No IDM numbers or unexecuted results are fabricated.
+The benchmark server shares the machine with the client; these are warm/cache-enabled runs, not a dedicated physical-network lab. HTTP/2 is enabled in the client but not exercised by this server. Phase 4 verifies retry/recovery correctness separately in the recovery suite. Interrupted/retried throughput, HTTP/2 wire benchmarks, physical-disk characterization, wider repetitions/network conditions, and a fair direct IDM comparison remain later performance work. No IDM numbers or unexecuted results are fabricated.

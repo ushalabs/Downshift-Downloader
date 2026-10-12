@@ -424,6 +424,17 @@ private:
 
 } // namespace
 
+DownloadEngine::Inspection DownloadEngine::inspect(const std::string& url,std::stop_token stop) const {
+    DownloadOptions options; options.url=url; options.connectTimeoutMs=3000; options.transferTimeoutMs=8000;
+    MultiSession session(1); auto transfer=std::make_unique<Transfer>(Kind::Probe,nullptr,stop);
+    transfer->configure(options,url,true); transfer=session.run(std::move(transfer),stop); transfer->verify();
+    const auto& metadata=transfer->collector.response;
+    if(transfer->probeRejected || metadata.status!=206 || !metadata.range || !strongEtag(metadata.etag) ||
+        metadata.contentType.starts_with("text/html") || metadata.contentType.starts_with("application/xhtml"))
+        fail(DownloadErrorCode::InvalidRequest,"This download needs Chrome or lacks verified public range support. It was left in Chrome.");
+    char* effective=nullptr; if(curl_easy_getinfo(transfer->easy.get(),CURLINFO_EFFECTIVE_URL,&effective)!=CURLE_OK || !effective) fail(DownloadErrorCode::Network,"Unable to verify this download.");
+    return {metadata.etag,std::string(effective),metadata.range->total};
+}
 DownloadResult DownloadEngine::download(const DownloadOptions& options, std::stop_token stop) const {
     validateUrl(options.url);
     if (options.destination.empty() || options.connectTimeoutMs <= 0 || options.transferTimeoutMs < 0 ||
@@ -550,6 +561,10 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         validateUrl(resolved);
         const auto metadata = probe->collector.response;
         const auto etag = strongEtag(metadata.etag) ? metadata.etag : std::string{};
+        if((!options.requiredEtag.empty() && (probe->probeRejected || etag!=options.requiredEtag)) ||
+            (!options.requiredResolvedUrl.empty() && resolved!=options.requiredResolvedUrl) ||
+            (options.requiredTotal && (!metadata.range || metadata.range->total!=*options.requiredTotal)))
+            fail(DownloadErrorCode::Integrity,"The browser download changed after acceptance. Your files were preserved; retry the link in Chrome.");
         if (resuming && (probe->probeRejected || metadata.status != 206 || etag != recovery.etag ||
             !metadata.range || metadata.range->total != recovery.total || resolved != recovery.resolvedUrl ||
             (!recovery.lastModified.empty() && metadata.lastModified != recovery.lastModified)))

@@ -89,4 +89,4 @@ The same immutable baseline governs transitive dependencies. Manifest versions f
 
 ## Chrome integration
 
-The extension and Native Messaging host are scheduled for Phase 7. No browser permissions or registry changes are performed during Phase 1.
+The Phase 7 extension and separate Native Messaging host are implemented. Follow [Chrome setup](CHROME.md): register the built host for your Windows account, load the project's extension folder in Chrome Developer mode, open Downshift, and enable the popup toggle. Local registration is explicit; simply building or opening the app does not install the extension or register the host. Installer integration remains Phase 9.

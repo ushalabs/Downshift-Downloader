@@ -3,6 +3,7 @@
 #include "core/FileWriter/FileWriter.h"
 #include "core/ResumeManager/ResumeJournal.h"
 #include <QDateTime>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
@@ -47,7 +48,8 @@ QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
 }
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
     {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"},
-    {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)}}; }
+    {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)},
+    {"handoffKey",handoffKey},{"requiredEtag",requiredEtag},{"requiredResolvedUrl",requiredResolvedUrl},{"requiredTotal",requiredTotal ? QString::number(*requiredTotal):QString()}}; }
 QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString(); e.origin=downshift::origin(e.url);
     e.error=o.value("error").toString(); e.sha256=o.value("sha256").toString(); e.status=static_cast<QueueStatus>(o.value("status").toInt(-1)); e.priority=o.value("priority").toInt();
@@ -55,6 +57,7 @@ QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     e.progress.downloadedBytes=o.value("downloaded").toString().toULongLong(); e.progress.verifiedBytes=o.value("verified").toString().toULongLong();
     const auto total=o.value("total").toString(); if(!total.isEmpty()) e.progress.totalBytes=total.toULongLong(); e.progress.resumable=o.value("resumable").toBool();
     e.progress.averageBytesPerSecond=o.value("averageSpeed").toDouble();e.progress.elapsedSeconds=o.value("elapsed").toDouble();e.progress.targetConnections=static_cast<std::uint32_t>(o.value("targetConnections").toInt(1));
+    e.handoffKey=o.value("handoffKey").toString();e.requiredEtag=o.value("requiredEtag").toString();e.requiredResolvedUrl=o.value("requiredResolvedUrl").toString();if(!o.value("requiredTotal").toString().isEmpty())e.requiredTotal=o.value("requiredTotal").toString().toULongLong();
     if(e.progress.averageBytesPerSecond<0 || e.progress.averageBytesPerSecond>1e15 || e.progress.elapsedSeconds<0 || e.progress.elapsedSeconds>1e12 || e.progress.targetConnections<1 || e.progress.targetConnections>16) invalid("Invalid saved download metrics.");
     if(e.id.size()!=32 || e.status < QueueStatus::Queued || e.status > QueueStatus::Prepared || e.existing < ExistingDownload::New || e.existing > ExistingDownload::Restart || e.priority < -1 || e.priority > 1 || e.destination.isEmpty()) invalid("Damaged download record.");
     return e;
@@ -96,8 +99,10 @@ void QueueManager::run() {
         const auto saved=store_->settings(); if(!saved.isEmpty()) settings_=QueueSettings::fromJson(object(saved));
         if(settings_.directory.isEmpty()) settings_.directory=QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
         budget_->configure(settings_.speedLimit);
+        for(const auto& row:store_->receipts()) {const auto r=object(row);const auto key=r.value("key").toString(),state=r.value("state").toString();if(key.size()!=32 || receipts_.contains(key) || (state!="prepared" && state!="committed" && state!="aborted"))invalid("Damaged browser handoff receipt.");receipts_.emplace(key,r);}
         for(const auto& row:store_->load()) {
             auto e=QueueEntry::fromJson(object(row));
+            if(!e.handoffKey.isEmpty() && (!receipts_.contains(e.handoffKey) || receipts_.at(e.handoffKey).value("downloadId")!=e.id))invalid("Missing or mismatched browser handoff receipt.");
             if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
             if(std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.id==e.id;})) invalid("Duplicate database download IDs.");
             entries_.push_back(std::move(e));
@@ -139,6 +144,8 @@ std::future<QString> QueueManager::add(QString url,QString dest,int priority,boo
 }
 std::future<void> QueueManager::action(QString id,QueueAction action) { return submit([this,id=std::move(id),action] {
     auto& e=entry(id); const auto worker=workers_.find(id);
+    if(e.status==QueueStatus::Prepared) invalid("Chrome still owns this handoff. Leave it in Chrome or cancel the pending handoff.");
+    if(!e.handoffKey.isEmpty() && receipts_.at(e.handoffKey).value("state")=="aborted" && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("This browser handoff was aborted. Add a fresh download link instead.");
     if(action==QueueAction::HighPriority || action==QueueAction::NormalPriority || action==QueueAction::LowPriority) { e.priority=action==QueueAction::HighPriority ? 1 : action==QueueAction::LowPriority ? -1 : 0; save(e); return; }
     if(worker!=workers_.end()) {
         if(action==QueueAction::Pause) worker->second->control.requestPause();
@@ -191,6 +198,7 @@ void QueueManager::schedule() {
         if(host>=std::min(settings_.perHost,settings_.hostConnections)) continue;
         auto w=std::make_unique<Worker>(); auto* mailbox=w.get();
         DownloadOptions options; options.url=e->url.toStdString(); options.destination=path(e->destination); options.existing=e->existing; options.control=&mailbox->control;
+        options.requiredEtag=e->requiredEtag.toStdString();options.requiredResolvedUrl=e->requiredResolvedUrl.toStdString();options.requiredTotal=e->requiredTotal;
         options.automaticConnections=settings_.automatic; options.maxConnections=static_cast<std::uint32_t>(std::min(settings_.connections,std::max(1,settings_.hostConnections/settings_.perHost)));
         if(!e->sha256.isEmpty()) options.expectedSha256=e->sha256.toStdString();
         auto local=std::make_shared<RateBudget>(); local->configure(e->speedLimit); auto global=budget_;
@@ -207,4 +215,39 @@ void QueueManager::schedule() {
         }); } catch(...) { workers_.erase(id); e->status=QueueStatus::Failed; e->error="Unable to create a download worker."; save(*e); }
     }
 }
+std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection) {
+    return submit([this,key=std::move(key),url=std::move(url),filename=std::move(filename),inspection=std::move(inspection)] {
+        const auto hash=QString::fromLatin1(QCryptographicHash::hash(url.toUtf8(),QCryptographicHash::Sha256).toHex());
+        if(const auto i=receipts_.find(key);i!=receipts_.end()) {if(i->second.value("urlHash")!=hash)invalid("This handoff key belongs to another request.");return QJsonObject{{"state",i->second.value("state")},{"downloadId",i->second.value("downloadId")}};}
+        if(entries_.size()>=10000 || receipts_.size()>=10000)invalid("The browser handoff/history limit has been reached.");
+        if(key.size()!=32 || std::any_of(key.begin(),key.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))invalid("Invalid handoff key.");
+        if(filename.isEmpty() || filename.size()>160 || filename.contains('/') || filename.contains('\\') || filename=="." || filename=="..")invalid("Invalid browser filename.");
+        QueueEntry e;e.id=QString::fromStdString(ResumeJournal::newId());e.url=url;e.origin=origin(url);e.handoffKey=key;e.status=QueueStatus::Prepared;e.created=QDateTime::currentSecsSinceEpoch();e.updated=e.created;
+        e.requiredEtag=QString::fromStdString(inspection.etag);e.requiredResolvedUrl=QString::fromStdString(inspection.resolvedUrl);e.requiredTotal=inspection.total;e.progress.totalBytes=inspection.total;e.progress.resumable=true;
+        const QFileInfo name(filename); bool assigned=false;
+        for(int index=0;index<1000;++index) {
+            const auto candidate=index ? name.completeBaseName()+" ("+QString::number(index)+")"+(name.suffix().isEmpty() ? "":"."+name.suffix()):filename;
+            const auto dest=destination(QDir(settings_.directory).filePath(candidate));
+            if(QFileInfo::exists(dest) || QFileInfo::exists(dest+".part") || QFileInfo::exists(dest+".part.resume") || std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.destination.compare(dest,Qt::CaseInsensitive)==0;}))continue;
+            e.destination=dest;assigned=true;break;
+        }
+        if(!assigned)invalid("No free download filename is available.");
+        QJsonObject receipt{{"version",1},{"key",key},{"downloadId",e.id},{"urlHash",hash},{"state","prepared"}};
+        try {store_->handoff(e.id,QJsonDocument(e.json()).toJson(QJsonDocument::Compact),key,QJsonDocument(receipt).toJson(QJsonDocument::Compact));}
+        catch(...){fatal_=std::current_exception();throw;}
+        receipts_.emplace(key,receipt);entries_.push_back(e);return QJsonObject{{"state","prepared"},{"downloadId",e.id}};
+    });
+}
+std::future<QJsonObject> QueueManager::handoff(QString key,QString command) {return submit([this,key=std::move(key),command=std::move(command)] {
+    const auto i=receipts_.find(key);if(i==receipts_.end())return QJsonObject{{"state","unknown"}};
+    auto receipt=i->second;const auto state=receipt.value("state").toString();const auto id=receipt.value("downloadId").toString();
+    if(command!="status" && command!="commit" && command!="abort")invalid("Unsupported browser operation.");
+    if(state=="prepared" && command!="status") {
+        auto e=entry(id);e.status=command=="commit" ? QueueStatus::Queued:QueueStatus::Cancelled;e.updated=QDateTime::currentSecsSinceEpoch();receipt["state"]=command=="commit" ? "committed":"aborted";
+        try{store_->handoff(e.id,QJsonDocument(e.json()).toJson(QJsonDocument::Compact),key,QJsonDocument(receipt).toJson(QJsonDocument::Compact));}catch(...){fatal_=std::current_exception();throw;}
+        entry(id)=e;i->second=receipt;
+    }
+    QJsonObject result{{"state",receipt.value("state")},{"downloadId",id}};
+    const auto e=std::find_if(entries_.begin(),entries_.end(),[&](const auto& row){return row.id==id;});result["downloadStatus"]=e==entries_.end() ? "Removed":statusText(e->status);return result;
+});}
 }

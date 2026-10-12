@@ -23,6 +23,8 @@ struct QueueSettings {
 };
 struct QueueEntry {
     QString id, url, destination, origin, error, sha256;
+    QString handoffKey, requiredEtag, requiredResolvedUrl;
+    std::optional<std::uint64_t> requiredTotal;
     QueueStatus status = QueueStatus::Queued;
     int priority = 0;
     std::uint64_t speedLimit = 0;
@@ -46,6 +48,8 @@ public:
     std::future<void> deleteCompleted(QString id);
     std::future<void> configure(QueueSettings settings);
     std::future<QueueSnapshot> snapshot();
+    std::future<QJsonObject> prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection);
+    std::future<QJsonObject> handoff(QString key,QString command);
 private:
     struct Worker;
     template<class F> auto submit(F function) -> std::future<decltype(function())> {
@@ -73,6 +77,7 @@ private:
     std::vector<QueueEntry> entries_;
     QueueSettings settings_;
     std::map<QString, std::unique_ptr<Worker>> workers_;
+    std::map<QString,QJsonObject> receipts_;
     class RateBudget;
     std::shared_ptr<RateBudget> budget_;
     std::thread service_;

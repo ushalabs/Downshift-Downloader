@@ -35,6 +35,9 @@ struct DownloadOptions {
     std::string url;
     std::filesystem::path destination;
     std::optional<std::string> expectedSha256;
+    std::string requiredEtag; // Optional browser preflight binding; never bypasses validation.
+    std::string requiredResolvedUrl;
+    std::optional<std::uint64_t> requiredTotal;
     std::filesystem::path caBundle; // Optional explicit trust bundle; TLS verification stays enabled.
     long connectTimeoutMs = 10'000;
     long transferTimeoutMs = 0; // Zero uses the stall timeout instead of a whole-transfer deadline.
@@ -92,6 +95,9 @@ struct DownloadResult {
 
 class DownloadEngine final {
 public:
+    struct Inspection { std::string etag, resolvedUrl; std::uint64_t total=0; };
+    // Bounded public-resource preflight, no file creation or authentication context.
+    [[nodiscard]] Inspection inspect(const std::string& url, std::stop_token stop={}) const;
     // Blocking worker API. Call off the GUI thread. CurlRuntime must outlive this call.
     // Failure leaves a .part file for inspection, never a completed destination.
     [[nodiscard]] DownloadResult download(const DownloadOptions& options,

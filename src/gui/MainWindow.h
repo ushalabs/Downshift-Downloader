@@ -18,6 +18,7 @@ public:
     void openAdd();
     void openSettings();
     void refresh();
+    void chromeStatus(QString status){chromeStatus_=std::move(status);}
 private:
     template<class T,class F> void watch(std::future<T> future,F success) {
         auto pending=std::make_shared<std::future<T>>(std::move(future)); auto* timer=new QTimer(this); timer->setInterval(30);
@@ -40,6 +41,7 @@ private:
     QueueSnapshot current_;
     std::optional<std::future<QueueSnapshot>> pending_;
     bool ready_=false;
+    QString chromeStatus_="Not connected";
     QTableWidget* table_=nullptr;
     QLineEdit* search_=nullptr;
     QComboBox* filter_=nullptr;

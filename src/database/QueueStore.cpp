@@ -46,9 +46,10 @@ QueueStore::QueueStore(const QString& path) {
         sqlite3_busy_timeout(db_, 2000);
         exec(db_, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON;");
         Statement version(db_, "PRAGMA user_version");
-        if (sqlite3_step(version.value) != SQLITE_ROW || sqlite3_column_int(version.value, 0) > 1) failure();
+        if (sqlite3_step(version.value) != SQLITE_ROW || sqlite3_column_int(version.value, 0) > 2) failure();
         exec(db_, "BEGIN IMMEDIATE; CREATE TABLE IF NOT EXISTS downloads(id TEXT PRIMARY KEY, payload BLOB NOT NULL);"
-            "CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1), payload BLOB NOT NULL); PRAGMA user_version=1; COMMIT;");
+            "CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1), payload BLOB NOT NULL);"
+            "CREATE TABLE IF NOT EXISTS handoffs(id TEXT PRIMARY KEY, payload BLOB NOT NULL); PRAGMA user_version=2; COMMIT;");
     } catch (...) { sqlite3_close(db_); db_ = nullptr; throw; }
 }
 QueueStore::~QueueStore() { sqlite3_close(db_); }
@@ -65,4 +66,14 @@ void QueueStore::save(const QString& id, const QByteArray& json) {
 void QueueStore::erase(const QString& id) { Statement s(db_, "DELETE FROM downloads WHERE id=?1"); s.text(1, id); s.done(); }
 QByteArray QueueStore::settings() { Statement s(db_, "SELECT payload FROM settings WHERE id=1"); const int status = sqlite3_step(s.value); if (status == SQLITE_DONE) return {}; if (status != SQLITE_ROW) failure(); return column(s.value); }
 void QueueStore::settings(const QByteArray& json) { Statement s(db_, "INSERT INTO settings VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload"); s.blob(1, protect(json, true)); s.done(); }
+std::vector<QByteArray> QueueStore::receipts() {
+    Statement s(db_,"SELECT payload FROM handoffs ORDER BY rowid");std::vector<QByteArray> result;int status;
+    while((status=sqlite3_step(s.value))==SQLITE_ROW){if(result.size()>=10000)failure();result.push_back(column(s.value));}
+    if(status!=SQLITE_DONE)failure();return result;
+}
+void QueueStore::handoff(const QString& id,const QByteArray& entry,const QString& key,const QByteArray& receipt) {
+    exec(db_,"BEGIN IMMEDIATE");
+    try { save(id,entry);Statement s(db_,"INSERT INTO handoffs(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload");s.text(1,key);s.blob(2,protect(receipt,true));s.done();exec(db_,"COMMIT"); }
+    catch(...) { sqlite3_exec(db_,"ROLLBACK",nullptr,nullptr,nullptr);throw; }
+}
 }

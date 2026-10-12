@@ -57,6 +57,8 @@ Fresh requests create a sibling `.part` with CREATE_NEW and no sharing. Explicit
 
 The behavior follows libcurl's [header callback contract](https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html), Windows' [rename-by-handle contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info), and libcurl's [Schannel verification policy](https://curl.se/docs/sslcerts.html).
 
-## Future boundaries
+## Browser integration and future boundaries
 
-Phase 4 recovery/retries are implemented through the worker/console interface. Phase 5's [queue service](QUEUE.md) owns SQLite and schedules blocking download workers with bounded progress mailboxes. GUI controls are Phase 6. Chrome Manifest V3, origin-restricted Native Messaging, and secure local IPC are Phase 7. The user approved 5-7 as one batch. Optimizations, packaging/compliance, and release follow in Phases 8-10 and remain unapproved.
+The [queue service](QUEUE.md) owns SQLite and schedules download workers; the [desktop](DESKTOP.md) submits asynchronous commands. The [Chrome extension](CHROME.md) uses a separate origin-restricted `DownshiftNativeHost.exe`, bounded JSON frames, and a current-user restricted named pipe. `PipeServer` performs native preflight on its worker and submits future commands to the queue service. Encrypted prepared entries/receipts persist atomically before Chrome cancellation, and idempotent commit/abort reconcile browser worker restarts. The engine binds a committed transfer to preflight's strong ETag, resolved URL, and length. No browser cookies/authorization context is imported. `src/main.cpp` owns the pipe after the queue/window; shutdown stops it before releasing queue ownership. A per-user mutex activates an existing application instance.
+
+Phases 1-7 are implemented. Optimizations, packaging/compliance, and release follow in Phases 8-10 and remain unapproved.

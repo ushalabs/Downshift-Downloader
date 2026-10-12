@@ -40,7 +40,12 @@ def main():
     server.configure(2*1024*1024, per_connection_bps=2*1024*1024, header_delay=.05)
     url=f"http://127.0.0.1:{server.server_port}/range"
     with workspace() as tmp:
-        root=pathlib.Path(tmp); db=root/"queue.sqlite"; d=Driver(exe,db)
+        root=pathlib.Path(tmp); db=root/"queue.sqlite"
+        import sqlite3
+        with sqlite3.connect(db) as sql:
+            sql.executescript("CREATE TABLE downloads(id TEXT PRIMARY KEY,payload BLOB NOT NULL);CREATE TABLE settings(id INTEGER PRIMARY KEY,payload BLOB NOT NULL);PRAGMA user_version=1;")
+        sql.close()
+        d=Driver(exe,db)
         settings=d.call("snapshot")["settings"]; settings.update(directory=str(root),simultaneous=2,perHost=2,hostConnections=4,connections=4,automatic=False,speedLimit=str(1024*1024))
         d.call("configure",settings=settings)
         ids=[]

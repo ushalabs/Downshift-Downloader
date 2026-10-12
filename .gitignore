@@ -14,6 +14,9 @@
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .env
 .env.*
 __pycache__/

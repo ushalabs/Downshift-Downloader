@@ -2,7 +2,7 @@
 
 Downshift is a free, open-source native Windows download manager being developed in ten approved phases. The product name is **Downshift**; the executable is `Downshift.exe`.
 
-**Current work: approved Phases 5-7.** The adaptive native engine supports safe pause/resume, bounded retries, verified crash recovery, and streaming fallback. The persistent queue adds encrypted SQLite history/settings, priorities, simultaneous downloads, origin limits, and bandwidth pacing. Desktop controls and Chrome integration follow in the approved batch. See [development progress](docs/DEVELOPMENT_PROGRESS.md) for verified acceptance results. No direct IDM comparison has been performed.
+**Phases 1-7 are implemented and verified locally.** The adaptive native engine supports safe pause/resume, bounded retries, verified crash recovery, and streaming fallback. The encrypted persistent queue provides priorities, simultaneous downloads, origin limits, and bandwidth pacing. Native desktop controls and a Chrome extension connect to those workers. See [development progress](docs/DEVELOPMENT_PROGRESS.md) for acceptance results and [Chrome setup](docs/CHROME.md) for local browser installation. No direct IDM performance comparison has been performed.
 
 ## Implemented features
 
@@ -11,7 +11,7 @@ Downshift is a free, open-source native Windows download manager being developed
 - SQLite integration with an in-memory 64-bit write/read check.
 - Windows x64 MSVC CMake presets and pinned vcpkg dependency baseline.
 - Dependency and Qt startup smoke tests, using the Windows and minimal platform plugins.
-- Windows build workflow for Debug and Release; the corrected workflow awaits the user's commit/push and a new CI run. Local verification is recorded in the development progress document.
+- Windows build workflow for Debug and Release; local verification and separate CI status are recorded in the development progress document.
 - libcurl multi transfers with automatic tuning by default, fixed 1-16 connection limits, and adaptive 256 KiB-16 MiB chunks.
 - Actual `bytes=0-0` capability probe, exact range validation, and strong ETag/`If-Match` version checks.
 - Streaming for servers ignoring ranges or lacking a strong validator; safe restart if range support disappears.
@@ -21,6 +21,7 @@ Downshift is a free, open-source native Windows download manager being developed
 - Console pause/resume, encrypted range checkpoints, local/remote revalidation, and recovery after forced termination.
 - Bounded transient retries with jitter/Retry-After and explicit archival restart when safe resume is unavailable.
 - Persistent SQLite queue/history/settings with user-scoped encryption, priorities, concurrency limits, and global/per-download pacing.
+- Manifest V3 Chrome extension, restricted Native Messaging/Windows IPC, durable handoff receipts, and tested browser fallback for unsupported or unavailable transfers.
 - Reproducible loopback benchmarks for 100 MB, 1 GB, and 5 GB files; SHA-256 verification before accepting samples.
 
 ## Build
@@ -46,9 +47,9 @@ The first configure builds the dependency set from source and can take substanti
 2. Segmented download engine (completed locally).
 3. Adaptive performance engine (completed locally).
 4. Resume and recovery (completed locally).
-5. Queue and persistence.
-6. Modern desktop GUI.
-7. Chrome integration.
+5. Queue and persistence (completed locally).
+6. Modern desktop GUI (completed locally).
+7. Chrome integration (completed locally).
 8. Performance optimization.
 9. Windows packaging.
 10. GitHub release.
@@ -68,6 +69,7 @@ Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 - [Pause/resume and recovery](docs/RECOVERY.md)
 - [Persistent queue](docs/QUEUE.md)
 - [Desktop usage](docs/DESKTOP.md)
+- [Chrome setup and handoff recovery](docs/CHROME.md)
 
 ## Download a file during development
 
@@ -83,7 +85,7 @@ Automatic mode adjusts future assignments after throughput trials; existing rang
 
 ## Limitations
 
-A persistent queue, desktop download controls, Chrome interception, themes, installers, and release binaries belong to later phases. Partial resume requires actual range support and an unchanged strong ETag; streaming and unverifiable partials need an explicit restart. Recovery records normally require the same Windows user/profile. Automatic tuning cannot guarantee the best throughput on every server. HTTP/3 is not enabled. An unframed response ending at EOF cannot independently prove its intended length; use a trusted SHA-256 when available. No download is executed automatically.
+Installers and release binaries belong to later phases. Chrome handoff supports public range-capable files with strong validators; browser login/cookies are not forwarded, and personalized resources should stay in Chrome. Its popup toggle defaults off and needs explicit local setup. Partial resume requires actual range support and an unchanged strong ETag; streaming and unverifiable partials need an explicit restart. Recovery records normally require the same Windows user/profile. Automatic tuning cannot guarantee the best throughput on every server. HTTP/3 is not enabled. An unframed response ending at EOF cannot independently prove its intended length; use a trusted SHA-256 when available. No download is executed automatically.
 
 ## License
 

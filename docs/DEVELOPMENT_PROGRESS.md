@@ -2,10 +2,10 @@
 
 ## Phase gate
 
-- Current phase: 6 - Modern Desktop GUI.
+- Current phase: 7 - Chrome Integration.
 - Last approved phase: 7; Phases 5-7 approved together on 2026-10-12.
-- Last completed phase: 6 - Modern Desktop GUI (2026-10-12).
-- Status: Phase 6 verified; commit/push checkpoint, then continue directly with Phase 7.
+- Last completed phase: 7 - Chrome Integration (2026-10-12).
+- Status: Phases 5-7 verified; Phase 7 is the final Git checkpoint of this authorized batch. Phase 8 requires further approval.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
@@ -79,7 +79,7 @@ The vcpkg baseline and tool checkout are pinned to `e456309491fd875487bf02b8a0dc
 
 ## Phase handoff
 
-The user committed Phase 4 (`49bac63`) and authorized Phases 5-7 as a single batch. Phase 5 was pushed as `b90ca734e782628a06eb42fd7b27d97f5ce91491`, with the remote ref verified. Phase 6 is verified and ready for its Git checkpoint; continue directly with Phase 7. Historical acceptance records preserve the workflow in effect when written.
+The user committed Phase 4 (`49bac63`) and authorized Phases 5-7 as a single batch. Phase 5 was pushed as `b90ca734e782628a06eb42fd7b27d97f5ce91491` and Phase 6 as `d1ccb51c1988abd2fa0be26af5f81afdb18754c6`, with each remote ref verified before continuing. Phase 7 is verified below; its containing commit is this batch's final checkpoint. Await Phase 8 approval after that push. Historical acceptance records preserve the workflow in effect when written.
 
 ## Phase 2 acceptance (2026-10-12)
 
@@ -177,7 +177,8 @@ Logs are `build/phase4-{release,debug}-{build,tests}.log` and `build/phase4-benc
 - Earlier inspected CI result: failed; https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38165976115. The user subsequently committed Phase 1 locally. No Phase 2 CI run has been executed by the assistant.
 - The WIP commit and push occurred before the earlier manual workflow. The latest user request now authorizes assistant commits and pushes after each verified Phase 5-7.
 - Phases 2 and 3 were left uncommitted at their handoffs; the user subsequently committed them. No assistant commits/pushes were made during Phases 2-4.
-- Next action: finish and push Phase 5, then continue directly with already-approved Phases 6 and 7. Phase 8 remains unapproved. No Phase 4 CI run is claimed.
+- Assistant phase checkpoints: Phase 5 `b90ca734e782628a06eb42fd7b27d97f5ce91491`, Phase 6 `d1ccb51c1988abd2fa0be26af5f81afdb18754c6`; both pushed to `dev/phase-01-foundation` and remotely verified.
+- Phase 7 checkpoint: the commit containing the acceptance record below. Phase 8 remains unapproved. No new successful CI result is claimed.
 
 Use Git history to resolve the current document's containing commit; a commit cannot embed its own hash. Record earlier verified commit IDs here once available.
 
@@ -189,7 +190,7 @@ Both MSVC x64 configurations compiled without warnings/errors. All eight CTest g
 
 Initial failures were in fixtures: a query string accidentally disabled test-server ranges, and Python's SQLite context manager left a corruption-test connection open during directory cleanup. Corrected both and added unconditional child-process cleanup before the final passing runs. Durable queue save failures stop scheduling. Range journals remain the authority for actual verified recovery intervals. Limits apply to the submitted origin; independent redirects do not share a global target-host reservation. Global and per-download caps can conservatively underutilize bandwidth when combined. No new performance or CI result is claimed.
 
-Acceptance: queues/history/settings persist, multiple real downloads are scheduled reliably, and interruptions preserve recoverable work. Logs: `build/phase5-{release,debug}-{build,tests}.log`. Commit this verified phase to the existing development branch, verify its remote ref after push, then begin already-approved Phase 6. Resolve this checkpoint's containing commit from Git history rather than embedding a self-referential hash.
+Acceptance: queues/history/settings persist, multiple real downloads are scheduled reliably, and interruptions preserve recoverable work. Logs: `build/phase5-{release,debug}-{build,tests}.log`. This phase was committed/pushed as `b90ca734e782628a06eb42fd7b27d97f5ce91491` before Phase 6 began.
 
 ## Phase 6 acceptance (2026-10-12)
 
@@ -199,4 +200,34 @@ Both MSVC configurations compiled without warnings/errors. All nine CTest groups
 
 Render review corrected the aggregate-speed label width and provided validation feedback inside Add Download. Qt's pinned minimal feature set does not encode PNG; test renders use built-in BMP and the committed PNG screenshots are conversions of real captures. Visually reviewed both actual themes. The test loop explicitly drains deferred widget deletion. Files/screenshots are in the Desktop project; no mockup, Internet-speed, startup benchmark, or CI result is claimed.
 
-Acceptance: the functional desktop operates the real queue/engine while remaining responsive during transfers. Usage/security and shutdown behavior: `docs/DESKTOP.md`. Logs: `build/phase6-{release,debug}-{build,tests}.log` and `build/phase6-controls-{release,debug}-tests.log`. Chrome status awaits Phase 7; installer/distribution remains later. Commit and push this verified phase to the same branch, verify its remote ref, and continue with already-approved Phase 7.
+Acceptance: the functional desktop operates the real queue/engine while remaining responsive during transfers. Usage/security and shutdown behavior: `docs/DESKTOP.md`. Logs: `build/phase6-{release,debug}-{build,tests}.log` and `build/phase6-controls-{release,debug}-tests.log`. This phase was committed/pushed as `d1ccb51c1988abd2fa0be26af5f81afdb18754c6` before Phase 7 began. Installer/distribution remains later.
+
+## Phase 7 acceptance (2026-10-12)
+
+Implemented Manifest V3 download events/controls, default-disabled consent, a popup with connection/open/restore/retry controls, a separate origin-restricted Native Messaging host, and cancellable bounded Windows named-pipe IPC restricted to the current user. Native preflight validates public range/strong-ETag representations. Encrypted SQLite schema 2 migrates existing queues and atomically saves prepared entries with receipts. Chrome cancellation is verified before commit; replayed prepare/status/commit/abort messages remain idempotent, including after history removal. Prepared work cannot start through generic desktop controls. Engine transfers pin preflight ETag, resolved URL, and size. GUI/database/network ownership stays on the existing asynchronous worker boundaries.
+
+Both MSVC x64 configurations built without compiler warnings/errors, using the unchanged pinned dependency set. Final full suites:
+
+| Check | Release | Debug |
+|---|---|---|
+| `browser.extension` (29 controller checks) | 0.06 s | 0.05 s |
+| `browser.native` (27 real protocol/queue checks) | 2.66 s | 3.14 s |
+| `gui.integration` (19 controls/checksum checks) | 12.98 s | 13.59 s |
+| `queue.integration` (26 checks, plus schema migration) | 18.89 s | 19.09 s |
+| `engine.unit` (12,225 checks) | 0.11 s | 0.10 s |
+| `engine.integration` (52 HTTP/HTTPS scenarios) | 4.28 s | 4.75 s |
+| `engine.adaptive` (12 scenarios) | 17.68 s | 17.66 s |
+| `engine.recovery` (36 scenarios) | 21.48 s | 22.58 s |
+| Dependency / minimal GUI / Windows GUI | All passed | All passed |
+| CTest summary | **11 passed, 0 failed; 80.45 s** | **11 passed, 0 failed; 83.68 s** |
+| Separate actual Chrome for Testing checks | **9 passed** | **9 passed** |
+
+GUI transfer heartbeat's longest observed gap was 0.0278 s Release / 0.0783 s Debug. Registration, valid manifests for both configurations, unregister, PowerShell/Python syntax, JSON, and whitespace checks passed. The registry check and browser tests restored the earlier registration; no extension was installed into the normal browser profile.
+
+Actual Chrome for Testing 155.0.8059.39 with Playwright 1.62.1 loaded the real extension in an isolated profile and exercised the actual Native Messaging registry/host, Qt window, queue, pipe, and engine. Both native completions and browser fallback files independently matched SHA-256 `2b07811057df887086f06a67edc6ebf911de8b6741156e7a2eb1416a4b8b1b2e`. Checks cover identity/readiness/default-disabled consent, disabled passthrough, a public handoff, duplicate reconcile, actual Chrome/worker restart during preparation, safe abort of the test-browser's cancelled download, a successful new handoff after restart, cookie-only authentication fallback, and native-unavailable fallback. Closing the automated browser also cancels its live download; this actual restart test verifies safe abort, not a standalone worker-only termination. Deterministic controller tests separately verify worker reconstruction, cancellation failures/races, lost commit acknowledgement, and outage after cancellation. Native tests verify no file before commit, durable preparation across app restart, abort stability, receipt retention after removal, invalid framing/origins/filenames/sizes, validator change rejection, and encrypted records. Evidence: `docs/evidence/phase7-*.json` with source/executable fingerprints; an actual popup capture is `assets/screenshots/chrome.png`.
+
+Resolved test-environment failures before these passing results: native IDM integration intercepted the isolated Chrome executable before Downshift; an identical signed Chrome for Testing copy with a test-only process name avoided that hook without changing IDM settings. Initial test queries selected an old cancelled download, and a service-worker message incorrectly sent to itself; corrected the harness. Inspector stop/reload attempts did not establish the expected replacement worker, so the accepted test instead restarts actual Chrome and explicitly verifies the resulting safe abort. Transient failed diagnostics remain under ignored `build`; accepted evidence is separate. No IDM performance comparison or new CI success is claimed.
+
+Acceptance: supported public downloads transfer successfully from actual Chrome into the native application, with tested failures and duplicate-safe recovery. Limits: browser cookies/authentication are not forwarded; the original browser ETag/checksum is unavailable, so same-length personalized/public representations cannot be proven equivalent. Unsupported/private resources should stay in Chrome. After cancellation an unavailable native receipt holds the decision pending until reconnect, avoiding an uncertain duplicate. Receipts are retained with a 10,000 bound. Same-user software is outside the Windows account protection boundary; remote/foreign-user rejection is enforced in code but not exercised with a second account. These are controlled HTTP tests, not universal website, HTTP/2 wire, public TLS-browser, throughput, reboot/power-loss, installer, or release claims. Setup, recovery, and precise boundaries are in [Chrome integration](CHROME.md) and [testing](TESTING.md).
+
+Logs: `build/phase7-{release,debug}-{build,tests}.log` and `build/phase7-chrome-{release,debug}.log`. Commit/push this final verified phase to the existing branch; its own hash is resolved from Git history. After remote verification, all three approved phases are finished and Phase 8 awaits the user's approval.

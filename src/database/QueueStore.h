@@ -16,6 +16,8 @@ public:
     void erase(const QString& id);
     QByteArray settings();
     void settings(const QByteArray& json);
+    std::vector<QByteArray> receipts();
+    void handoff(const QString& id,const QByteArray& entry,const QString& key,const QByteArray& receipt);
 private:
     sqlite3* db_ = nullptr;
 };

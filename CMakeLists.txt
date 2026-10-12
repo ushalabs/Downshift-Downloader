@@ -48,6 +48,14 @@ add_library(downshift_queue STATIC
 target_link_libraries(downshift_queue PUBLIC downshift_engine Qt6::Core PRIVATE crypt32)
 target_compile_options(downshift_queue PRIVATE /W4 /permissive- /utf-8)
 
+add_library(downshift_browser STATIC src/browser/NativeProtocol.cpp src/browser/PipeServer.cpp)
+target_link_libraries(downshift_browser PUBLIC downshift_queue PRIVATE advapi32)
+target_compile_options(downshift_browser PRIVATE /W4 /permissive- /utf-8)
+add_executable(downshift_native_host src/browser/NativeHost.cpp)
+set_target_properties(downshift_native_host PROPERTIES OUTPUT_NAME DownshiftNativeHost)
+target_link_libraries(downshift_native_host PRIVATE downshift_browser)
+target_compile_options(downshift_native_host PRIVATE /W4 /permissive- /utf-8)
+
 add_library(downshift_gui STATIC
     src/gui/MainWindow.cpp
     src/gui/MainWindow.h
@@ -57,7 +65,7 @@ target_link_libraries(downshift_gui PUBLIC downshift_queue Qt6::Widgets)
 target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)
 qt_add_executable(downshift WIN32 src/main.cpp)
 set_target_properties(downshift PROPERTIES OUTPUT_NAME Downshift)
-target_link_libraries(downshift PRIVATE downshift_gui)
+target_link_libraries(downshift PRIVATE downshift_gui downshift_browser)
 target_compile_definitions(downshift PRIVATE
     DOWNSHIFT_VERSION="${PROJECT_VERSION}"
 )
@@ -80,6 +88,19 @@ add_custom_command(TARGET downshift POST_BUILD
 include(CTest)
 if(BUILD_TESTING)
     find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+    find_program(NODE_EXECUTABLE NAMES node)
+    if(NODE_EXECUTABLE)
+        add_test(NAME browser.extension COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/ExtensionTests.mjs")
+        set_tests_properties(browser.extension PROPERTIES TIMEOUT 30)
+    else()
+        message(STATUS "Node.js unavailable: extension state checks require a separate Node test run.")
+    endif()
+    add_executable(downshift_browser_tests tests/BrowserDriver.cpp)
+    target_link_libraries(downshift_browser_tests PRIVATE downshift_browser downshift_gui)
+    target_compile_options(downshift_browser_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME browser.native COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserTests.py" "$<TARGET_FILE:downshift_native_host>" "$<TARGET_FILE:downshift_browser_tests>")
+    set_tests_properties(browser.native PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
     add_executable(downshift_gui_tests tests/GuiTests.cpp)
     target_link_libraries(downshift_gui_tests PRIVATE downshift_gui)
     target_compile_options(downshift_gui_tests PRIVATE /W4 /permissive- /utf-8)

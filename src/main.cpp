@@ -1,5 +1,10 @@
 #include "core/Runtime.h"
 #include "gui/MainWindow.h"
+#include "browser/PipeServer.h"
+#include "browser/NativeProtocol.h"
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 #include <QApplication>
 #include <QMessageBox>
@@ -20,12 +25,26 @@ int main(int argc, char* argv[]) {
 
     try {
         downshift::CurlRuntime curl;
+        struct Instance {HANDLE mutex=nullptr;~Instance(){if(mutex)CloseHandle(mutex);}} instance;
+        if(!smokeTest) {
+            const auto name=("Local\\Downshift-"+downshift::browser::userSid()).toStdWString();instance.mutex=CreateMutexW(nullptr,FALSE,name.c_str());
+            if(!instance.mutex)throw std::runtime_error("Downshift could not establish its local instance.");
+            if(GetLastError()==ERROR_ALREADY_EXISTS) {
+                std::jthread activate([&application]{try{(void)downshift::browser::send({{"version",1},{"command","open"}});}catch(...){}QMetaObject::invokeMethod(&application,&QCoreApplication::quit,Qt::QueuedConnection);});
+                return application.exec();
+            }
+        }
         (void)downshift::checkDependencies();
         QTemporaryDir temporary;
         const auto directory=smokeTest ? temporary.path() : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         downshift::QueueManager queue(QDir(directory).filePath("queue.sqlite"));
         downshift::MainWindow window(queue);
         window.show();
+        std::unique_ptr<downshift::browser::PipeServer> browser;
+        if(!smokeTest) {
+            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();window.activateWindow();},Qt::QueuedConnection);});
+            auto* status=new QTimer(&window);status->setInterval(1000);QObject::connect(status,&QTimer::timeout,&window,[&window,&browser]{window.chromeStatus(browser->active() ? "Ready for the extension":"Unavailable");});status->start();
+        }
 
         if (smokeTest) {
             QTimer::singleShot(1000, &window, [&application, &window] {

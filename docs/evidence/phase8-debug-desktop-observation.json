@@ -1,0 +1,8 @@
+{
+  "scope": "Observed earlier Debug desktop-test failure; not silently discarded",
+  "date": "2026-10-13",
+  "log_sha256": "1d7196847f8a2820cbdd7f03f0e96e1f3837feaafb5c9e160356e6e667842c74",
+  "failure": "GUI must show real running worker; observed status/error was not available in the original assertion.",
+  "followup": "Added assertion diagnostics without changing product behavior or weakening acceptance. Focused GUI rerun passed; final complete-suite results are in phase8-local-tests.json. External cause remains unestablished.",
+  "focused_rerun_log_sha256": "a46077bec7d8987831a03df79c81eaf10b07a6a6aeb4f6e108b328dede8b9036"
+}

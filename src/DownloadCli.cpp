@@ -49,6 +49,9 @@ void resultJson(const downshift::DownloadResult& r) {
         << ",\"peak_working_set_bytes\":" << m.peakWorkingSetBytes << ",\"write_bytes\":" << m.writeBytes
         << ",\"write_seconds\":" << m.writeSeconds << ",\"allocation_seconds\":" << m.allocationSeconds
         << ",\"checksum_seconds\":" << m.checksumSeconds << ",\"flush_seconds\":" << m.flushSeconds
+        << ",\"write_calls\":" << m.writeCalls << ",\"checksum_read_bytes\":" << m.checksumReadBytes
+        << ",\"checksum_read_calls\":" << m.checksumReadCalls << ",\"checkpoint_seconds\":" << m.checkpointSeconds
+        << ",\"checkpoints\":" << m.checkpoints
         << ",\"connection_setup_seconds\":" << m.connectionSetupSeconds << ",\"first_byte_seconds\":" << m.firstByteSeconds
         << ",\"connections_opened\":" << m.connectionsOpened << ",\"network_bytes\":" << m.networkBytes
         << ",\"smallest_range_bytes\":" << m.smallestRangeBytes << ",\"largest_range_bytes\":" << m.largestRangeBytes

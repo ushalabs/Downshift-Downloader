@@ -2,16 +2,16 @@
 
 ## Phase gate
 
-- Current phase: 7 - Chrome Integration.
-- Last approved phase: 7; Phases 5-7 approved together on 2026-10-12.
-- Last completed phase: 7 - Chrome Integration (2026-10-12).
-- Status: Phases 5-7 verified; Phase 7 is the final Git checkpoint of this authorized batch. Phase 8 requires further approval.
+- Current phase: 8 - Performance Optimization.
+- Last approved phase: 8; approved after the completed Phase 5-7 batch.
+- Last completed phase: 8 - Performance Optimization (2026-10-13).
+- Status: Phase 8 implemented and verified locally; changes remain uncommitted for the user’s manual Git handoff.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
-- Git workflow: the latest user instruction authorizes assistant commits and pushes after each verified phase in this batch.
+- Git workflow: the latest user instruction reserves all Git operations for the user. Leave Phase 8 uncommitted and provide `main` creation/merge instructions after completion.
 - Authorized repository: https://github.com/ushalabs/Downshift-Download-Manager.
-- Phases 5, 6, and 7 authorization: granted. Phase 8: not granted.
+- Phases 1-8: completed locally. Phase 9: not granted.
 
 ## Completed work
 
@@ -178,7 +178,7 @@ Logs are `build/phase4-{release,debug}-{build,tests}.log` and `build/phase4-benc
 - The WIP commit and push occurred before the earlier manual workflow. The latest user request now authorizes assistant commits and pushes after each verified Phase 5-7.
 - Phases 2 and 3 were left uncommitted at their handoffs; the user subsequently committed them. No assistant commits/pushes were made during Phases 2-4.
 - Assistant phase checkpoints: Phase 5 `b90ca734e782628a06eb42fd7b27d97f5ce91491`, Phase 6 `d1ccb51c1988abd2fa0be26af5f81afdb18754c6`; both pushed to `dev/phase-01-foundation` and remotely verified.
-- Phase 7 checkpoint: the commit containing the acceptance record below. Phase 8 remains unapproved. No new successful CI result is claimed.
+- Phase 7 checkpoint: `017390e3167f0f6dad40f2671ae29f8f894d456a`, matched to the remote development branch at Phase 8 start. Phase 8 is now approved with all Git operations reserved for the user. No new successful CI result is claimed.
 
 Use Git history to resolve the current document's containing commit; a commit cannot embed its own hash. Record earlier verified commit IDs here once available.
 
@@ -231,3 +231,21 @@ Resolved test-environment failures before these passing results: native IDM inte
 Acceptance: supported public downloads transfer successfully from actual Chrome into the native application, with tested failures and duplicate-safe recovery. Limits: browser cookies/authentication are not forwarded; the original browser ETag/checksum is unavailable, so same-length personalized/public representations cannot be proven equivalent. Unsupported/private resources should stay in Chrome. After cancellation an unavailable native receipt holds the decision pending until reconnect, avoiding an uncertain duplicate. Receipts are retained with a 10,000 bound. Same-user software is outside the Windows account protection boundary; remote/foreign-user rejection is enforced in code but not exercised with a second account. These are controlled HTTP tests, not universal website, HTTP/2 wire, public TLS-browser, throughput, reboot/power-loss, installer, or release claims. Setup, recovery, and precise boundaries are in [Chrome integration](CHROME.md) and [testing](TESTING.md).
 
 Logs: `build/phase7-{release,debug}-{build,tests}.log` and `build/phase7-chrome-{release,debug}.log`. Commit/push this final verified phase to the existing branch; its own hash is resolved from Git history. After remote verification, all three approved phases are finished and Phase 8 awaits the user's approval.
+
+## Phase 8 verification (2026-10-13)
+
+Approved separately after Phase 7. All source, builds, test files, and reports remain in `C:\Users\HP\Desktop\Projects\Downshift`. The user reserves all Git operations and requested instructions for a new `main` branch and merge after completion. No staging, commit, branch, merge, or push operation has been performed during this phase. Phase 9 remains unapproved.
+
+Implemented bounded 64 KiB validated/paced segment-write buffers, a reusable 1 MiB checksum-read buffer, requested 256 KiB segmented libcurl receives, and write/read/checkpoint counters. Streaming retains the established default receive/direct-write path after a wider-receive prototype regressed. Retry progress subtracts actual writes; successful verified responses alone flush short segment tails. Independent range/final checksums, flush-before-journal ordering, TLS/validator/length checks, and queue limits remain intact.
+
+Long prototype benchmarks exposed an existing metadata-replacement failure in both original Phase 7 and optimized clients. An isolated operation-specific diagnostic confirmed Windows error 5 during replacement; the external blocking cause is unknown. Production retries only relevant replacement errors with nine attempts/eight 25 ms waits (200 ms of requested waits; filesystem calls and scheduling can add time), retaining the prior encrypted ledger on exhaustion. Real Windows reader-lock tests verify transient recovery, permanent safe failure, encrypted checkpoint preservation, and temporary-file cleanup. Final performance comparisons apply this identical journal hardening to the Phase 7 comparison engine to isolate the I/O changes. See [performance decisions and provenance](PERFORMANCE.md).
+
+Both MSVC x64 builds compiled without warnings/errors. Final full CTest: Release **12/12 passed, 102.03 s**; Debug **12/12 passed, 105.61 s**. Each configuration passed 12,239 engine checks, 52 HTTP/HTTPS integration scenarios, 12 adaptive scenarios, 22 buffered/tail/retry transfers, 36 recovery scenarios, 26 queue checks, 19 desktop checks, 27 native browser checks, 29 extension checks, dependency checks, and two GUI startup checks. GUI longest event gaps were 0.068059 s Release / 0.210436 s Debug. Separate actual Chrome for Testing: **9 checks each**, with independently hashed native and browser files. Evidence: [local tests](evidence/phase8-local-tests.json), [Release Chrome](evidence/phase8-chrome-release.json), [Debug Chrome](evidence/phase8-chrome-debug.json). Earlier prototype test evidence is preserved separately under `phase8-wide-*`.
+
+An earlier Debug desktop check observed a non-running status after its progress threshold; the original assertion did not report status/error. Added diagnostic output without changing the product or weakening the check. A focused rerun and subsequent complete suites passed; no external cause is inferred. Its failure is retained in [verification notes](evidence/phase8-debug-desktop-observation.json) rather than described as a clean first run.
+
+An early Chrome restart test closed the browser after its storage stage became preparing but before a native queue entry existed. The corrected harness holds a test-only browser storage transition after real native prepare acknowledgment, asserts a real Prepared entry, then closes Chrome before cancellation authorization advances. The gate dies with the old worker; the replacement uses unchanged real APIs. No product extension code changed. Final tests restored the original absent HKCU registration and left the normal profile untouched.
+
+Preserved preliminary performance evidence: 36 initial diagnostic samples, 36 first-pilot samples, 18 receive-pilot samples, and incomplete prototype runs of 137 and 39 samples. These prototypes are excluded from final acceptance. Installed IDM 6,42,63,3 did not request the local fixture or produce a file in either final documented-CLI availability probe. Probe-owned launchers were closed; no throughput comparison or licensing/configuration cause is inferred. See [IDM status](IDM_COMPARISON.md).
+
+Final matrix: **180 accepted samples, 90 pairs, 30 cases, three pairs each; zero failed attempts.** All sizes/hashes, exact byte totals/range coverage, hard connection bounds, current binary/source fingerprints, and archive hashes passed. No interrupted/prototype subsets are combined. [Final report](../benchmarks/results/phase8-final-20261013.md), [acceptance evidence](evidence/phase8-performance-acceptance.json), and [measured source archive](../benchmarks/results/phase8-final-source.json) retain reproducible results. The full report includes gains and regressions; no universal speed/CPU or IDM advantage is claimed. Phase 8 meets its verified-benchmark/documented-decisions/correctness criteria. Git HEAD remains the Phase 7 checkpoint; all phase changes remain uncommitted for the user. [Manual Git instructions](GIT_HANDOFF.md) are prepared for the completed handoff. No new CI, physical-network/storage, HTTP/2 wire, installer, or release result is claimed.

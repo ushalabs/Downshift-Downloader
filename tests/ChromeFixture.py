@@ -12,9 +12,6 @@ class ChromeHandler(Handler):
             html=b'''<!doctype html><html><title>Downshift browser fixture</title><body><h1>Local download checks</h1><a id="public" href="/range?kind=public" download>Public file</a><a id="auth" href="/range?kind=auth" download>Authenticated file</a><a id="stream" href="/stream?kind=stream" download>Streaming file</a><a id="restart" href="/range?kind=restart" download>Worker restart file</a></body></html>'''
             self.send_response(200);self.send_header("Content-Type","text/html");self.send_header("Content-Length",str(len(html)));self.end_headers();self.wfile.write(html);return
         query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-        if query.get("kind")==["restart"] and self.headers.get("Range")=="bytes=0-0":
-            import time
-            time.sleep(.8)
         if query.get("kind")==["auth"] and "fixture_session=authorized" not in self.headers.get("Cookie",""):
             self.send_error(401);return
         # Chrome resumes with open-ended HTTP ranges, which the engine's narrow fixture

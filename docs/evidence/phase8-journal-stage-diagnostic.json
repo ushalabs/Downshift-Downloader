@@ -1,0 +1,13 @@
+{
+  "scope": "Diagnostic-only Phase 7 engine with Windows error number on failures, not performance acceptance",
+  "executable_sha256": "447873434362ee20d0b74f07fad6ce7c0c31c349cc61bd086da4df2c2ebee6af",
+  "source_sha256": "70a8836e81f63032c8782994dc3e8181db44c74fe71d47192acc00b42314fcbe",
+  "attempts": [
+    {
+      "index": 0,
+      "code": 1,
+      "stderr": "Downshift: Unable to safely read or save recovery metadata. Windows error 5 (replace). [category=7]\n",
+      "stdout": ""
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 # Downshift benchmarks
 
-Phase 3 supplies a reproducible Release benchmark suite and measured local results; Phase 4 records a separate fresh-download performance check with recovery enabled. No direct IDM comparison has been performed. These results describe controlled HTTP/1.1 loopback traffic on the development machine; they do not establish Internet throughput or universal superiority over another application.
+Phase 8 adds a paired comparison against the preserved Phase 7 Release executable. Its measured bottlenecks, bounded buffering changes, reproduction steps, and current evidence are in [Phase 8 performance](PERFORMANCE.md). [IDM comparison status](IDM_COMPARISON.md) records the installed comparator's unsuccessful availability probes; no IDM throughput is claimed.
+
+The historical Phase 3/4 evidence below describes earlier engines. All these results describe controlled HTTP/1.1 loopback traffic on the development machine; they do not establish Internet throughput or universal superiority over another application.
 
 ## Reproduce
 

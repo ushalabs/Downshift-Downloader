@@ -31,7 +31,21 @@ const expected=crypto.createHash('sha256');for(let i=0;i<4*1024*1024/256;i++)exp
     item=await click('public');await until(async()=>(await rows()).some(r=>r.status===3));let nativeRows=await rows();assert.equal(nativeRows.length,1);assert.equal(digest(nativeRows[0].destination),checksum);await until(async()=>(await items()).find(d=>d.id===item.id)?.error==='USER_CANCELED');checks++;
     await popup.evaluate(()=>chrome.runtime.sendMessage({type:'reconcile'}));assert.equal((await rows()).length,1);checks++;
     // Restart actual Chrome (and its MV3 worker) while durable preparation is pending.
+    // Hold the next browser storage transition AFTER actual native preparation
+    // replies, before cancellation is authorized. All other storage calls remain
+    // real. Browser shutdown destroys this test-only gate with the old worker.
+    await worker.evaluate(()=>{
+      const save=chrome.storage.local.set.bind(chrome.storage.local);
+      chrome.storage.local.set=async values=>{
+        if(Object.values(values.handoffState?.pending || {}).some(r=>r.phase==='prepared')) {
+          globalThis.restartPreparedBlocked=true;await new Promise(()=>{});
+        }
+        return save(values);
+      };
+    });
     item=await click('restart');await until(async()=>await worker.evaluate(async()=>Object.values((await chrome.storage.local.get('handoffState')).handoffState.pending).some(r=>r.phase==='preparing')));
+    await until(async()=>await worker.evaluate(()=>!!globalThis.restartPreparedBlocked));
+    nativeRows=await rows();assert.equal(nativeRows.length,2);assert.equal(nativeRows.filter(r=>r.status===6).length,1);
     const previousWorker=worker;await context.close();context=await chromium.launchPersistentContext(path.join(root,'profile'),browserOptions);
     worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker',{timeout:15000});assert.notEqual(worker,previousWorker);
     popup=await context.newPage();await popup.goto(`chrome-extension://${id}/popup.html`);page=await context.newPage();await page.goto(base+'/page');

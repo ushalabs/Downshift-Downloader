@@ -1,8 +1,8 @@
 # Downshift
 
-Downshift is a free, open-source native Windows download manager being developed in ten approved phases. The product name is **Downshift**; the executable is `Downshift.exe`.
+Downshift is a free, open-source native Windows download manager being developed in ten phases. The product name is **Downshift**; the executable is `Downshift.exe`.
 
-**Phases 1-7 are implemented and verified locally.** The adaptive native engine supports safe pause/resume, bounded retries, verified crash recovery, and streaming fallback. The encrypted persistent queue provides priorities, simultaneous downloads, origin limits, and bandwidth pacing. Native desktop controls and a Chrome extension connect to those workers. See [development progress](docs/DEVELOPMENT_PROGRESS.md) for acceptance results and [Chrome setup](docs/CHROME.md) for local browser installation. No direct IDM performance comparison has been performed.
+**Phases 1-8 are implemented and verified locally.** The adaptive native engine supports safe pause/resume, bounded retries, verified crash recovery, and streaming fallback. The encrypted persistent queue provides priorities, simultaneous downloads, origin limits, and bandwidth pacing. Native desktop controls and a Chrome extension connect to those workers. See [development progress](docs/DEVELOPMENT_PROGRESS.md) for acceptance results and [Chrome setup](docs/CHROME.md) for local browser installation. No direct IDM performance comparison has been performed.
 
 ## Implemented features
 
@@ -22,7 +22,8 @@ Downshift is a free, open-source native Windows download manager being developed
 - Bounded transient retries with jitter/Retry-After and explicit archival restart when safe resume is unavailable.
 - Persistent SQLite queue/history/settings with user-scoped encryption, priorities, concurrency limits, and global/per-download pacing.
 - Manifest V3 Chrome extension, restricted Native Messaging/Windows IPC, durable handoff receipts, and tested browser fallback for unsupported or unavailable transfers.
-- Reproducible loopback benchmarks for 100 MB, 1 GB, and 5 GB files; SHA-256 verification before accepting samples.
+- Bounded segmented write buffers, larger checksum reads, recovery-metadata contention handling, and structured I/O/checkpoint counters.
+- Reproducible paired loopback benchmarks: 180 independently verified 100 MB/1 GB/5 GB samples across fixed counts, automatic mode, streaming, and traffic caps. See [performance results](docs/PERFORMANCE.md) for measured gains, regressions, and limits.
 
 ## Build
 
@@ -54,7 +55,7 @@ The first configure builds the dependency set from source and can take substanti
 9. Windows packaging.
 10. GitHub release.
 
-The user approved Phases 5-7 together and requested an assistant commit/push after each verified phase, without intervening approval questions. Phase 8 remains unapproved. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
+The user approved Phase 8 after the completed Phase 5-7 batch. All Phase 8 Git operations belong to the user; [the Git handoff](docs/GIT_HANDOFF.md) explains committing the verified changes, creating `main`, and merging the existing development branch. Phase 9 packaging requires further approval. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
 
 Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 
@@ -64,6 +65,9 @@ Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 - [Development progress](docs/DEVELOPMENT_PROGRESS.md)
 - [Setup and installation](docs/INSTALLATION.md)
 - [Benchmark status and methodology](docs/BENCHMARKS.md)
+- [Phase 8 optimization and paired measurements](docs/PERFORMANCE.md)
+- [IDM comparison availability](docs/IDM_COMPARISON.md)
+- [Manual Git steps: create main and merge](docs/GIT_HANDOFF.md)
 - [Third-party licensing](docs/THIRD_PARTY_NOTICES.md)
 - [Engine tests](docs/TESTING.md)
 - [Pause/resume and recovery](docs/RECOVERY.md)

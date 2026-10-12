@@ -1,0 +1,32 @@
+{
+  "started_utc": "2026-10-12T17:24:09.536720+00:00",
+  "version": "6, 42, 63, 3",
+  "executable_sha256": "27ca6f93b7c9fa368012f66ed5a9aa3916cb523a5562ec3d8ee289029858cf63",
+  "available_for_benchmark": false,
+  "attempts": [
+    {
+      "syntax": "documented-parameter-order",
+      "return_code": null,
+      "seconds": 30.037555400282145,
+      "server_requests": [],
+      "download_ranges": [],
+      "file_exists": false,
+      "sha256_verified": false,
+      "launched_pid": 8960,
+      "closed_own_failed_launcher": true
+    },
+    {
+      "syntax": "documented-example-order",
+      "return_code": null,
+      "seconds": 30.090506199747324,
+      "server_requests": [],
+      "download_ranges": [],
+      "file_exists": false,
+      "sha256_verified": false,
+      "launched_pid": 448,
+      "closed_own_failed_launcher": true
+    }
+  ],
+  "scope": "CLI availability only; no accepted IDM throughput/CPU comparison",
+  "documentation": "https://www.internetdownloadmanager.com/support/command_line.html"
+}

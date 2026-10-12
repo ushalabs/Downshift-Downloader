@@ -5,8 +5,8 @@ Product name: Downshift. The original phase-gated requirements follow.
 ## Direct user instructions overriding the original attachment (2026-10-12)
 
 - Develop locally in `C:\Users\HP\Desktop\Projects\Downshift`.
-- Latest authorization: implement Phases 5, 6, and 7 sequentially without intervening approval questions. Commit and push after each verified phase. Phase 8 remains unapproved.
-- This supersedes the earlier one-phase approval and manual Git workflow. Preserve user history and use the existing development branch.
+- Latest authorization: implement and verify Phase 8. The user will perform all Git operations; provide instructions afterward to create `main` and merge the existing development branch. Do not execute branch/commit/merge/push operations. Phase 9 remains unapproved.
+- This supersedes the completed Phase 5-7 batch's assistant Git authorization. Preserve user history and work in the existing local checkout.
 - The original prompt below remains a technical requirements reference; direct user instructions control phase progression.
 
 # CODEX MASTER PROMPT

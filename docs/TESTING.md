@@ -1,5 +1,7 @@
 # Engine verification
 
+The desktop group uses real Qt controls and a real engine transfer; it verifies pause/resume, independent checksum, filters, details, Save/Cancel settings, history reopening, validation feedback, deletion, renders, and an event-loop heartbeat. See [desktop checks](DESKTOP.md).
+
 Run `ctest --preset release` and `ctest --preset debug` after their corresponding builds. Groups cover dependency lifecycle, two Qt startup/rendering checks, engine units, HTTP/HTTPS integration, adaptive policy, cross-process recovery, and the persistent queue. Python 3.10+ is needed only for integration/benchmark servers, not the native application. Test output/timing are correctness evidence; separate repeated runs provide benchmarks.
 
 The queue group runs real concurrent transfers, independently checks their SHA-256, tests global/per-origin limits and byte pacing, and verifies priorities, encrypted SQLite/WAL, settings/history persistence, exclusive ownership, pause/cancel/removal, forced process death, recovery, and corruption failure. See [queue architecture](QUEUE.md).

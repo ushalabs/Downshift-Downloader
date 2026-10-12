@@ -49,7 +49,7 @@ For an external tools location, pass `-ToolsDirectory 'C:\your\tools'` to bootst
 ./build/windows-msvc/Release/Downshift.exe
 ```
 
-The window shows Downshift and the linked dependency versions. Full desktop download controls are Phase 6. CTest checks its rendering/event loop with `qwindows` and `qminimal`. Phase 2 provides a native development download client:
+The desktop provides working download controls, details, search/history, settings, and light/dark themes. See [desktop usage](DESKTOP.md). CTest checks rendering/event-loop startup with `qwindows` and `qminimal`, plus real GUI download/control scenarios. The native development download client remains available:
 
 ```powershell
 ./build/windows-msvc/Release/DownshiftDownload.exe --help

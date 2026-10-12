@@ -5,11 +5,15 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QStandardPaths>
 #include <QUrl>
 #include <algorithm>
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 namespace downshift {
 namespace {
 std::filesystem::path path(const QString& s) { return std::filesystem::path(s.toStdWString()); }
@@ -42,25 +46,29 @@ QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
     return s;
 }
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
-    {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"}}; }
+    {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"},
+    {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)}}; }
 QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString(); e.origin=downshift::origin(e.url);
     e.error=o.value("error").toString(); e.sha256=o.value("sha256").toString(); e.status=static_cast<QueueStatus>(o.value("status").toInt(-1)); e.priority=o.value("priority").toInt();
     e.created=o.value("created").toString().toLongLong(); e.updated=o.value("updated").toString().toLongLong(); e.existing=static_cast<ExistingDownload>(o.value("existing").toInt(-1)); e.speedLimit=o.value("speedLimit").toString().toULongLong();
     e.progress.downloadedBytes=o.value("downloaded").toString().toULongLong(); e.progress.verifiedBytes=o.value("verified").toString().toULongLong();
     const auto total=o.value("total").toString(); if(!total.isEmpty()) e.progress.totalBytes=total.toULongLong(); e.progress.resumable=o.value("resumable").toBool();
+    e.progress.averageBytesPerSecond=o.value("averageSpeed").toDouble();e.progress.elapsedSeconds=o.value("elapsed").toDouble();e.progress.targetConnections=static_cast<std::uint32_t>(o.value("targetConnections").toInt(1));
+    if(e.progress.averageBytesPerSecond<0 || e.progress.averageBytesPerSecond>1e15 || e.progress.elapsedSeconds<0 || e.progress.elapsedSeconds>1e12 || e.progress.targetConnections<1 || e.progress.targetConnections>16) invalid("Invalid saved download metrics.");
     if(e.id.size()!=32 || e.status < QueueStatus::Queued || e.status > QueueStatus::Prepared || e.existing < ExistingDownload::New || e.existing > ExistingDownload::Restart || e.priority < -1 || e.priority > 1 || e.destination.isEmpty()) invalid("Damaged download record.");
     return e;
 }
 class QueueManager::RateBudget {
-    std::mutex mutex; std::uint64_t rate=0;
+    std::mutex mutex; std::uint64_t rate=0, generation=0;
     std::chrono::steady_clock::time_point next = std::chrono::steady_clock::now();
 public:
-    void configure(std::uint64_t value) { std::lock_guard lock(mutex); rate=value; next=std::chrono::steady_clock::now(); }
+    void configure(std::uint64_t value) { std::lock_guard lock(mutex); rate=value; ++generation; next=std::chrono::steady_clock::now(); }
     void wait(std::size_t count, std::stop_token stop, DownloadControl* control) {
-        std::chrono::steady_clock::time_point due;
-        { std::lock_guard lock(mutex); if (!rate) return; next=std::max(next,std::chrono::steady_clock::now()) + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(static_cast<double>(count)/static_cast<double>(rate))); due=next; }
+        std::chrono::steady_clock::time_point due; std::uint64_t version;
+        { std::lock_guard lock(mutex); if (!rate) return; version=generation; next=std::max(next,std::chrono::steady_clock::now()) + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(static_cast<double>(count)/static_cast<double>(rate))); due=next; }
         while (std::chrono::steady_clock::now() < due) {
+            { std::lock_guard lock(mutex); if(generation!=version) return; }
             if (stop.stop_requested()) throw DownloadError(DownloadErrorCode::Cancelled,"Download cancelled; partial files preserved.");
             if (control->pauseRequested()) throw DownloadError(DownloadErrorCode::Paused,"Download paused.");
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -112,6 +120,11 @@ void QueueManager::save(QueueEntry& e) {
     e.updated=QDateTime::currentSecsSinceEpoch();
     try { store_->save(e.id,QJsonDocument(e.json()).toJson(QJsonDocument::Compact)); }
     catch (...) { fatal_=std::current_exception(); throw; } // Fail closed before scheduling unpersisted work.
+    if(settings_.diagnostics) {
+        QFile log(database_+".log");
+        if(log.open(log.size()>1024*1024 ? QIODevice::WriteOnly|QIODevice::Truncate : QIODevice::WriteOnly|QIODevice::Append))
+            log.write(QString("%1 %2 %3\n").arg(e.updated).arg(e.id).arg(statusText(e.status)).toUtf8());
+    }
 }
 std::future<QString> QueueManager::add(QString url,QString dest,int priority,bool start,QString sha256,std::uint64_t speedLimit) {
     return submit([this,url=std::move(url),dest=std::move(dest),priority,start,sha256=std::move(sha256),speedLimit] {
@@ -145,6 +158,17 @@ std::future<void> QueueManager::rename(QString id,QString dest) { return submit(
     const auto d=destination(dest); for(const auto& old:entries_) if(old.id!=id && old.destination.compare(d,Qt::CaseInsensitive)==0) invalid("Another download owns that destination.");
     if(QFileInfo::exists(d) || QFileInfo::exists(d+".part") || QFileInfo::exists(d+".part.resume")) invalid("The destination already exists.");
     e.destination=d; save(e);
+}); }
+std::future<void> QueueManager::deleteCompleted(QString id) { return submit([this,id=std::move(id)] {
+    auto& e=entry(id); if(e.status!=QueueStatus::Completed || workers_.contains(id)) invalid("Only completed files can be deleted here.");
+    const auto p=path(e.destination);
+    const auto handle=CreateFileW(p.c_str(),GENERIC_READ|DELETE,0,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+    if(handle==INVALID_HANDLE_VALUE) invalid("The completed file could not be opened for deletion.");
+    BY_HANDLE_FILE_INFORMATION info{}; FILE_DISPOSITION_INFO disposition{TRUE};
+    const bool safe=GetFileInformationByHandle(handle,&info) && info.nNumberOfLinks==1 && !(info.dwFileAttributes&(FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_DIRECTORY));
+    const bool deleted=safe && SetFileInformationByHandle(handle,FileDispositionInfo,&disposition,sizeof(disposition)); CloseHandle(handle);
+    if(!deleted) invalid("The completed file could not be safely deleted.");
+    store_->erase(id); std::erase_if(entries_,[&](const auto& row){return row.id==id;});
 }); }
 std::future<void> QueueManager::configure(QueueSettings s) { return submit([this,s=std::move(s)]() mutable {
     s=QueueSettings::fromJson(s.json()); if(s.directory.isEmpty() || !QFileInfo(s.directory).isDir()) invalid("Select an existing download directory.");

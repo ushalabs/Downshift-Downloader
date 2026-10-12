@@ -2,10 +2,10 @@
 
 ## Phase gate
 
-- Current phase: 5 - Queue and Persistence.
+- Current phase: 6 - Modern Desktop GUI.
 - Last approved phase: 7; Phases 5-7 approved together on 2026-10-12.
-- Last completed phase: 5 - Queue and Persistence (2026-10-12).
-- Status: Phase 5 verified; commit/push checkpoint, then continue the approved batch with Phase 6.
+- Last completed phase: 6 - Modern Desktop GUI (2026-10-12).
+- Status: Phase 6 verified; commit/push checkpoint, then continue directly with Phase 7.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
@@ -79,7 +79,7 @@ The vcpkg baseline and tool checkout are pinned to `e456309491fd875487bf02b8a0dc
 
 ## Phase handoff
 
-The user committed Phase 4 (`49bac63`) and authorized Phases 5-7 as a single batch, including assistant commits and pushes after each phase. Phase 5 is verified; continue directly with Phase 6 after its Git checkpoint. The following historical acceptance records preserve the workflow in effect when they were written.
+The user committed Phase 4 (`49bac63`) and authorized Phases 5-7 as a single batch. Phase 5 was pushed as `b90ca734e782628a06eb42fd7b27d97f5ce91491`, with the remote ref verified. Phase 6 is verified and ready for its Git checkpoint; continue directly with Phase 7. Historical acceptance records preserve the workflow in effect when written.
 
 ## Phase 2 acceptance (2026-10-12)
 
@@ -190,3 +190,13 @@ Both MSVC x64 configurations compiled without warnings/errors. All eight CTest g
 Initial failures were in fixtures: a query string accidentally disabled test-server ranges, and Python's SQLite context manager left a corruption-test connection open during directory cleanup. Corrected both and added unconditional child-process cleanup before the final passing runs. Durable queue save failures stop scheduling. Range journals remain the authority for actual verified recovery intervals. Limits apply to the submitted origin; independent redirects do not share a global target-host reservation. Global and per-download caps can conservatively underutilize bandwidth when combined. No new performance or CI result is claimed.
 
 Acceptance: queues/history/settings persist, multiple real downloads are scheduled reliably, and interruptions preserve recoverable work. Logs: `build/phase5-{release,debug}-{build,tests}.log`. Commit this verified phase to the existing development branch, verify its remote ref after push, then begin already-approved Phase 6. Resolve this checkpoint's containing commit from Git history rather than embedding a self-referential hash.
+
+## Phase 6 acceptance (2026-10-12)
+
+Added the real Qt desktop: light-default/dark appearance, native branding, live download table, progress/rates/ETA/connections/status/priority, selected details, aggregate speed, add/start/pause/resume/cancel/restart controls, search/filters/history, filename changes, copy link/open folder, and explicit confirmed open/delete actions. Settings persist folder, concurrency/connection limits, speed, appearance, startup queue behavior, notifications, and redacted activity logging. Completed history retains average rate/elapsed time. All queue/database/file/engine operations remain on workers; GUI snapshots and command results are asynchronous and bounded. Closing cooperatively pauses workers.
+
+Both MSVC configurations compiled without warnings/errors. All nine CTest groups passed across the full regression and final targeted runs in each configuration. The full Debug suite passed in 79.90 s. The initial full Release run passed eight groups but its GUI heartbeat assertion included initial widget construction while a Debug build was consuming CPU. Scoped that assertion to the actual download interval and reran the changed GUI/queue groups in both configurations. Final targeted Release: 2/2 passed, 31.92 s; Debug: 2/2 passed, 33.12 s. GUI checks: 19 each, including an independently reread SHA-256, pause/resume, details/search/filters, settings Save/Cancel, actual light/dark renders, validation feedback, history/settings/metrics reopening, and worker deletion. Longest observed transfer event gap: 0.0316 s Release and 0.1522 s Debug. Queue checks: 26 each, including live aggregate-cap changes waking a long wait and redacted diagnostic logs. Existing engine/TLS/recovery/dependency/Windows/minimal GUI checks passed in the full runs; no further engine change followed them.
+
+Render review corrected the aggregate-speed label width and provided validation feedback inside Add Download. Qt's pinned minimal feature set does not encode PNG; test renders use built-in BMP and the committed PNG screenshots are conversions of real captures. Visually reviewed both actual themes. The test loop explicitly drains deferred widget deletion. Files/screenshots are in the Desktop project; no mockup, Internet-speed, startup benchmark, or CI result is claimed.
+
+Acceptance: the functional desktop operates the real queue/engine while remaining responsive during transfers. Usage/security and shutdown behavior: `docs/DESKTOP.md`. Logs: `build/phase6-{release,debug}-{build,tests}.log` and `build/phase6-controls-{release,debug}-tests.log`. Chrome status awaits Phase 7; installer/distribution remains later. Commit and push this verified phase to the same branch, verify its remote ref, and continue with already-approved Phase 7.

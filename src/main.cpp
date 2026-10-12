@@ -5,6 +5,9 @@
 #include <QMessageBox>
 #include <QPixmap>
 #include <QTimer>
+#include <QDir>
+#include <QStandardPaths>
+#include <QTemporaryDir>
 
 #include <exception>
 
@@ -17,14 +20,17 @@ int main(int argc, char* argv[]) {
 
     try {
         downshift::CurlRuntime curl;
-        const auto dependencies = downshift::checkDependencies();
-        downshift::MainWindow window(dependencies);
+        (void)downshift::checkDependencies();
+        QTemporaryDir temporary;
+        const auto directory=smokeTest ? temporary.path() : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        downshift::QueueManager queue(QDir(directory).filePath("queue.sqlite"));
+        downshift::MainWindow window(queue);
         window.show();
 
         if (smokeTest) {
-            QTimer::singleShot(250, &window, [&application, &window] {
+            QTimer::singleShot(1000, &window, [&application, &window] {
                 const bool healthy = window.isVisible() && window.centralWidget() != nullptr &&
-                    window.windowTitle() == QStringLiteral("Downshift") && !window.grab().isNull();
+                    window.windowTitle() == QStringLiteral("Downshift") && window.ready() && !window.grab().isNull();
                 application.exit(healthy ? 0 : 1);
             });
         }

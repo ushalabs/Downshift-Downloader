@@ -6,7 +6,7 @@ Downshift is a free, open-source native Windows download manager being developed
 
 ## Implemented features
 
-- C++20 and Qt 6 Widgets application shell.
+- Native Qt 6 desktop with working download controls, live details, history/search, and light/dark themes.
 - libcurl process lifetime management and multi-handle capability check.
 - SQLite integration with an in-memory 64-bit write/read check.
 - Windows x64 MSVC CMake presets and pinned vcpkg dependency baseline.
@@ -67,6 +67,7 @@ Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 - [Engine tests](docs/TESTING.md)
 - [Pause/resume and recovery](docs/RECOVERY.md)
 - [Persistent queue](docs/QUEUE.md)
+- [Desktop usage](docs/DESKTOP.md)
 
 ## Download a file during development
 

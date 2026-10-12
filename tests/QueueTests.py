@@ -96,6 +96,14 @@ def main():
         rows=wait(d,lambda rows:next(r for r in rows if r["id"]==high)["status"]==3)
         assert next(r for r in rows if r["id"]==low)["status"]!=3
         wait(d,lambda rows:next(r for r in rows if r["id"]==low)["status"]==3); checks+=2
+        # A changed cap wakes even a very long existing pacing wait. Diagnostics are redacted.
+        settings.update(speedLimit="1",diagnostics=True); d.call("configure",settings=settings)
+        wake=d.call("add",url=secret,destination=str(root/"wake.bin"))["id"]
+        wait(d,lambda rows:any(r["id"]==wake and r["active"]>0 for r in rows)); time.sleep(.15)
+        settings.update(speedLimit="0"); d.call("configure",settings=settings)
+        wait(d,lambda rows:next(r for r in rows if r["id"]==wake)["status"]==3,timeout=6)
+        assert b"QUEUE_SECRET_4729" not in pathlib.Path(str(db)+".log").read_bytes()
+        d.call("action",id=wake,action=4); checks+=2
         d.close(); d=Driver(exe,db); assert len(d.rows())==6; d.close(); checks+=1
         # Authenticated encrypted record corruption is a visible startup failure.
         import sqlite3

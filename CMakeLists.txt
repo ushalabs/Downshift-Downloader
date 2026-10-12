@@ -48,13 +48,16 @@ add_library(downshift_queue STATIC
 target_link_libraries(downshift_queue PUBLIC downshift_engine Qt6::Core PRIVATE crypt32)
 target_compile_options(downshift_queue PRIVATE /W4 /permissive- /utf-8)
 
-qt_add_executable(downshift WIN32
-    src/main.cpp
+add_library(downshift_gui STATIC
     src/gui/MainWindow.cpp
     src/gui/MainWindow.h
+    src/gui/Dialogs.cpp
 )
+target_link_libraries(downshift_gui PUBLIC downshift_queue Qt6::Widgets)
+target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)
+qt_add_executable(downshift WIN32 src/main.cpp)
 set_target_properties(downshift PROPERTIES OUTPUT_NAME Downshift)
-target_link_libraries(downshift PRIVATE downshift_foundation Qt6::Widgets)
+target_link_libraries(downshift PRIVATE downshift_gui)
 target_compile_definitions(downshift PRIVATE
     DOWNSHIFT_VERSION="${PROJECT_VERSION}"
 )
@@ -77,6 +80,13 @@ add_custom_command(TARGET downshift POST_BUILD
 include(CTest)
 if(BUILD_TESTING)
     find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+    add_executable(downshift_gui_tests tests/GuiTests.cpp)
+    target_link_libraries(downshift_gui_tests PRIVATE downshift_gui)
+    target_compile_options(downshift_gui_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME gui.integration COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/GuiIntegration.py" "$<TARGET_FILE:downshift_gui_tests>"
+        "${CMAKE_CURRENT_BINARY_DIR}/gui-shots/$<CONFIG>")
+    set_tests_properties(gui.integration PROPERTIES TIMEOUT 90)
     add_executable(downshift_queue_tests tests/QueueDriver.cpp)
     target_link_libraries(downshift_queue_tests PRIVATE downshift_queue)
     target_compile_options(downshift_queue_tests PRIVATE /W4 /permissive- /utf-8)

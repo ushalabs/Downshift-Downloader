@@ -4,7 +4,7 @@
 
 The native Windows application uses C++20, MSVC v143, Qt 6 Widgets, libcurl multi with Schannel TLS/HTTP2, and SQLite's C API. Qt and the MSVC runtime are dynamically linked. CMake's x64 Visual Studio generator and a pinned vcpkg baseline build Debug and Release. HTTP/3 is not selected.
 
-`src/main.cpp` owns `QApplication` and `CurlRuntime`, validates linked dependencies, and opens the foundation `MainWindow`. The window does not call the transfer engine. The Phase 2 console executable, `DownshiftDownload.exe`, owns its own `CurlRuntime` and calls the engine on its main worker thread. The blocking API must remain off the GUI thread when desktop controls are added in Phase 6. Persistent queue/database work is Phase 5.
+`src/main.cpp` owns `QApplication`, `CurlRuntime`, and `QueueManager`, validates linked dependencies, and opens `MainWindow`. The window submits asynchronous commands and polls bounded snapshots; the queue service owns SQLite and starts engine workers. Blocking networking/database/file operations stay outside the GUI thread. The Phase 2 console executable, `DownshiftDownload.exe`, owns its own `CurlRuntime` and calls the engine on its main worker thread. See [desktop](DESKTOP.md) and [queue](QUEUE.md).
 
 ## Implemented engine
 

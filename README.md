@@ -2,7 +2,7 @@
 
 Downshift is a free, open-source native Windows download manager being developed in ten approved phases. The product name is **Downshift**; the executable is `Downshift.exe`.
 
-**Current status: Phase 4 completed locally.** Downshift downloads HTTP/HTTPS files through the development console client, with adaptive ranges/concurrency, live speed/ETA, pause/resume, bounded retries, verified crash recovery, and streaming fallback. Debug and Release each passed seven test groups, including 52 protocol, 12 adaptive, and 36 recovery scenarios. Phase 3 recorded 108 checksum-verified benchmark samples, including 5 GB files; Phase 4 adds a separate 100 MB performance check. The desktop window remains the foundation shell; the full interface is Phase 6. See [development progress](docs/DEVELOPMENT_PROGRESS.md). No direct IDM comparison has been performed.
+**Current work: approved Phases 5-7.** The adaptive native engine supports safe pause/resume, bounded retries, verified crash recovery, and streaming fallback. The persistent queue adds encrypted SQLite history/settings, priorities, simultaneous downloads, origin limits, and bandwidth pacing. Desktop controls and Chrome integration follow in the approved batch. See [development progress](docs/DEVELOPMENT_PROGRESS.md) for verified acceptance results. No direct IDM comparison has been performed.
 
 ## Implemented features
 
@@ -20,6 +20,7 @@ Downshift is a free, open-source native Windows download manager being developed
 - Live speed/ETA, structured measurements, process CPU/memory and file-call timings.
 - Console pause/resume, encrypted range checkpoints, local/remote revalidation, and recovery after forced termination.
 - Bounded transient retries with jitter/Retry-After and explicit archival restart when safe resume is unavailable.
+- Persistent SQLite queue/history/settings with user-scoped encryption, priorities, concurrency limits, and global/per-download pacing.
 - Reproducible loopback benchmarks for 100 MB, 1 GB, and 5 GB files; SHA-256 verification before accepting samples.
 
 ## Build
@@ -52,7 +53,7 @@ The first configure builds the dependency set from source and can take substanti
 9. Windows packaging.
 10. GitHub release.
 
-Each phase is implemented, built, tested, and documented locally, then reported for explicit approval of the next phase. The user handles commits and GitHub pushes; the assistant does not publish automatically. This direct user instruction overrides the automatic Git workflow in the original attached prompt. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
+The user approved Phases 5-7 together and requested an assistant commit/push after each verified phase, without intervening approval questions. Phase 8 remains unapproved. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
 
 Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 
@@ -65,6 +66,7 @@ Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 - [Third-party licensing](docs/THIRD_PARTY_NOTICES.md)
 - [Engine tests](docs/TESTING.md)
 - [Pause/resume and recovery](docs/RECOVERY.md)
+- [Persistent queue](docs/QUEUE.md)
 
 ## Download a file during development
 

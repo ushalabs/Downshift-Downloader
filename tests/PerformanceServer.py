@@ -85,7 +85,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         raw_range = self.headers.get("Range")
         probe = raw_range == "bytes=0-0" and not self.headers.get("If-Match")
         match = re.fullmatch(r"bytes=(\d+)-(\d+)", raw_range or "")
-        segmented = self.path == "/range" and match is not None
+        segmented = self.path.split("?", 1)[0] == "/range" and match is not None
         first, last = tuple(map(int, match.groups())) if segmented else (0, size - 1)
         if first < 0 or last >= size or last < first:
             self.send_error(416); return

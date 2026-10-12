@@ -4,11 +4,11 @@ The product is **Downshift**, a native Windows C++20 application. Preserve the r
 
 ## Phase gate
 
-Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Implement only the phase explicitly approved by the user. Phases 1-4 are complete locally. Phase 4 was explicitly approved by "Continue with 4" on 2026-10-12; Phase 5 is not approved. Stop at the Phase 4 handoff until the user approves Phase 5. Silence and previous-phase approval do not authorize advancing.
+Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Phases 1-4 are complete. On 2026-10-12 the user explicitly authorized Phases 5, 6, and 7 together: finish all three without intervening approval questions. Phase 8 remains unapproved.
 
 The active local project is `C:\Users\HP\Desktop\Projects\Downshift`. Use this directory for all project source and development artifacts.
 
-Within an approved phase, work independently: implement, build, test, fix, document, report results, and stop to request the user's approval for the next phase. The user handles Git commits and GitHub pushes. Do not commit, push, merge, or publish automatically. Leave phase changes in the working tree for the user. Local phase completion requires its acceptance checks; manual publication is a separate user action. For interruptions, preserve files and record remaining work without committing.
+Within the approved batch, implement, build, test, fix, and document each phase independently, then commit and push that verified phase to the existing branch. This latest explicit Git authorization supersedes the earlier manual workflow. Do not merge or publish a release. Stop for further phase approval only after Phase 7. For interruptions, preserve files and record remaining work; do not mark incomplete phases complete.
 
 Preserve existing history and user changes. Do not force-push, commit secrets, or include dependency/build directories. Record actual test results; distinguish failed and unexecuted checks. Do not fabricate benchmark, IDM, startup, or CI results.
 

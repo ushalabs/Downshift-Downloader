@@ -196,6 +196,7 @@ struct Transfer {
     CURLcode result = CURLE_OK;
     std::stop_token stop;
     DownloadControl* control = nullptr;
+    std::function<void(std::size_t, std::stop_token)> beforeWrite;
     std::uint32_t attempts = 0;
 
     Transfer(Kind value, FileWriter* file, std::stop_token token, Telemetry* observer = nullptr)
@@ -260,6 +261,7 @@ struct Transfer {
             if ((bound && (self.received > *bound || bytes > *bound - self.received)) ||
                 bytes > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - self.received) fail(DownloadErrorCode::Integrity, "The response exceeded its expected byte count.");
             if (self.writer) {
+                if (self.beforeWrite) self.beforeWrite(bytes, self.stop);
                 self.writer->writeAt((self.assigned ? self.assigned->first : 0) + self.received, data, bytes);
                 if (self.telemetry) self.telemetry->progress.downloadedBytes += bytes;
             }
@@ -275,6 +277,7 @@ struct Transfer {
 
     void configure(const DownloadOptions& options, const std::string& url, bool follow) {
         control = options.control;
+        beforeWrite = options.beforeWrite;
         const auto scheme = validateUrl(url);
         option(easy.get(), CURLOPT_URL, url.c_str());
         option(easy.get(), CURLOPT_PROTOCOLS_STR, "http,https");

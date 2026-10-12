@@ -46,6 +46,8 @@ struct DownloadOptions {
     std::uint32_t maxRetries = 3; // Per request; excludes the initial attempt.
     std::uint32_t retryBaseMs = 500, retryMaxWaitMs = 60'000;
     DownloadControl* control = nullptr; // Must outlive the worker call.
+    // Worker-only pacing hook; called for validated bytes before writing. Exceptions stop safely.
+    std::function<void(std::size_t, std::stop_token)> beforeWrite;
     // Runs on the owning worker at most four times/second, plus stage boundaries.
     // Observer exceptions disable further notifications without failing the download.
     std::function<void(const struct DownloadProgress&)> onProgress;

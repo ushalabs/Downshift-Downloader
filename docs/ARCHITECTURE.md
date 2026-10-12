@@ -59,4 +59,4 @@ The behavior follows libcurl's [header callback contract](https://curl.se/libcur
 
 ## Future boundaries
 
-Phase 4 recovery/retries are implemented through the worker/console interface. SQLite queues/history/settings are Phase 5. GUI controls and queued progress are Phase 6. Chrome Manifest V3, origin-restricted Native Messaging, and authenticated local IPC are Phase 7. Optimizations, packaging/compliance, and release follow in Phases 8-10. Those modules remain reserved directories. Approval is required before each phase.
+Phase 4 recovery/retries are implemented through the worker/console interface. Phase 5's [queue service](QUEUE.md) owns SQLite and schedules blocking download workers with bounded progress mailboxes. GUI controls are Phase 6. Chrome Manifest V3, origin-restricted Native Messaging, and secure local IPC are Phase 7. The user approved 5-7 as one batch. Optimizations, packaging/compliance, and release follow in Phases 8-10 and remain unapproved.

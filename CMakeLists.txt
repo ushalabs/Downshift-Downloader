@@ -41,6 +41,13 @@ set_target_properties(downshift_download PROPERTIES OUTPUT_NAME DownshiftDownloa
 target_link_libraries(downshift_download PRIVATE downshift_engine)
 target_compile_options(downshift_download PRIVATE /W4 /permissive- /utf-8)
 
+add_library(downshift_queue STATIC
+    src/database/QueueStore.cpp
+    src/core/DownloadQueue/QueueManager.cpp
+)
+target_link_libraries(downshift_queue PUBLIC downshift_engine Qt6::Core PRIVATE crypt32)
+target_compile_options(downshift_queue PRIVATE /W4 /permissive- /utf-8)
+
 qt_add_executable(downshift WIN32
     src/main.cpp
     src/gui/MainWindow.cpp
@@ -70,6 +77,12 @@ add_custom_command(TARGET downshift POST_BUILD
 include(CTest)
 if(BUILD_TESTING)
     find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+    add_executable(downshift_queue_tests tests/QueueDriver.cpp)
+    target_link_libraries(downshift_queue_tests PRIVATE downshift_queue)
+    target_compile_options(downshift_queue_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME queue.integration COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/QueueTests.py" "$<TARGET_FILE:downshift_queue_tests>")
+    set_tests_properties(queue.integration PROPERTIES TIMEOUT 120)
     add_executable(downshift_engine_tests tests/EngineTests.cpp)
     target_link_libraries(downshift_engine_tests PRIVATE downshift_engine)
     target_compile_options(downshift_engine_tests PRIVATE /W4 /permissive- /utf-8)

@@ -2,16 +2,16 @@
 
 ## Phase gate
 
-- Current phase: 4 - Resume and Recovery.
-- Last approved phase: 4, explicitly approved by "Continue with 4" on 2026-10-12.
-- Last completed phase: 4 - Resume and Recovery (2026-10-12).
-- Status: Phase 4 completed locally; stopped for Phase 5 approval.
+- Current phase: 5 - Queue and Persistence.
+- Last approved phase: 7; Phases 5-7 approved together on 2026-10-12.
+- Last completed phase: 5 - Queue and Persistence (2026-10-12).
+- Status: Phase 5 verified; commit/push checkpoint, then continue the approved batch with Phase 6.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
-- Git workflow: the user commits and pushes; the assistant must not commit or push automatically.
+- Git workflow: the latest user instruction authorizes assistant commits and pushes after each verified phase in this batch.
 - Authorized repository: https://github.com/ushalabs/Downshift-Download-Manager.
-- Phase 4 authorization: granted. Phase 5 authorization: not granted.
+- Phases 5, 6, and 7 authorization: granted. Phase 8: not granted.
 
 ## Completed work
 
@@ -79,7 +79,7 @@ The vcpkg baseline and tool checkout are pinned to `e456309491fd875487bf02b8a0dc
 
 ## Phase handoff
 
-The user committed Phase 3 and explicitly approved Phase 4. Phase 4 implementation, local Debug/Release checks, performance verification, and documentation are complete. Changes remain in the Desktop project for the user's commit/push. Phase 5 queues/history/settings remain unapproved. Await explicit approval before beginning Phase 5.
+The user committed Phase 4 (`49bac63`) and authorized Phases 5-7 as a single batch, including assistant commits and pushes after each phase. Phase 5 is verified; continue directly with Phase 6 after its Git checkpoint. The following historical acceptance records preserve the workflow in effect when they were written.
 
 ## Phase 2 acceptance (2026-10-12)
 
@@ -168,14 +168,25 @@ Logs are `build/phase4-{release,debug}-{build,tests}.log` and `build/phase4-benc
 
 ## Git checkpoint
 
-- Latest user-created commit: `d7d9a1e55320bf4ddb304e58ae6b807775d1a823` (`Phase 3`); working tree was clean at Phase 4 start.
+- Latest user-created commit: `49bac63` (`Phase 4`); working tree was clean at Phase 5 start and matched the remote branch.
+- Earlier user-created commit: `d7d9a1e55320bf4ddb304e58ae6b807775d1a823` (`Phase 3`).
 - Earlier user-created commit: `b70626c5931be10f5555c9de8183b69c961a78c2` (`Phase 2`).
 - Earlier user-created commit: `8dddb3c47d0c21ed729ac8c165eff1d197612dc0` (`Phase 1`).
 - Published WIP checkpoint: `935f1e33e7033c866872a375abf5b8c5c0afbd06`.
 - Remote push: verified on `dev/phase-01-foundation` by matching the remote ref.
 - Earlier inspected CI result: failed; https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38165976115. The user subsequently committed Phase 1 locally. No Phase 2 CI run has been executed by the assistant.
-- The WIP commit and push occurred before the user changed the workflow. No further automatic commits or pushes are authorized.
+- The WIP commit and push occurred before the earlier manual workflow. The latest user request now authorizes assistant commits and pushes after each verified Phase 5-7.
 - Phases 2 and 3 were left uncommitted at their handoffs; the user subsequently committed them. No assistant commits/pushes were made during Phases 2-4.
-- Next action: the user commits/pushes Phase 4 changes and explicitly approves Phase 5 when ready. Phase 5 will add persistent queues/history, priorities, simultaneous download management, and settings. No Phase 4 CI run is claimed.
+- Next action: finish and push Phase 5, then continue directly with already-approved Phases 6 and 7. Phase 8 remains unapproved. No Phase 4 CI run is claimed.
 
 Use Git history to resolve the current document's containing commit; a commit cannot embed its own hash. Record earlier verified commit IDs here once available.
+
+## Phase 5 acceptance (2026-10-12)
+
+Approved together with Phases 6-7, including assistant commits/pushes after each verified phase. Added the C++ queue service, encrypted SQLite queue/history/settings and recovery references, stable priorities, global and original-origin download/connection limits, global/per-download byte pacing, pause/resume/cancel/restart/remove/rename operations, exclusive database ownership, crash/startup holding, and bounded progress mailboxes. Database work and engine workers stay outside the GUI thread; the desktop remains the foundation shell until Phase 6.
+
+Both MSVC x64 configurations compiled without warnings/errors. All eight CTest groups passed in Release (62.97 s) and Debug (63.69 s). The new real-transfer queue group passed in 18.95/18.25 s, respectively; engine protocol, adaptive, recovery, dependency, and both GUI startup regressions also passed. Queue evidence includes independently hashed concurrent files, priorities, origin/global bounds, aggregate pacing, encrypted DB/WAL query secrets, settings/history across restarts, ownership refusal, forced process death followed by resume, pause/cancel preserving partials, non-destructive removal, invalid-input rejection, and authenticated-record corruption failure.
+
+Initial failures were in fixtures: a query string accidentally disabled test-server ranges, and Python's SQLite context manager left a corruption-test connection open during directory cleanup. Corrected both and added unconditional child-process cleanup before the final passing runs. Durable queue save failures stop scheduling. Range journals remain the authority for actual verified recovery intervals. Limits apply to the submitted origin; independent redirects do not share a global target-host reservation. Global and per-download caps can conservatively underutilize bandwidth when combined. No new performance or CI result is claimed.
+
+Acceptance: queues/history/settings persist, multiple real downloads are scheduled reliably, and interruptions preserve recoverable work. Logs: `build/phase5-{release,debug}-{build,tests}.log`. Commit this verified phase to the existing development branch, verify its remote ref after push, then begin already-approved Phase 6. Resolve this checkpoint's containing commit from Git history rather than embedding a self-referential hash.

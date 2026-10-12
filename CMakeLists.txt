@@ -27,6 +27,19 @@ target_link_libraries(downshift_foundation PUBLIC
 )
 target_compile_options(downshift_foundation PRIVATE /W4 /permissive- /utf-8)
 
+add_library(downshift_engine STATIC
+    src/core/DownloadEngine/DownloadEngine.cpp
+    src/core/DownloadEngine/HttpResponse.cpp
+    src/core/FileWriter/FileWriter.cpp
+)
+target_link_libraries(downshift_engine PUBLIC downshift_foundation PRIVATE bcrypt)
+target_compile_options(downshift_engine PRIVATE /W4 /permissive- /utf-8)
+
+add_executable(downshift_download src/DownloadCli.cpp)
+set_target_properties(downshift_download PROPERTIES OUTPUT_NAME DownshiftDownload)
+target_link_libraries(downshift_download PRIVATE downshift_engine)
+target_compile_options(downshift_download PRIVATE /W4 /permissive- /utf-8)
+
 qt_add_executable(downshift WIN32
     src/main.cpp
     src/gui/MainWindow.cpp
@@ -55,6 +68,17 @@ add_custom_command(TARGET downshift POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+    add_executable(downshift_engine_tests tests/EngineTests.cpp)
+    target_link_libraries(downshift_engine_tests PRIVATE downshift_engine)
+    target_compile_options(downshift_engine_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME engine.unit COMMAND downshift_engine_tests)
+    add_test(NAME engine.integration COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/IntegrationTests.py"
+        "$<TARGET_FILE:downshift_download>" "$<TARGET_FILE:downshift_engine_tests>"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+    set_tests_properties(engine.unit PROPERTIES TIMEOUT 30)
+    set_tests_properties(engine.integration PROPERTIES TIMEOUT 180)
     add_executable(downshift_foundation_tests tests/FoundationTests.cpp)
     target_link_libraries(downshift_foundation_tests PRIVATE downshift_foundation)
     target_compile_options(downshift_foundation_tests PRIVATE /W4 /permissive- /utf-8)

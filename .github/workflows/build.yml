@@ -1,4 +1,4 @@
-name: Windows foundation
+name: Windows build and engine tests
 on:
   push:
   pull_request:
@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: foundation-${{ github.ref }}
+  group: windows-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:

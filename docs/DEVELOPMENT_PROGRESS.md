@@ -2,16 +2,16 @@
 
 ## Phase gate
 
-- Current phase: 1 - Native C++ Foundation.
-- Last approved phase: 1, confirmed by the user's direct request to continue development.
-- Last completed phase: 1 - Native C++ Foundation (2026-10-12).
-- Status: completed and verified locally; awaiting explicit Phase 2 approval.
+- Current phase: 2 - Segmented Download Engine.
+- Last approved phase: 2, explicitly approved by the user's "Go ahead" on 2026-10-12.
+- Last completed phase: 2 - Segmented Download Engine (2026-10-12).
+- Status: Phase 2 completed and verified locally; awaiting Phase 3 approval.
 - Product name: Downshift.
 - Active local project: `C:\Users\HP\Desktop\Projects\Downshift`.
 - Former workspace copy remains as a backup; removing it was blocked by the execution approval policy. Do not develop in that copy.
 - Git workflow: the user commits and pushes; the assistant must not commit or push automatically.
 - Authorized repository: https://github.com/ushalabs/Downshift-Download-Manager.
-- Phase 2 authorization: not granted; do not begin Phase 2.
+- Phase 2 authorization: granted. Phase 3 authorization: not granted.
 
 ## Completed work
 
@@ -71,20 +71,48 @@ Acceptance: the pinned Windows build produces a functioning native Qt skeleton i
 
 ## Decisions
 
-Keep the required native Windows stack. Qt uses dynamic linkage, libcurl uses Schannel and HTTP/2, and SQLite uses its C API. HTTP/3 is optional and not selected currently. Download modules are directories reserved for later phases; no transfer engine or Chrome integration is implemented.
+Keep the required native Windows stack. Qt uses dynamic linkage, libcurl uses Schannel and HTTP/2, and SQLite uses its C API. HTTP/3 is optional and not selected. Phase 2 implements the download engine, fixed scheduler, and file writer. Other download modules and Chrome integration remain reserved for later phases.
+
+Expose the Phase 2 engine through a native console development client, keeping blocking network/disk work outside the Qt GUI thread. Full desktop controls remain Phase 6. Segmentation requires a strong ETag and valid actual range probe; otherwise use a complete stream. Fixed four-connection/4 MiB policy is the correctness baseline for Phase 3 tuning. Failed partials remain untouched by later attempts until Phase 4 supplies verified recovery.
 
 The vcpkg baseline and tool checkout are pinned to `e456309491fd875487bf02b8a0dca76c1b1b00cc`. Minimum CMake is 3.25; the compiler/SDK versions from the verified build are recorded above.
 
 ## Phase handoff
 
-Phase 1 implementation, compilation, tests, fixes, and documentation are complete locally. The user reviews, commits, and pushes the changes. The assistant stops until the user explicitly approves Phase 2: HTTP/HTTPS transfers, server capability and range verification, segmented downloading, safe file writing, and integrity/fallback tests. No Phase 2 code has been implemented.
+Phase 2 implementation, builds, tests, fixes, and documentation are complete locally. The user reviews, commits, and pushes these working-tree changes. The assistant stops here until the user explicitly approves Phase 3: adaptive connection/chunk tuning, speed calculations, and initial performance benchmarks. No Phase 3 implementation or performance claim is included.
+
+## Phase 2 acceptance (2026-10-12)
+
+Approved by the user's "Go ahead" after the Phase 1 handoff. Implemented libcurl multi HTTP/HTTPS transfers, actual range probing, strict response validation, fixed concurrent segments, strong ETag/If-Match checks, streaming fallback, 64-bit partial-file writes, CNG SHA-256, safe finalization, a native development client, and controlled tests. TLS peer/hostname/revocation checks remain enabled. HTTPS CONNECT proxy headers are excluded from file-response validation and covered by a local restricted-proxy test.
+
+Same verified Windows/MSVC/SDK/dependency environment as Phase 1; Python 3.12.14 runs only the local test servers. No dependency baseline changes or new system installations. Both configurations compile without compiler warnings/errors.
+
+| Check | Release | Debug |
+|---|---|---|
+| GUI, client, engine, and test compilation | Passed | Passed |
+| `engine.unit` (4,162 assertions, including an actual sparse file write/read beyond 4 GB) | Passed (0.14 s) | Passed (0.16 s) |
+| `engine.integration` (52 loopback HTTP/HTTPS scenarios) | Passed (5.83 s) | Passed (6.21 s) |
+| `foundation.dependencies` | Passed (0.05 s) | Passed (0.04 s) |
+| `foundation.gui.minimal` | Passed (0.34 s) | Passed (0.37 s) |
+| `foundation.gui.windows` | Passed (0.49 s) | Passed (0.60 s) |
+| CTest summary | 5 passed, 0 failed; 6.89 s total | 5 passed, 0 failed; 7.43 s total |
+
+Successful fixture downloads are checked byte-for-byte and against independent Python SHA-256 digests. The 17 MiB payload needs five chunks, verifying concurrency limits and reassignment after the initial four. Tests check complete nonoverlapping coverage, safe fallback after data transmission, malformed/changed/truncated responses, certificate/hostname failures, redirect policy, existing-file preservation, and cooperative cancellation. Detailed scope and unverified areas are in `docs/TESTING.md`.
+
+During verification, fixed Windows macro interference in compilation and a CONNECT-header classification issue. The initial CA-signed test certificate lacked a revocation service; replaced the fixture with a self-signed, explicitly trusted test root without changing any client verification setting. Initial test failures were resolved before the successful runs above.
+
+Development client: `build/windows-msvc/Release/DownshiftDownload.exe` (and Debug equivalent). Usage and safe partial-file handling are in `docs/INSTALLATION.md`. The desktop GUI is still the foundation shell. Build and verbose test logs: `build/phase2-{release,debug}-{build,tests}.log`. Generated binaries, logs, dependency caches, and Python caches are ignored.
+
+Acceptance: correct HTTP/HTTPS files from range and non-range servers, verified by checksums, with safe partials/finalization and passing Debug/Release checks. No local Phase 2 acceptance blocker remains. HTTP/2 capability is enabled but the fixture tests HTTP/1.1 wire behavior; throughput/IDM comparisons, retry/resume, persistent queues, and full GUI are future phases. Phase 2 CI has not been run or claimed successful; publication remains the user's action.
 
 ## Git checkpoint
 
+- Latest user-created commit: `8dddb3c47d0c21ed729ac8c165eff1d197612dc0` (`Phase 1`); working tree was clean at Phase 2 start.
 - Published WIP checkpoint: `935f1e33e7033c866872a375abf5b8c5c0afbd06`.
 - Remote push: verified on `dev/phase-01-foundation` by matching the remote ref.
-- Earlier CI result: failed; https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38165976115. Local fixes have not been committed or pushed.
+- Earlier inspected CI result: failed; https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38165976115. The user subsequently committed Phase 1 locally. No Phase 2 CI run has been executed by the assistant.
 - The WIP commit and push occurred before the user changed the workflow. No further automatic commits or pushes are authorized.
-- Next action: the user reviews and publishes the local changes, and explicitly approves Phase 2 when ready. The assistant must not commit or push automatically, and must not start Phase 2 before explicit approval. Current local tests passed; no successful rerun of the corrected CI workflow is claimed.
+- Phase 2 changes: left uncommitted and unpushed for the user. No assistant Git commits/pushes were made during Phase 2.
+- Next action: the user reviews/publishes Phase 2 and explicitly approves Phase 3 when ready. The assistant must not commit/push automatically or start Phase 3 before approval. Current local tests passed; no successful CI run is claimed.
 
 Use Git history to resolve the current document's containing commit; a commit cannot embed its own hash. Record earlier verified commit IDs here once available.

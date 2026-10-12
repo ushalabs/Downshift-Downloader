@@ -13,3 +13,5 @@
 *.db-wal
 .env
 .env.*
+__pycache__/
+*.pyc

@@ -1,0 +1,30 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string>
+
+namespace downshift {
+
+// Owned by one engine worker; positional writes are serialized on that worker.
+class FileWriter final {
+public:
+    explicit FileWriter(const std::filesystem::path& destination);
+    ~FileWriter();
+    FileWriter(const FileWriter&) = delete;
+    FileWriter& operator=(const FileWriter&) = delete;
+    void preallocate(std::uint64_t bytes, bool sparse = false);
+    void reset();
+    void writeAt(std::uint64_t offset, const char* data, std::size_t bytes);
+    [[nodiscard]] std::uint64_t size() const;
+    [[nodiscard]] std::string sha256();
+    // Flush and rename the open file by handle, without replacing an existing destination.
+    void commit(std::uint64_t expectedSize, const std::optional<std::string>& expectedSha256 = {});
+private:
+    void* handle_ = nullptr;
+    std::filesystem::path destination_;
+};
+
+} // namespace downshift

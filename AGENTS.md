@@ -4,7 +4,7 @@ The product is **Downshift**, a native Windows C++20 application. Preserve the r
 
 ## Phase gate
 
-Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Implement only the phase explicitly approved by the user. Phase 1 is approved; later phases require separate explicit approval. Silence and previous-phase approval do not authorize advancing.
+Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Implement only the phase explicitly approved by the user. Phases 1 and 2 are complete locally; Phase 2 was approved by the user's "Go ahead" on 2026-10-12. Phase 3 is awaiting explicit approval. Silence and previous-phase approval do not authorize advancing.
 
 The active local project is `C:\Users\HP\Desktop\Projects\Downshift`. Use this directory for all project source and development artifacts.
 
@@ -14,7 +14,7 @@ Preserve existing history and user changes. Do not force-push, commit secrets, o
 
 ## Foundation build and checks
 
-From the repository root in PowerShell, after installing MSVC v143, Windows SDK, CMake 3.25+, and Git:
+From the repository root in PowerShell, after installing MSVC v143, Windows SDK, CMake 3.25+, Git, and Python 3.10+ for the integration servers:
 
 ```powershell
 ./scripts/Bootstrap.ps1

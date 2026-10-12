@@ -10,6 +10,7 @@ No installer, portable package, or verified release binary is available yet. Sta
 - Visual Studio 2022 or Build Tools 2022, MSVC v143, Desktop development with C++, and a Windows SDK.
 - Git.
 - CMake 3.25 or newer, either on PATH or bundled with Visual Studio's C++ CMake tools.
+- Python 3.10+ for controlled HTTP/HTTPS integration tests only. The application itself does not need Python.
 - Internet access and sufficient disk space for a Qt source build and its dependencies.
 
 Use Microsoft's official [Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) and the official [CMake downloads](https://cmake.org/download/). Installing tools may require administrator permission. The project bootstrap does not install system software.
@@ -32,6 +33,8 @@ ctest --preset debug
 
 Bootstrap clones vcpkg into `.tools/windows/vcpkg`, checks out the manifest's exact baseline, disables vcpkg metrics, and sets `VCPKG_ROOT` for the current session. It also finds Visual Studio's bundled CMake when CMake is absent from PATH. It refuses to change an existing checkout at a different revision. The configure step installs dependencies through manifest mode.
 
+If Python is not on PATH, add `-DPython3_EXECUTABLE=C:/path/to/python.exe` to the configure command. Set `-DBUILD_TESTING=OFF` only for an application-only build; that excludes the acceptance tests.
+
 In a new PowerShell session, set the checkout location before configuring:
 
 ```powershell
@@ -46,11 +49,18 @@ For an external tools location, pass `-ToolsDirectory 'C:\your\tools'` to bootst
 ./build/windows-msvc/Release/Downshift.exe
 ```
 
-The window should show Downshift and the linked Qt, libcurl, and SQLite versions. It has no download controls in Phase 1. CTest launches that executable, checks its rendering and event loop, and returns failure if startup fails. The Windows smoke test exercises `qwindows`; the headless minimal test exercises `qminimal`.
+The window shows Downshift and the linked dependency versions. Full desktop download controls are Phase 6. CTest checks its rendering/event loop with `qwindows` and `qminimal`. Phase 2 provides a native development download client:
+
+```powershell
+./build/windows-msvc/Release/DownshiftDownload.exe --help
+./build/windows-msvc/Release/DownshiftDownload.exe 'https://example.com/file.zip' "$env:USERPROFILE\Downloads\file.zip"
+```
+
+Arguments: URL, explicit destination, optional `--sha256 HEX`, `--ca-bundle FILE`, and `--timeout-ms N`. The destination parent must exist; existing destinations/partials are never overwritten. The trust bundle preserves peer/hostname verification. Do not use the public test key/certificate for real downloads. Failures leave `.part`; choose a new name or review/remove the partial yourself before a fresh attempt. Resume is Phase 4.
 
 ### Verified local build (2026-10-12)
 
-Windows x64 builds passed with MSVC 19.44.35229.0 (v143 toolset 14.44.35207), Windows SDK 10.0.26100.0, and Visual Studio's CMake 3.31.6-msvc6. All three CTest checks passed in Release and Debug. Qt 6.11.2, libcurl 8.22.0, and SQLite 3.53.4 were built through the pinned vcpkg manifest. Detailed evidence and the separate CI status are in [development progress](DEVELOPMENT_PROGRESS.md).
+Windows x64 builds passed with MSVC 19.44.35229.0 (v143 toolset 14.44.35207), Windows SDK 10.0.26100.0, and Visual Studio's CMake 3.31.6-msvc6. Phase 1 passed all three foundation checks in Release and Debug; Phase 2 adds the native engine and integration groups. Current results and the separate CI status are in [development progress](DEVELOPMENT_PROGRESS.md). Qt 6.11.2, libcurl 8.22.0, and SQLite 3.53.4 use the unchanged pinned manifest.
 
 On the active development machine, the Release executable is `C:\Users\HP\Desktop\Projects\Downshift\build\windows-msvc\Release\Downshift.exe`. Keep it beside the copied DLLs and `platforms` folder. This is a development build; installer and portable distribution are later-phase work.
 

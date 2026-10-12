@@ -128,6 +128,9 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/PerformanceTests.py"
         "$<TARGET_FILE:downshift_download>" "$<TARGET_FILE:downshift_engine_tests>")
     set_tests_properties(engine.adaptive PROPERTIES TIMEOUT 150)
+    add_test(NAME engine.buffered COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/BufferedTests.py" "$<TARGET_FILE:downshift_download>")
+    set_tests_properties(engine.buffered PROPERTIES TIMEOUT 90)
     add_test(NAME engine.recovery COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/RecoveryTests.py"
         "$<TARGET_FILE:downshift_download>" "$<TARGET_FILE:downshift_engine_tests>")

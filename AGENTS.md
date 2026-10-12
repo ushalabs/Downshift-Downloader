@@ -4,11 +4,11 @@ The product is **Downshift**, a native Windows C++20 application. Preserve the r
 
 ## Phase gate
 
-Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Phases 1-7 are verified locally. On 2026-10-12 the user explicitly authorized Phases 5, 6, and 7 together: finish all three without intervening approval questions. Phase 8 remains unapproved.
+Read `docs/DEVELOPMENT_PROGRESS.md` and inspect Git status/history before changing code. Read `docs/PROJECT_REQUIREMENTS.md` for technical acceptance criteria. The user's latest direct instructions override the original attached prompt. Phases 1-8 are verified locally. The user subsequently approved Phase 8 and restored a manual Git workflow: implement and verify Phase 8, then provide instructions to create `main` and merge the development branch. Do not execute Git mutations for Phase 8. Phase 9 remains unapproved.
 
 The active local project is `C:\Users\HP\Desktop\Projects\Downshift`. Use this directory for all project source and development artifacts.
 
-Within the approved batch, implement, build, test, fix, and document each phase independently, then commit and push that verified phase to the existing branch. This latest explicit Git authorization supersedes the earlier manual workflow. Do not merge or publish a release. Stop for further phase approval only after Phase 7. For interruptions, preserve files and record remaining work; do not mark incomplete phases complete.
+Implement, build, test, fix, and document the approved phase. The earlier Phase 5-7 commits/pushes are complete. For Phase 8 leave changes uncommitted and give the user concrete Git instructions after verification. Do not create/switch/merge branches, commit, push, or publish a release. For interruptions, preserve files and record remaining work; do not mark incomplete phases complete.
 
 Preserve existing history and user changes. Do not force-push, commit secrets, or include dependency/build directories. Record actual test results; distinguish failed and unexecuted checks. Do not fabricate benchmark, IDM, startup, or CI results.
 

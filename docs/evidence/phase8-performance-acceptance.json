@@ -1,0 +1,550 @@
+{
+  "complete": true,
+  "samples": 180,
+  "pairs": 90,
+  "cases": 30,
+  "report_sha256": "2b3af3568305d76c86ab94f5fa9b770017f0a4ac7f69acf4229b21b5c9981d52",
+  "final_source_archive_sha256": "d6ab71efe53426a8659b9ecc1427f8fb683c1427b6ddd591bf607da3d03e1b4d",
+  "comparisons": [
+    {
+      "size": "100MB",
+      "profile": "unlimited",
+      "mode": "4",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        30.485948682731202,
+        -1.7913678138053002,
+        7.102833519576657
+      ],
+      "median_paired_change_percent": 7.102833519576657,
+      "median_paired_cpu_reduction_percent": 0.0,
+      "baseline_wall_seconds": 0.6969612999819219,
+      "optimized_wall_seconds": 0.6204364998266101,
+      "optimized_peak_mib": 9.203125,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "unlimited",
+      "mode": "8",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        20.73943405578578,
+        18.671091027957164,
+        28.981900119411197
+      ],
+      "median_paired_change_percent": 20.73943405578578,
+      "median_paired_cpu_reduction_percent": 12.121212121212121,
+      "baseline_wall_seconds": 0.7592190997675061,
+      "optimized_wall_seconds": 0.6288079000078142,
+      "optimized_peak_mib": 9.5,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "unlimited",
+      "mode": "stream",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.8088654570212572,
+        -3.836383072080818,
+        13.247947290652373
+      ],
+      "median_paired_change_percent": 0.8088654570212572,
+      "median_paired_cpu_reduction_percent": 8.333333333333337,
+      "baseline_wall_seconds": 0.4355430998839438,
+      "optimized_wall_seconds": 0.452918800059706,
+      "optimized_peak_mib": 8.66015625,
+      "optimized_write_calls": 6104,
+      "optimized_checksum_read_calls": 96
+    },
+    {
+      "size": "100MB",
+      "profile": "unlimited",
+      "mode": "auto",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        11.73464142495666,
+        26.114055949718427,
+        7.572034029437136
+      ],
+      "median_paired_change_percent": 11.73464142495666,
+      "median_paired_cpu_reduction_percent": 23.684210526315784,
+      "baseline_wall_seconds": 0.7665850999765098,
+      "optimized_wall_seconds": 0.6786001999862492,
+      "optimized_peak_mib": 9.19921875,
+      "optimized_write_calls": 1536,
+      "optimized_checksum_read_calls": 201
+    },
+    {
+      "size": "100MB",
+      "profile": "unlimited",
+      "mode": "1",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -22.12384253335795,
+        30.254840941126602,
+        1.2974041195709995
+      ],
+      "median_paired_change_percent": 1.2974041195709995,
+      "median_paired_cpu_reduction_percent": 10.81081081081081,
+      "baseline_wall_seconds": 1.1757926000282168,
+      "optimized_wall_seconds": 1.1607331996783614,
+      "optimized_peak_mib": 9.015625,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "unlimited",
+      "mode": "16",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        3.8340387881220073,
+        16.382926170820067,
+        16.80404867370935
+      ],
+      "median_paired_change_percent": 16.382926170820067,
+      "median_paired_cpu_reduction_percent": -3.3333333333333437,
+      "baseline_wall_seconds": 0.6628478998318315,
+      "optimized_wall_seconds": 0.591246800031513,
+      "optimized_peak_mib": 10.078125,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "per-connection",
+      "mode": "auto",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.582915938505657,
+        0.7431422885225247,
+        -2.9016135985838742
+      ],
+      "median_paired_change_percent": 0.582915938505657,
+      "median_paired_cpu_reduction_percent": -13.725490196078427,
+      "baseline_wall_seconds": 4.152413100004196,
+      "optimized_wall_seconds": 4.128348299767822,
+      "optimized_peak_mib": 10.19140625,
+      "optimized_write_calls": 1535,
+      "optimized_checksum_read_calls": 240
+    },
+    {
+      "size": "100MB",
+      "profile": "per-connection",
+      "mode": "4",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -1.375000722517561,
+        -0.09811877832794913,
+        -0.44699704057610257
+      ],
+      "median_paired_change_percent": -0.44699704057610257,
+      "median_paired_cpu_reduction_percent": 0.0,
+      "baseline_wall_seconds": 6.895168700255454,
+      "optimized_wall_seconds": 6.965414499863982,
+      "optimized_peak_mib": 9.19921875,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "per-connection",
+      "mode": "16",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        4.309079207587141,
+        1.8041986083926265,
+        -7.236266938264513
+      ],
+      "median_paired_change_percent": 1.8041986083926265,
+      "median_paired_cpu_reduction_percent": 2.2727272727272707,
+      "baseline_wall_seconds": 2.6538124000653625,
+      "optimized_wall_seconds": 2.5441815997473896,
+      "optimized_peak_mib": 10.078125,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "per-connection",
+      "mode": "stream",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.13645602213117058,
+        0.07658668561167925,
+        0.08740036535184181
+      ],
+      "median_paired_change_percent": 0.08740036535184181,
+      "median_paired_cpu_reduction_percent": 3.6363636363636376,
+      "baseline_wall_seconds": 25.866716099902987,
+      "optimized_wall_seconds": 25.84692079992965,
+      "optimized_peak_mib": 8.65625,
+      "optimized_write_calls": 6136,
+      "optimized_checksum_read_calls": 96
+    },
+    {
+      "size": "100MB",
+      "profile": "per-connection",
+      "mode": "8",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.9563722581945377,
+        -2.1778815403685203,
+        -0.5118591687912954
+      ],
+      "median_paired_change_percent": -0.5118591687912954,
+      "median_paired_cpu_reduction_percent": 8.860759493670889,
+      "baseline_wall_seconds": 3.7197336996905506,
+      "optimized_wall_seconds": 3.696234100032598,
+      "optimized_peak_mib": 9.49609375,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "per-connection",
+      "mode": "1",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -0.24229887677961193,
+        -3.326945272542059,
+        -0.07956337366389343
+      ],
+      "median_paired_change_percent": -0.24229887677961193,
+      "median_paired_cpu_reduction_percent": -7.692307692307687,
+      "baseline_wall_seconds": 26.889722700230777,
+      "optimized_wall_seconds": 27.176072400063276,
+      "optimized_peak_mib": 8.90625,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "shared",
+      "mode": "8",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.9473409547891665,
+        1.233583007320549,
+        1.0032705006739917
+      ],
+      "median_paired_change_percent": 1.0032705006739917,
+      "median_paired_cpu_reduction_percent": -20.253164556962023,
+      "baseline_wall_seconds": 6.597661899868399,
+      "optimized_wall_seconds": 6.535746100358665,
+      "optimized_peak_mib": 9.484375,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "shared",
+      "mode": "stream",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.09241657699865513,
+        0.7419710166043592,
+        4.320583354027963
+      ],
+      "median_paired_change_percent": 0.7419710166043592,
+      "median_paired_cpu_reduction_percent": -26.923076923076916,
+      "baseline_wall_seconds": 7.773425000254065,
+      "optimized_wall_seconds": 7.689087400212884,
+      "optimized_peak_mib": 8.65234375,
+      "optimized_write_calls": 6113,
+      "optimized_checksum_read_calls": 96
+    },
+    {
+      "size": "100MB",
+      "profile": "shared",
+      "mode": "auto",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        1.002108378907307,
+        0.4477928026293876,
+        0.21504817608239968
+      ],
+      "median_paired_change_percent": 0.4477928026293876,
+      "median_paired_cpu_reduction_percent": 17.708333333333336,
+      "baseline_wall_seconds": 6.544904100243002,
+      "optimized_wall_seconds": 6.504542599897832,
+      "optimized_peak_mib": 9.546875,
+      "optimized_write_calls": 1530,
+      "optimized_checksum_read_calls": 216
+    },
+    {
+      "size": "100MB",
+      "profile": "shared",
+      "mode": "1",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        0.3750204058746931,
+        2.0785009401468546,
+        -1.554110188928881
+      ],
+      "median_paired_change_percent": 0.3750204058746931,
+      "median_paired_cpu_reduction_percent": 4.597701149425292,
+      "baseline_wall_seconds": 9.10857760021463,
+      "optimized_wall_seconds": 9.071255099959671,
+      "optimized_peak_mib": 8.89453125,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "shared",
+      "mode": "4",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -0.735323646967212,
+        -0.16147929825731655,
+        1.154594169638412
+      ],
+      "median_paired_change_percent": -0.16147929825731655,
+      "median_paired_cpu_reduction_percent": -53.448275862068975,
+      "baseline_wall_seconds": 6.591052799951285,
+      "optimized_wall_seconds": 6.601713200099766,
+      "optimized_peak_mib": 9.22265625,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "100MB",
+      "profile": "shared",
+      "mode": "16",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -0.11748376609104216,
+        1.44553497521418,
+        1.3996715226247458
+      ],
+      "median_paired_change_percent": 1.3996715226247458,
+      "median_paired_cpu_reduction_percent": 19.696969696969703,
+      "baseline_wall_seconds": 6.617717100307345,
+      "optimized_wall_seconds": 6.556759800296277,
+      "optimized_peak_mib": 10.01953125,
+      "optimized_write_calls": 1526,
+      "optimized_checksum_read_calls": 192
+    },
+    {
+      "size": "1GB",
+      "profile": "unlimited",
+      "mode": "stream",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -4.84225455699282,
+        2.7959997212765098,
+        2.2686846482923517
+      ],
+      "median_paired_change_percent": 2.2686846482923517,
+      "median_paired_cpu_reduction_percent": -1.3071895424836555,
+      "baseline_wall_seconds": 7.834545600228012,
+      "optimized_wall_seconds": 7.723960000090301,
+      "optimized_peak_mib": 8.65234375,
+      "optimized_write_calls": 61037,
+      "optimized_checksum_read_calls": 954
+    },
+    {
+      "size": "1GB",
+      "profile": "unlimited",
+      "mode": "16",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        27.01766756164261,
+        22.63642240004038,
+        21.08532633482283
+      ],
+      "median_paired_change_percent": 22.63642240004038,
+      "median_paired_cpu_reduction_percent": 18.459495351925625,
+      "baseline_wall_seconds": 14.007701700087637,
+      "optimized_wall_seconds": 11.456915399990976,
+      "optimized_peak_mib": 10.1875,
+      "optimized_write_calls": 15259,
+      "optimized_checksum_read_calls": 1908
+    },
+    {
+      "size": "1GB",
+      "profile": "unlimited",
+      "mode": "1",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -12.640317859611915,
+        -11.707120683943872,
+        -3.2492719762675537
+      ],
+      "median_paired_change_percent": -11.707120683943872,
+      "median_paired_cpu_reduction_percent": 8.89487870619946,
+      "baseline_wall_seconds": 16.01536829955876,
+      "optimized_wall_seconds": 18.138912700116634,
+      "optimized_peak_mib": 9.34375,
+      "optimized_write_calls": 15259,
+      "optimized_checksum_read_calls": 1908
+    },
+    {
+      "size": "1GB",
+      "profile": "unlimited",
+      "mode": "8",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        21.67355218436542,
+        22.84096834147702,
+        23.79248463236212
+      ],
+      "median_paired_change_percent": 22.84096834147702,
+      "median_paired_cpu_reduction_percent": 17.532467532467532,
+      "baseline_wall_seconds": 14.136391299776733,
+      "optimized_wall_seconds": 11.419426099862903,
+      "optimized_peak_mib": 9.7890625,
+      "optimized_write_calls": 15259,
+      "optimized_checksum_read_calls": 1908
+    },
+    {
+      "size": "1GB",
+      "profile": "unlimited",
+      "mode": "auto",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        28.628685370810224,
+        27.052445246647604,
+        24.170854639510498
+      ],
+      "median_paired_change_percent": 27.052445246647604,
+      "median_paired_cpu_reduction_percent": 20.050761421319795,
+      "baseline_wall_seconds": 14.325777500402182,
+      "optimized_wall_seconds": 11.341634300071746,
+      "optimized_peak_mib": 10.25,
+      "optimized_write_calls": 15277,
+      "optimized_checksum_read_calls": 1958
+    },
+    {
+      "size": "1GB",
+      "profile": "unlimited",
+      "mode": "4",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        11.985824877927364,
+        24.05607643808725,
+        19.527141691033954
+      ],
+      "median_paired_change_percent": 19.527141691033954,
+      "median_paired_cpu_reduction_percent": 14.554579673776658,
+      "baseline_wall_seconds": 14.474382699932903,
+      "optimized_wall_seconds": 12.109703700058162,
+      "optimized_peak_mib": 9.5703125,
+      "optimized_write_calls": 15259,
+      "optimized_checksum_read_calls": 1908
+    },
+    {
+      "size": "5GB",
+      "profile": "unlimited",
+      "mode": "stream",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -5.949174970046178,
+        2.406581593784818,
+        14.263436841824051
+      ],
+      "median_paired_change_percent": 2.406581593784818,
+      "median_paired_cpu_reduction_percent": 2.7765338110165683,
+      "baseline_wall_seconds": 36.31170010007918,
+      "optimized_wall_seconds": 35.458365600090474,
+      "optimized_peak_mib": 8.66015625,
+      "optimized_write_calls": 305178,
+      "optimized_checksum_read_calls": 4769
+    },
+    {
+      "size": "5GB",
+      "profile": "unlimited",
+      "mode": "4",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        40.394474456173654,
+        32.54362277823262,
+        29.98548350103738
+      ],
+      "median_paired_change_percent": 32.54362277823262,
+      "median_paired_cpu_reduction_percent": 21.993281075027994,
+      "baseline_wall_seconds": 76.52531010005623,
+      "optimized_wall_seconds": 54.50735180033371,
+      "optimized_peak_mib": 10.421875,
+      "optimized_write_calls": 76294,
+      "optimized_checksum_read_calls": 9538
+    },
+    {
+      "size": "5GB",
+      "profile": "unlimited",
+      "mode": "8",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -34.52415338218538,
+        33.46952389895963,
+        28.492895417346496
+      ],
+      "median_paired_change_percent": 28.492895417346496,
+      "median_paired_cpu_reduction_percent": 15.84216725559482,
+      "baseline_wall_seconds": 34.47873029997572,
+      "optimized_wall_seconds": 51.29533779993653,
+      "optimized_peak_mib": 10.59375,
+      "optimized_write_calls": 76294,
+      "optimized_checksum_read_calls": 9538
+    },
+    {
+      "size": "5GB",
+      "profile": "unlimited",
+      "mode": "auto",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        25.07438126089825,
+        15.951688688501564,
+        16.76295518395603
+      ],
+      "median_paired_change_percent": 16.76295518395603,
+      "median_paired_cpu_reduction_percent": 13.075281926241999,
+      "baseline_wall_seconds": 59.097860599868,
+      "optimized_wall_seconds": 50.96765840006992,
+      "optimized_peak_mib": 9.67578125,
+      "optimized_write_calls": 76301,
+      "optimized_checksum_read_calls": 9570
+    },
+    {
+      "size": "5GB",
+      "profile": "unlimited",
+      "mode": "1",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        -8.825054589303827,
+        0.0357599616716886,
+        47.22516224720073
+      ],
+      "median_paired_change_percent": 0.0357599616716886,
+      "median_paired_cpu_reduction_percent": 12.221387427998998,
+      "baseline_wall_seconds": 88.95348969986662,
+      "optimized_wall_seconds": 60.42003169981763,
+      "optimized_peak_mib": 10.12109375,
+      "optimized_write_calls": 76294,
+      "optimized_checksum_read_calls": 9538
+    },
+    {
+      "size": "5GB",
+      "profile": "unlimited",
+      "mode": "16",
+      "pairs": 3,
+      "paired_rate_changes_percent": [
+        20.8448845903203,
+        21.013870397541456,
+        40.85727338058651
+      ],
+      "median_paired_change_percent": 21.013870397541456,
+      "median_paired_cpu_reduction_percent": 16.57127991675338,
+      "baseline_wall_seconds": 71.76894759992138,
+      "optimized_wall_seconds": 59.38931370014325,
+      "optimized_peak_mib": 11.0234375,
+      "optimized_write_calls": 76294,
+      "optimized_checksum_read_calls": 9538
+    }
+  ]
+}

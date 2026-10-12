@@ -37,6 +37,8 @@ int main(int argc,char** argv) {
             widget<QPushButton>(window,"addButton")->click();auto* add=widget<QDialog>(window,"addDialog");
             widget<QLineEdit>(*add,"addUrl")->setText(url);widget<QLineEdit>(*add,"addDestination")->setText(file);widget<QLineEdit>(*add,"addSha256")->setText(sha);widget<QSpinBox>(*add,"addSpeedLimit")->setValue(256);widget<QPushButton>(*add,"addSubmit")->click();
             auto* table=widget<QTableWidget>(window,"downloadTable");wait([&]{return table->rowCount()==1 && window.current().entries[0].progress.downloadedBytes>100000;});table->selectRow(0);
+            if(window.current().entries[0].status!=downshift::QueueStatus::Running)
+                std::cerr<<"Observed queue status="<<static_cast<int>(window.current().entries[0].status)<<" error="<<window.current().entries[0].error.toStdString()<<'\n';
             check(window.current().entries[0].status==downshift::QueueStatus::Running,"GUI must show real running worker");check(widget<QLabel>(window,"detail0")->text()==url,"Source details");
             check(window.grab().save(QDir(shots).filePath("light.bmp"),"BMP"),"Light render");
             widget<QPushButton>(window,"pauseButton")->click();wait([&]{return window.current().entries[0].status==downshift::QueueStatus::Paused;});check(widget<QPushButton>(window,"startButton")->isEnabled(),"Resume control");

@@ -5,10 +5,12 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace downshift {
 struct FileMetrics {
     std::uint64_t writeBytes = 0;
+    std::uint64_t writeCalls = 0, checksumReadBytes = 0, checksumReadCalls = 0;
     double writeSeconds = 0, allocationSeconds = 0, checksumSeconds = 0, flushSeconds = 0;
 };
 enum class FileOpenMode { CreatePartial, ReopenPartial, InspectCompleted };
@@ -37,6 +39,8 @@ private:
     void* handle_ = nullptr;
     std::filesystem::path destination_;
     FileMetrics metrics_;
+    // Reused bounded heap storage; large verification buffers never occupy the thread stack.
+    std::vector<unsigned char> checksumBuffer_;
 };
 
 } // namespace downshift

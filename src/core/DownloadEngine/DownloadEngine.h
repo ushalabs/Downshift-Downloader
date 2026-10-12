@@ -74,6 +74,8 @@ struct DownloadMetrics {
     double totalSeconds = 0, transferSeconds = 0, averageBytesPerSecond = 0, peakBytesPerSecond = 0;
     double cpuSeconds = 0, writeSeconds = 0, allocationSeconds = 0, checksumSeconds = 0, flushSeconds = 0;
     double connectionSetupSeconds = 0, firstByteSeconds = 0;
+    double checkpointSeconds = 0;
+    std::uint64_t writeCalls = 0, checksumReadBytes = 0, checksumReadCalls = 0, checkpoints = 0;
     std::uint64_t peakWorkingSetBytes = 0, networkBytes = 0, writeBytes = 0, connectionsOpened = 0;
     std::uint64_t smallestRangeBytes = 0, largestRangeBytes = 0;
     std::uint32_t peakActiveRanges = 0, initialConnections = 1, finalConnections = 1, tuningChanges = 0;

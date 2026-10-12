@@ -117,6 +117,7 @@ void FileWriter::writeAt(std::uint64_t offset, const char* data, std::size_t byt
         const auto count = static_cast<DWORD>(std::min<std::size_t>(bytes, std::numeric_limits<DWORD>::max()));
         DWORD written = 0;
         if (!WriteFile(handle_, data, count, &written, nullptr) || written == 0) fileError("Partial-file write failed. Check disk space and permissions.");
+        ++metrics_.writeCalls;
         data += written;
         bytes -= written;
         metrics_.writeBytes += written;
@@ -155,12 +156,14 @@ std::string FileWriter::sha256Range(std::uint64_t offset, std::uint64_t bytes) {
     state.object.resize(objectBytes);
     cryptoCheck(BCryptCreateHash(state.algorithm, &state.hash, state.object.data(), objectBytes, nullptr, 0, 0));
     seek(handle_, offset);
-    std::array<unsigned char, 64 * 1024> buffer{};
+    if (checksumBuffer_.empty() && bytes != 0) checksumBuffer_.resize(1024 * 1024);
     while (bytes != 0) {
         DWORD received = 0;
-        if (!ReadFile(handle_, buffer.data(), static_cast<DWORD>(std::min<std::uint64_t>(bytes, buffer.size())), &received, nullptr) || received == 0) fileError("Unable to read the partial file for checksum verification.");
+        if (!ReadFile(handle_, checksumBuffer_.data(), static_cast<DWORD>(std::min<std::uint64_t>(bytes, checksumBuffer_.size())), &received, nullptr) || received == 0) fileError("Unable to read the partial file for checksum verification.");
+        ++metrics_.checksumReadCalls;
+        metrics_.checksumReadBytes += received;
         bytes -= received;
-        cryptoCheck(BCryptHashData(state.hash, buffer.data(), received, 0));
+        cryptoCheck(BCryptHashData(state.hash, checksumBuffer_.data(), received, 0));
     }
     std::array<unsigned char, 32> digest{};
     cryptoCheck(BCryptFinishHash(state.hash, digest.data(), static_cast<ULONG>(digest.size()), 0));

@@ -210,6 +210,27 @@ void recovery(const std::filesystem::path& directory) {
         auto metadata = destination; metadata += ".part.resume";
         const auto ciphertext = contents(metadata);
         require(ciphertext.find("PRIVATE_TOKEN") == std::string::npos && ciphertext.find(r.etag) == std::string::npos, "Metadata was plaintext.");
+        // A real no-delete-share reader blocks atomic journal replacement. A
+        // temporary lock must recover; a persistent lock must fail safely.
+        auto block = [&] {
+            const auto handle = CreateFileW(metadata.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+            require(handle != INVALID_HANDLE_VALUE, "Unable to hold journal replacement.");
+            return handle;
+        };
+        const auto transient = block();
+        std::jthread release([transient] { std::this_thread::sleep_for(std::chrono::milliseconds(75)); CloseHandle(transient); });
+        auto changed = r; changed.status = RecoveryStatus::Paused;
+        journal.save(changed); release.join();
+        require(journal.load().status == RecoveryStatus::Paused, "Transient journal lock did not recover.");
+        const auto stable = contents(metadata);
+        const auto persistent = block();
+        try { fails([&] { journal.save(r); }, DownloadErrorCode::File); }
+        catch (...) { CloseHandle(persistent); throw; }
+        CloseHandle(persistent);
+        require(contents(metadata) == stable && journal.load().status == RecoveryStatus::Paused, "Blocked replacement changed the last durable journal.");
+        for (const auto& entry : std::filesystem::directory_iterator(directory))
+            require(!entry.path().filename().wstring().starts_with(L".downshift-"), "Failed journal replacement leaked its temporary file.");
         { FileWriter reopened(destination, true);
           require(reopened.identity() == r.fileIdentity && reopened.sha256Range(3, 3) == r.completed[0].sha256, "Reopened bytes/identity changed."); }
         auto invalid = r; invalid.completed.push_back({{5, 5}, std::string(64, '0')});

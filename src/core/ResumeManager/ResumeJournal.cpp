@@ -19,6 +19,9 @@ namespace {
 constexpr std::size_t maximumBytes = 32 * 1024 * 1024, maximumRanges = 100'000;
 [[noreturn]] void invalid() { throw DownloadError(DownloadErrorCode::ResumeUnsafe, "Recovery metadata is invalid or unavailable. Use an explicit restart to archive the old partial."); }
 [[noreturn]] void fileFail() { throw DownloadError(DownloadErrorCode::File, "Unable to safely read or save recovery metadata."); }
+[[noreturn]] void replaceFail(DWORD error) {
+    throw DownloadError(DownloadErrorCode::File, "Unable to replace recovery metadata. Windows error " + std::to_string(error) + ".");
+}
 struct Handle {
     HANDLE value = INVALID_HANDLE_VALUE;
     ~Handle() { if (value != INVALID_HANDLE_VALUE) CloseHandle(value); }
@@ -163,7 +166,14 @@ void ResumeJournal::save(RecoveryRecord& r) {
             DWORD written = 0;
             if (!WriteFile(file.value, output.pbData, output.cbData, &written, nullptr) || written != output.cbData || !FlushFileBuffers(file.value)) fileFail();
         }
-        if (!MoveFileExW(temp.c_str(), path_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) fileFail();
+        // A short-lived reader/filter can deny replacement after our flushed
+        // temporary handle closes. Keep the old journal intact while retrying.
+        for (unsigned attempt = 0;; ++attempt) {
+            if (MoveFileExW(temp.c_str(), path_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) break;
+            const auto error = GetLastError();
+            if (attempt == 8 || (error != ERROR_ACCESS_DENIED && error != ERROR_SHARING_VIOLATION && error != ERROR_LOCK_VIOLATION)) replaceFail(error);
+            Sleep(25); // At most 200 ms; no permission/attribute changes or deletion.
+        }
     } catch (...) { DeleteFileW(temp.c_str()); throw; }
 }
 bool ResumeJournal::remove() noexcept { return DeleteFileW(path_.c_str()) != 0 || GetLastError() == ERROR_FILE_NOT_FOUND; }

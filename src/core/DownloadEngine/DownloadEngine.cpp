@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <exception>
 #include <limits>
 #include <memory>
@@ -161,6 +162,8 @@ public:
         }
         const auto& file = writer_.metrics();
         metrics.writeBytes = file.writeBytes; metrics.networkBytes = file.writeBytes;
+        metrics.writeCalls = file.writeCalls; metrics.checksumReadBytes = file.checksumReadBytes;
+        metrics.checksumReadCalls = file.checksumReadCalls;
         metrics.writeSeconds = file.writeSeconds; metrics.allocationSeconds = file.allocationSeconds;
         metrics.checksumSeconds = file.checksumSeconds; metrics.flushSeconds = file.flushSeconds;
         metrics.firstByteSeconds = firstCount_ ? firstSum_ / static_cast<double>(firstCount_) : 0;
@@ -189,6 +192,9 @@ struct Transfer {
     std::optional<std::uint64_t> expectedTotal;
     std::string etag;
     std::uint64_t received = 0;
+    std::uint64_t written = 0;
+    std::vector<char> writeBuffer;
+    std::size_t buffered = 0;
     bool probeRejected = false;
     bool rangeUnsupported = false;
     bool accepted = false;
@@ -202,6 +208,24 @@ struct Transfer {
     Transfer(Kind value, FileWriter* file, std::stop_token token, Telemetry* observer = nullptr)
         : kind(value), writer(file), telemetry(observer), stop(token) {
         if (!easy) fail(DownloadErrorCode::Network, "Unable to create a transfer handle.");
+    }
+
+    void flushBuffered() {
+        if (buffered == 0) return;
+        writer->writeAt((assigned ? assigned->first : 0) + written, writeBuffer.data(), buffered);
+        written += buffered;
+        if (telemetry) telemetry->progress.downloadedBytes += buffered;
+        buffered = 0;
+    }
+
+    void bufferBody(const char* data, std::size_t bytes) {
+        if (bytes != 0 && writeBuffer.empty()) writeBuffer.resize(64 * 1024);
+        while (bytes != 0) {
+            const auto count = std::min(bytes, writeBuffer.size() - buffered);
+            std::memcpy(writeBuffer.data() + buffered, data, count);
+            buffered += count; data += count; bytes -= count;
+            if (buffered == writeBuffer.size()) flushBuffered();
+        }
     }
 
     void validateHeaders() {
@@ -262,8 +286,15 @@ struct Transfer {
                 bytes > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - self.received) fail(DownloadErrorCode::Integrity, "The response exceeded its expected byte count.");
             if (self.writer) {
                 if (self.beforeWrite) self.beforeWrite(bytes, self.stop);
-                self.writer->writeAt((self.assigned ? self.assigned->first : 0) + self.received, data, bytes);
-                if (self.telemetry) self.telemetry->progress.downloadedBytes += bytes;
+                // Pacing still sees every validated callback, before bounded buffering.
+                if (self.kind == Kind::Segment) self.bufferBody(data, bytes);
+                else {
+                    // Streaming retains the established small-receive/direct-write
+                    // path; larger receives regressed fast single-stream transfers.
+                    self.writer->writeAt(self.written, data, bytes);
+                    self.written += bytes;
+                    if (self.telemetry) self.telemetry->progress.downloadedBytes += bytes;
+                }
             }
             self.received += bytes;
             return bytes;
@@ -297,6 +328,9 @@ struct Transfer {
         option(easy.get(), CURLOPT_ACCEPT_ENCODING, "identity");
         option(easy.get(), CURLOPT_HTTP_CONTENT_DECODING, 0L);
         option(easy.get(), CURLOPT_HTTP_TRANSFER_DECODING, 1L);
+        // Larger bounded receives reduce event-loop/socket overhead. Write callbacks
+        // remain capped by libcurl; probes retain their small default buffer.
+        if (kind == Kind::Segment) option(easy.get(), CURLOPT_BUFFERSIZE, 256 * 1024L);
         option(easy.get(), CURLOPT_HTTP_VERSION, static_cast<long>(CURL_HTTP_VERSION_2TLS));
         option(easy.get(), CURLOPT_USERAGENT, "Downshift");
         option(easy.get(), CURLOPT_NOSIGNAL, 1L);
@@ -325,7 +359,7 @@ struct Transfer {
         }
     }
 
-    void verify() const {
+    void verify() {
         if (control && control->pauseRequested()) fail(DownloadErrorCode::Paused, "Download paused; verified ranges are retained for --resume.");
         if (stop.stop_requested()) fail(DownloadErrorCode::Cancelled, "The download was cancelled.");
         if (exception) std::rethrow_exception(exception);
@@ -335,6 +369,9 @@ struct Transfer {
         const auto expected = kind == Kind::Probe ? std::optional<std::uint64_t>(1) :
             kind == Kind::Segment ? std::optional<std::uint64_t>(assigned->size()) : collector.response.length;
         if (expected && received != *expected) fail(DownloadErrorCode::Integrity, "The response ended before all expected bytes arrived.");
+        // Only a fully validated response may publish its final short buffer.
+        // Failed/pending responses discard their buffer and never enter a checkpoint.
+        if (writer) flushBuffered();
     }
     [[nodiscard]] bool retryable() const {
         const auto status = collector.response.status;
@@ -499,6 +536,12 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
     Telemetry telemetry(options, writer);
     MultiSession session(options.maxConnections);
     bool journalActive = false;
+    auto checkpoint = [&] {
+        const auto began = Clock::now();
+        journal.save(recovery);
+        telemetry.metrics.checkpointSeconds += std::chrono::duration<double>(Clock::now() - began).count();
+        ++telemetry.metrics.checkpoints;
+    };
     try {
         if (resuming) {
             if (writer.identity() != recovery.fileIdentity || writer.size() != recovery.total)
@@ -517,7 +560,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             recovery.id = ResumeJournal::newId(); recovery.url = options.url;
             recovery.destination = ResumeJournal::pathText(destination);
             recovery.fileIdentity = writer.identity(); recovery.expectedSha256 = expectedHash.value_or("");
-            writer.flush(); journal.save(recovery); journalActive = true;
+            writer.flush(); checkpoint(); journalActive = true;
         }
         telemetry.update(0, true);
         std::mt19937 random(std::random_device{}());
@@ -584,7 +627,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             recovery.resumable = true; recovery.total = total; recovery.etag = etag;
             recovery.resolvedUrl = resolved; recovery.lastModified = metadata.lastModified;
             recovery.status = RecoveryStatus::Active;
-            writer.flush(); journal.save(recovery); journalActive = true;
+            writer.flush(); checkpoint(); journalActive = true;
             controller.observe(telemetry.seconds(), 0, false);
             std::vector<ByteRange> savedRanges;
             for (const auto& saved : recovery.completed) savedRanges.push_back(saved.range);
@@ -638,7 +681,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                         telemetry.checkPause();
                         if (stop.stop_requested()) throw;
                         const auto delay = delayFor(*transfer); if (!delay) throw;
-                        telemetry.progress.downloadedBytes -= transfer->received;
+                        telemetry.progress.downloadedBytes -= transfer->written;
                         pending.push_back({*transfer->assigned, transfer->attempts + 1, Clock::now() + std::chrono::milliseconds(*delay)});
                         if (transfer->collector.response.status == 429 || transfer->collector.response.status == 503)
                             hostNotBefore = std::max(hostNotBefore, pending.back().due);
@@ -653,7 +696,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                 }
                 if (!done.empty()) {
                     std::sort(recovery.completed.begin(), recovery.completed.end(), [](const auto& a, const auto& b) { return a.range.first < b.range.first; });
-                    writer.flush(); journal.save(recovery);
+                    writer.flush(); checkpoint();
                 }
                 if (unsupported) { session.clear(&telemetry); break; }
                 fill();
@@ -678,7 +721,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                 telemetry.metrics.tuningChanges = controller.changes();
                 telemetry.networkDone();
                 telemetry.checkPause();
-                recovery.status = RecoveryStatus::Finalizing; journal.save(recovery);
+                recovery.status = RecoveryStatus::Finalizing; checkpoint();
                 writer.commit(total, expectedHash);
                 result.bytes = total;
                 result.segmented = true;
@@ -689,7 +732,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             // All easy handles are detached before truncating previously written ranges.
             if (resuming) fail(DownloadErrorCode::ResumeUnsafe, "Range support disappeared during resumption. Saved data is retained; use --restart.");
             recovery.completed.clear(); recovery.resumable = false;
-            journal.save(recovery); // Invalidate reused bytes durably before truncation.
+            checkpoint(); // Invalidate reused bytes durably before truncation.
             writer.reset();
             telemetry.metrics.recoveredBytes = telemetry.progress.recoveredBytes = 0;
             telemetry.progress.downloadedBytes = telemetry.progress.verifiedBytes = 0;
@@ -706,7 +749,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         telemetry.progress.totalBytes.reset();
         recovery.resumable = false; recovery.resolvedUrl = resolved; recovery.etag = etag;
         recovery.lastModified = metadata.lastModified;
-        recovery.status = RecoveryStatus::Active; journal.save(recovery);
+        recovery.status = RecoveryStatus::Active; checkpoint();
         auto stream = request(Kind::Stream, resolved, etag);
         telemetry.progress.totalBytes = stream->received;
         telemetry.progress.verifiedBytes = stream->received;
@@ -714,7 +757,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         telemetry.checkPause();
         recovery.total = stream->received; recovery.status = RecoveryStatus::Finalizing;
         recovery.finalSha256 = expectedHash ? *expectedHash : writer.sha256();
-        journal.save(recovery);
+        checkpoint();
         writer.commit(stream->received, expectedHash);
         result.bytes = stream->received;
         result.suggestedFilename = suggestedFilename(stream->collector.response.disposition);
@@ -728,7 +771,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             recovery.status = options.control && options.control->pauseRequested() ? RecoveryStatus::Paused : RecoveryStatus::Failed;
             try {
                 std::sort(recovery.completed.begin(), recovery.completed.end(), [](const auto& a, const auto& b) { return a.range.first < b.range.first; });
-                writer.flush(); journal.save(recovery);
+                writer.flush(); checkpoint();
             } catch (...) {} // Preserve the original failure and the last durable checkpoint.
         }
         if (options.control && options.control->pauseRequested()) {

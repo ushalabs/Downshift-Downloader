@@ -27,7 +27,7 @@ class Server(http.server.ThreadingHTTPServer):
         assert self.active == 0, "Previous fixture requests did not drain"
         self.settings = dict(size=12 * 1048576, etag='"version-1"', modified="Mon, 12 Oct 2026 00:00:00 GMT",
             bps=4 * 1048576, fault="", scope="range", status=503, retry_after="", ignore=False, weak=False,
-            fault_first=None, change_after_probe=False) | settings
+            fault_first=None, change_after_probe=False, drop_bytes=None) | settings
         self.records = []
         self.attempts = collections.Counter()
 
@@ -87,6 +87,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Range", f"bytes {first}-{last}/{s['size']}")
         self.end_headers()
         end = first + (last - first + 1) // 2 - 1 if fault.startswith("drop") and failing else last
+        if fault.startswith("drop") and failing and s["drop_bytes"] is not None:
+            end = min(end, first + s["drop_bytes"] - 1)
         deadline = time.monotonic()
         for pos in range(first, end + 1, 65536):
             count = min(65536, end + 1 - pos)

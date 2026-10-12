@@ -1,0 +1,61 @@
+{
+  "scope": "Diagnostic-only Phase 7 engine with Windows error number on failures, not performance acceptance",
+  "executable_sha256": "579334d93b518b92e11b24803b7b2ce2d717b1f161f3033bde23432f92e384c7",
+  "source_sha256": "da27fcd4b80031ea61b8d3b00821ddcf3235eb26471ec316a5e5cab993d3be43",
+  "attempts": [
+    {
+      "index": 0,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":22.626356900000001,\"transfer_seconds\":19.106211299999998,\"average_bps\":261695001.771492,\"peak_bps\":325013430.00277859,\"cpu_seconds\":16,\"peak_working_set_bytes\":9940992,\"write_bytes\":5000000000,\"write_seconds\":5.005418999999212,\"allocation_seconds\":0.0025806000000000002,\"checksum_seconds\":6.9863423999999927,\"flush_seconds\":3.245940500000005,\"connection_setup_seconds\":0.0036690000000000004,\"first_byte_seconds\":0.0015531867671691804,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 1,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":23.069419100000001,\"transfer_seconds\":19.5247028,\"average_bps\":256085844.23625645,\"peak_bps\":329636535.70636791,\"cpu_seconds\":17.125,\"peak_working_set_bytes\":9424896,\"write_bytes\":5000000000,\"write_seconds\":5.1475034000001321,\"allocation_seconds\":0.0032956999999999999,\"checksum_seconds\":7.1700841999999945,\"flush_seconds\":3.1869912000000085,\"connection_setup_seconds\":0.0046369999999999996,\"first_byte_seconds\":0.0027120418760468983,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 2,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":23.441128800000001,\"transfer_seconds\":19.999094800000002,\"average_bps\":250011315.51214007,\"peak_bps\":330300953.02442729,\"cpu_seconds\":16.640625,\"peak_working_set_bytes\":9248768,\"write_bytes\":5000000000,\"write_seconds\":5.1891784999998087,\"allocation_seconds\":0.0032653000000000001,\"checksum_seconds\":7.2676367999999991,\"flush_seconds\":3.3615386999999997,\"connection_setup_seconds\":0.004241,\"first_byte_seconds\":0.0016678735343383573,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 3,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":23.9842251,\"transfer_seconds\":20.399153200000001,\"average_bps\":245108213.60957277,\"peak_bps\":358497911.65998483,\"cpu_seconds\":16.890625,\"peak_working_set_bytes\":9334784,\"write_bytes\":5000000000,\"write_seconds\":5.2455783999999985,\"allocation_seconds\":0.0030902,\"checksum_seconds\":7.3749119999999992,\"flush_seconds\":3.5644721000000019,\"connection_setup_seconds\":0.004117,\"first_byte_seconds\":0.0013648509212730333,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 4,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":23.616543700000001,\"transfer_seconds\":20.0060465,\"average_bps\":249924441.59319535,\"peak_bps\":322055382.0940423,\"cpu_seconds\":16.96875,\"peak_working_set_bytes\":9216000,\"write_bytes\":5000000000,\"write_seconds\":5.181016099999872,\"allocation_seconds\":0.0033785999999999998,\"checksum_seconds\":7.442579899999993,\"flush_seconds\":3.3497987000000014,\"connection_setup_seconds\":0.003601,\"first_byte_seconds\":0.0019679388609715252,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 5,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":23.4661635,\"transfer_seconds\":19.994602100000002,\"average_bps\":250067491.96574408,\"peak_bps\":378283900.97096461,\"cpu_seconds\":16.078125,\"peak_working_set_bytes\":9392128,\"write_bytes\":5000000000,\"write_seconds\":5.1933088000001471,\"allocation_seconds\":0.0038156000000000002,\"checksum_seconds\":7.2975951000000041,\"flush_seconds\":3.338816599999999,\"connection_setup_seconds\":0.0039940000000000002,\"first_byte_seconds\":0.0020148442211055276,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 6,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":24.2179006,\"transfer_seconds\":20.7181344,\"average_bps\":241334470.73304051,\"peak_bps\":314716322.36727649,\"cpu_seconds\":17.703125,\"peak_working_set_bytes\":9297920,\"write_bytes\":5000000000,\"write_seconds\":5.342043300000098,\"allocation_seconds\":0.0028386000000000002,\"checksum_seconds\":7.3624670000000094,\"flush_seconds\":3.5593899000000011,\"connection_setup_seconds\":0.0035690000000000001,\"first_byte_seconds\":0.0015413618090452258,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 7,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"bytes\":5000000000,\"segmented\":true,\"fallback\":false,\"ranges\":1193,\"total_seconds\":24.612985599999998,\"transfer_seconds\":20.720281799999999,\"average_bps\":241309459.41092366,\"peak_bps\":307055519.06095618,\"cpu_seconds\":17.859375,\"peak_working_set_bytes\":9330688,\"write_bytes\":5000000000,\"write_seconds\":5.3766414999999146,\"allocation_seconds\":0.0034053999999999998,\"checksum_seconds\":7.8273965000000016,\"flush_seconds\":3.5460019999999997,\"connection_setup_seconds\":0.0040309999999999999,\"first_byte_seconds\":0.0017897847571189303,\"connections_opened\":4,\"network_bytes\":5000000000,\"smallest_range_bytes\":389632,\"largest_range_bytes\":4194304,\"peak_active_ranges\":4,\"initial_connections\":4,\"final_connections\":4,\"tuning_changes\":0,\"resource_metrics_available\":true,\"observer_failed\":false,\"recovered_bytes\":0,\"retries\":0,\"cleanup_pending\":false}\n"
+    },
+    {
+      "index": 8,
+      "code": 1,
+      "stderr": "Downshift: Unable to safely read or save recovery metadata. Windows error 5. [category=7]\n",
+      "stdout": ""
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "scope": "Additional independent full video/audio decoding of final actual YouTube output; distinct from production ffprobe completion checks",
+  "streamsDecoded": [
+    "video",
+    "audio"
+  ],
+  "exitCode": 0,
+  "inputSha256": "8fe5bbc9d5f30362412345871b82daef0aa58a0f3a4a9d685101360aa51f8f6b",
+  "duration": 713.247,
+  "decoderSha256": "4b7264e5ac33ea34b02d280a0fe5c19e88d48d27195908fae8394358d907fad0",
+  "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

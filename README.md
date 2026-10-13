@@ -8,7 +8,7 @@ Downshift is a free, open-source Windows download manager for ordinary files and
 
 ## Get started
 
-Get the Windows x64 portable archive from [Downshift releases](https://github.com/ushalabs/Downshift-Download-Manager/releases). Extract the **whole ZIP** to a permanent writable folder and run **Setup.cmd**. Open the Desktop Downshift shortcut or Downshift.exe beside its DLLs. Windows 10/11 x64 is required; developer tools are not needed.
+Get the Windows x64 portable archive from [verified v0.3.1 preview](https://github.com/ushalabs/Downshift-Download-Manager/releases/tag/v0.3.1). Extract the **whole ZIP** to a permanent writable folder and run **Setup.cmd**. Open the Desktop Downshift shortcut or Downshift.exe beside its DLLs. Windows 10/11 x64 is required; developer tools are not needed.
 
 For Chrome, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted package's **extension** folder. Reload existing video pages. A previously installed extension needs **Reload** after an update. Capture defaults on for fresh installs; saved off preferences persist. [Full setup](docs/PACKAGING.md) and [Chrome recovery](docs/CHROME.md) explain moving or uninstalling the package.
 

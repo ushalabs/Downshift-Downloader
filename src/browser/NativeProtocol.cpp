@@ -12,7 +12,8 @@
 #include <stdexcept>
 namespace downshift::browser {
 namespace {
-[[noreturn]] void fail(){throw std::runtime_error("Chrome integration is unavailable or received an invalid message. Keep this download in Chrome.");}
+bool isolatedTestPipe=false;
+[[noreturn]] void fail(){throw std::runtime_error("Downshift's browser connection is unavailable or the request is invalid. Open the updated app and reload its extension.");}
 QString sid(HANDLE process) {
     HANDLE token=nullptr;if(!OpenProcessToken(process,TOKEN_QUERY,&token))fail();DWORD count=0;GetTokenInformation(token,TokenUser,nullptr,0,&count);std::vector<unsigned char> buffer(count);
     const auto ok=GetTokenInformation(token,TokenUser,buffer.data(),count,&count);CloseHandle(token);if(!ok)fail();wchar_t* text=nullptr;if(!ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(buffer.data())->User.Sid,&text))fail();const auto result=QString::fromWCharArray(text);LocalFree(text);return result;
@@ -21,12 +22,14 @@ bool hexadecimal(const QString& key){return key.size()==32 && std::all_of(key.be
 }
 QString userSid(){return sid(GetCurrentProcess());}
 bool sameUserProcess(unsigned long id){const auto process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,id);if(!process)return false;bool same=false;try{same=sid(process)==userSid();}catch(...){}CloseHandle(process);return same;}
-QString pipeName(){return "\\\\.\\pipe\\Downshift-"+userSid();}
+QString pipeName(){return "\\\\.\\pipe\\Downshift-"+userSid()+(isolatedTestPipe ? "-tests":"");}
+void useIsolatedTestPipe(){isolatedTestPipe=true;}
 QJsonObject parse(const QByteArray& data) {if(data.isEmpty() || data.size()>maximumMessage)fail();QJsonParseError error{};const auto doc=QJsonDocument::fromJson(data,&error);if(error.error!=QJsonParseError::NoError || !doc.isObject())fail();return doc.object();}
 void validate(const QJsonObject& request) {
     if(request.value("version")!=QJsonValue(1) || !request.value("command").isString())fail();const auto command=request.value("command").toString();QSet<QString> allowed={"version","command"};
     if(command=="prepare"){
-        allowed.unite({"key","url","filename","total","mime"});if(!hexadecimal(request.value("key").toString()))fail();
+        allowed.unite({"key","url","filename","total","mime","serverFilename"});if(!hexadecimal(request.value("key").toString()))fail();
+        if(request.contains("serverFilename") && !request.value("serverFilename").isBool())fail();
         if(request.contains("mime") && (!request.value("mime").isString() || request.value("mime").toString().size()>120 || request.value("mime").toString().contains(QChar(0))))fail();
         const auto url=request.value("url").toString(),name=request.value("filename").toString();if(url.isEmpty() || url.size()>32768 || url.contains(QChar(0)) || name.isEmpty() || name.size()>160 || name.contains(QChar(0)))fail();
         if(request.contains("total")){bool valid=false;const auto n=request.value("total").toString().toLongLong(&valid);if(!valid || n < -1)fail();}

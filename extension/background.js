@@ -4,7 +4,12 @@ const mediaSources = new MediaSources();
 async function ensureApp() {
   const request = command=>chrome.runtime.sendNativeMessage("org.ushalabs.downshift",{version:1,command});
   const opened=await request("open");if(!opened?.ok)throw Error("Could not open Downshift");
-  for(let attempt=0;attempt<8;attempt++) {try{if((await request("ping")).ok)return;}catch{}await new Promise(resolve=>setTimeout(resolve,400));}
+  for(let attempt=0;attempt<8;attempt++) {
+    let answer;try{answer=await request("ping");}catch(error){if(opened.state!=="opening")throw error;}
+    if(answer?.ok){if(answer.appVersion!==chrome.runtime.getManifest().version)throw Error("Close the old Downshift window and open the updated Desktop shortcut, then retry.");return answer;}
+    if(answer?.error && opened.state!=="opening")throw Error(answer.error);
+    await new Promise(resolve=>setTimeout(resolve,400));
+  }
   throw Error("Downshift is still starting");
 }
 chrome.webRequest.onHeadersReceived.addListener(details=>mediaSources.observe(details), {urls:["http://*/*","https://*/*"]}, ["responseHeaders"]);
@@ -60,7 +65,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
     if(!url || !publicUrl(sender.url) || sender.tab?.incognito){reply({ok:false,error:"This link cannot be captured."});return false;}
     let pathName=new URL(url).pathname.split('/').pop();try{pathName=decodeURIComponent(pathName);}catch{}
     const name=String(message.filename || pathName || "download.bin").split(/[\\/]/).pop().replace(/[<>:"|?*\x00-\x1f]/g,'_').slice(0,150);
-    task=controller.direct(url,name || "download.bin");
+    task=controller.direct(url,name || "download.bin",!message.filename);
   }
   else if(message.type==="status")task=controller.status();
   else if(message.type==="configure")task=controller.configure(message.enabled);
@@ -69,6 +74,6 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   else if(message.type==="reconcile")task=controller.reconcile().then(()=>controller.status());
   else if(message.type==="retry")task=controller.retry().then(()=>controller.status());
   else return false;
-  task.then(value=>reply({ok:true,...value})).catch(error=>reply({ok:false,error:String(error?.message || "Downshift is unavailable. Open the app and try again.").slice(0,240)}));return true;
+  task.then(value=>reply({ok:true,...value,captureProtocol:2})).catch(error=>reply({ok:false,captureProtocol:2,error:String(error?.message || "Downshift is unavailable. Open the app and try again.").slice(0,240)}));return true;
 });
 quiet(controller.reconcile());

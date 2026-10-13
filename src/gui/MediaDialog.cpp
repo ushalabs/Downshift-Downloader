@@ -1,4 +1,5 @@
 #include "MediaDialog.h"
+#include "Controls.h"
 #include "core/DownloadQueue/VideoUrl.h"
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -41,7 +42,7 @@ MediaDialog::MediaDialog(QueueManager& queue,QString url,QString title,QWidget* 
     setProperty("mediaUrl",url_);setObjectName("mediaDialog");
     auto* layout=new QVBoxLayout(this);layout->setContentsMargins(24,22,24,22);layout->setSpacing(14);title_=new QLabel(title.isEmpty() ? "Video":title);title_->setObjectName("mediaTitle");title_->setWordWrap(true);title_->setTextFormat(Qt::PlainText);layout->addWidget(title_);
     auto* source=new QLabel(QUrl(url_).host());source->setTextFormat(Qt::PlainText);layout->addWidget(source);
-    auto* form=new QFormLayout;quality_=new QComboBox;quality_->setObjectName("mediaQuality");quality_->setEnabled(false);form->addRow("Quality",quality_);
+    auto* form=new QFormLayout;quality_=new QComboBox;modernCombo(quality_);quality_->setObjectName("mediaQuality");quality_->setEnabled(false);form->addRow("Quality",quality_);
     destination_=new QLineEdit;destination_->setObjectName("mediaDestination");destination_->setReadOnly(true);
     auto* folder=new QHBoxLayout;folder->addWidget(destination_);browse_=new QPushButton("Choose folder");browse_->setEnabled(false);folder->addWidget(browse_);form->addRow("Save to",folder);layout->addLayout(form);
     status_=new QLabel("Checking video…");status_->setObjectName("mediaStatus");status_->setWordWrap(true);status_->setTextFormat(Qt::PlainText);layout->addWidget(status_);

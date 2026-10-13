@@ -9,6 +9,7 @@ function fixture(options={}) {
       f.log.push(request.command);if(f.offline || options.missing)throw Error();let state=f.receipt;
       if(request.command==="ping")state="ready";
       if(request.command==="prepare"){
+        f.lastPrepare=request;
         assert(options.direct || f.item.paused);if(options.prepareFails)throw Error();if(f.receipt==="unknown")f.receipt="prepared";state=f.receipt;
         if(options.completedDuringPrepare)f.item.state="complete";
         if(options.disableDuringPrepare)f.disablePromise=f.controller.configure(false);
@@ -56,4 +57,6 @@ for(const options of [{missing:true},{prepareFails:true},{cancelFails:true}]){
 {const f=fixture({direct:true});await f.controller.direct('https://files.example/file.bin','file.bin');check(f.commits===1 && !f.log.includes('pause') && !f.log.includes('cancel'),'Direct link never starts or cancels Chrome');check(f.saved.direct.length===0,'Direct receipt finished');}
 {const f=fixture({direct:true,lostCommit:true});await f.controller.direct('https://files.example/file.bin','file.bin');check(f.commits===1 && f.saved.direct.length===0,'Direct lost acknowledgment reconciles without duplicate');}
 {const f=fixture({direct:true,prepareFails:true});await assert.rejects(f.controller.direct('https://files.example/file.bin','file.bin'));check(f.commits===0 && f.saved.direct.length===0 && !f.log.includes('cancel'),'Failed direct preparation leaves browser untouched');}
+{const f=fixture({direct:true});f.api.ensureApp=async()=>({capabilities:{serverFilename:true}});await f.controller.direct('https://files.example/download','download');check(f.lastPrepare.serverFilename===true,'Native server filename requested for a default link name');}
+{const f=fixture({direct:true});f.api.ensureApp=async()=>({capabilities:{serverFilename:true}});await f.controller.direct('https://files.example/download','custom.bin',false);check(f.lastPrepare.serverFilename===undefined,'Explicit user filename is preserved');}
 console.log(`Extension state checks passed: ${checks}`);

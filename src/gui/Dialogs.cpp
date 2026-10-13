@@ -2,6 +2,7 @@
 #include "core/DownloadQueue/Categories.h"
 #include "core/DownloadQueue/VideoUrl.h"
 #include <QApplication>
+#include "Controls.h"
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
@@ -41,7 +42,7 @@ void MainWindow::openAdd(QString address,QString filename) {
         accept->setEnabled(false);feedback->clear();const auto index=priority->currentIndex();
         auto future=queue_.add(url->text(),dest->text(),index==1 ? 1 : index==2 ? -1:0,start->isChecked(),sha->text(),static_cast<std::uint64_t>(cap->value())*1024);
         auto pending=std::make_shared<std::future<QString>>(std::move(future));auto* timer=new QTimer(dialog);timer->setInterval(30);connect(timer,&QTimer::timeout,dialog,[this,dialog,accept,timer,pending,feedback]{if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();try{pending->get();dialog->accept();banner_->hide();refresh();}catch(const std::exception& e){accept->setEnabled(true);feedback->setText(QString::fromUtf8(e.what()));message(QString::fromUtf8(e.what()),true);}});timer->start();
-    });dialog->open();url->setFocus();
+    });for(auto* combo:dialog->findChildren<QComboBox*>())modernCombo(combo);dialog->open();url->setFocus();
 }
 void MainWindow::confirmDownload(const QueueEntry& row) {
     if(findChild<QDialog*>("captureDialog-"+row.id))return;
@@ -70,7 +71,7 @@ void MainWindow::openSettings() {
     connect(buttons,&QDialogButtonBox::accepted,dialog,[this,dialog,saved,directory,simultaneous,host,hostConnections,connections,cap,themeChoice,startup,notifications,diagnostics]() mutable {
         saved.directory=directory->text();saved.simultaneous=simultaneous->value();saved.perHost=host->value();saved.hostConnections=hostConnections->value();const int count=connections->currentData().toInt();saved.automatic=count==0;saved.connections=count ? count:16;saved.speedLimit=static_cast<std::uint64_t>(cap->value())*1024;saved.dark=themeChoice->currentIndex()==1;saved.startOnLaunch=startup->isChecked();saved.notifications=notifications->isChecked();saved.diagnostics=diagnostics->isChecked();
         watch(queue_.configure(saved),[this,guard=QPointer<QDialog>(dialog)]{if(guard)guard->accept();message("Settings saved.");});
-    });dialog->open();
+    });for(auto* combo:dialog->findChildren<QComboBox*>())modernCombo(combo);dialog->open();
 }
 void MainWindow::more() {
     const auto* e=selected();if(!e)return;const auto row=*e;QMenu menu(this);

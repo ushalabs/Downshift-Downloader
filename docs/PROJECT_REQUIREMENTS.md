@@ -1264,3 +1264,7 @@ The user controls phase progression. You control engineering implementation with
 ## Follow-up reliability request (2026-10-13)
 
 Fix the extension player action that opens Downshift without a usable YouTube URL; prevent avoidable Chrome download starts and cancelled history entries; investigate slow ordinary transfers and preserve partial progress through Pause/Resume. The user confirmed clicking Downshift's overlay, but did not identify the current failing video's URL. Earlier verified main/publishing authorization remains applicable; preserve user files/history.
+
+## Current follow-up scope
+
+Prioritize shared downloader engineering and general server compatibility after Lightshot failed, rather than URL-specific repairs. The user confirms WinRAR and YouTube downloads succeeded. Remove the duplicate status selector, show new history first, add three sorting views on all four sidebar pages, and use the modern pink styling throughout forms. The unspecified third sort is Oldest; Size means largest first. Existing main/verified publication authorization remains in force. Preserve files and history.

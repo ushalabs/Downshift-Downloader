@@ -83,6 +83,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         size = self.server.size
         raw_range = self.headers.get("Range")
+        if raw_range=="bytes=0-0" and getattr(self.server,"probe_status",0):
+            self.send_response(self.server.probe_status);self.send_header("Content-Length","0");self.end_headers();return
         probe = raw_range == "bytes=0-0" and not self.headers.get("If-Match")
         match = re.fullmatch(r"bytes=(\d+)-(\d+)", raw_range or "")
         segmented = self.path.split("?", 1)[0] == "/range" and match is not None
@@ -99,7 +101,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if self.server.header_delay: time.sleep(self.server.header_delay)
             self.send_response(206 if segmented else 200)
             self.send_header("Content-Length", str(last - first + 1))
-            self.send_header("ETag", ("W/" if self.server.weak_etag else "") + f'"pattern-{size}"')
+            self.send_header("ETag", ("W/" if self.server.weak_etag else "") + getattr(self.server,"entity_tag",f'"pattern-{size}"'))
+            if getattr(self.server,"suggested_filename",None):self.send_header("Content-Disposition",f'attachment; filename="{self.server.suggested_filename}"')
             if segmented: self.send_header("Content-Range", f"bytes {first}-{last}/{size}")
             self.end_headers()
             local_deadline = time.perf_counter()

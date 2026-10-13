@@ -9,6 +9,7 @@ inline constexpr unsigned maximumMessage=65536;
 QJsonObject parse(const QByteArray& data);
 void validate(const QJsonObject& request);
 QString pipeName();
+void useIsolatedTestPipe(); // Test executables only; production never enables it.
 QJsonObject send(const QJsonObject& request);
 bool sameUserProcess(unsigned long process);
 QString userSid();

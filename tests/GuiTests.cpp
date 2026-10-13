@@ -1,6 +1,7 @@
 #include "gui/MainWindow.h"
 #include "gui/Brand.h"
 #include "core/Runtime.h"
+#include "database/QueueStore.h"
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -9,6 +10,8 @@
 #include <QEvent>
 #include <QFileInfo>
 #include <QLineEdit>
+#include <QJsonDocument>
+#include <QAbstractItemView>
 #include <QPixmap>
 #include <QPushButton>
 #include <QResizeEvent>
@@ -58,7 +61,7 @@ int main(int argc,char** argv) {
             widget<QPushButton>(window,"startButton")->click();wait([&]{return window.current().entries[0].status==downshift::QueueStatus::Completed;});
             measuring=false;
             check(window.current().entries[0].progress.downloadedBytes==2*1024*1024,"Completed byte count");check(!widget<QPushButton>(window,"startButton")->isEnabled(),"Completed control disabled");
-            widget<QComboBox>(window,"filterField")->setCurrentIndex(3);check(table->isRowHidden(0),"Attention filter");widget<QComboBox>(window,"filterField")->setCurrentIndex(2);check(!table->isRowHidden(0),"History filter");table->selectRow(0);
+            const auto navigation=window.findChildren<QPushButton*>("navigation");navigation[3]->click();check(table->isRowHidden(0),"Attention page");navigation[2]->click();check(!table->isRowHidden(0),"Completed page");table->selectRow(0);
             widget<QPushButton>(window,"settingsButton")->click();auto* settings=widget<QDialog>(window,"settingsDialog");widget<QLineEdit>(*settings,"settingsDirectory")->setText(root);widget<QComboBox>(*settings,"settingsTheme")->setCurrentIndex(1);widget<QSpinBox>(*settings,"settingsSimultaneous")->setValue(2);widget<QCheckBox>(*settings,"settingsNotifications")->setChecked(false);widget<QCheckBox>(*settings,"settingsDiagnostics")->setChecked(true);widget<QPushButton>(*settings,"settingsSave")->click();
             wait([&]{return window.current().settings.dark;});check(window.current().settings.simultaneous==2,"Settings connected");check(window.grab().save(QDir(shots).filePath("dark.bmp"),"BMP"),"Dark render");
             widget<QPushButton>(window,"settingsButton")->click();settings=widget<QDialog>(window,"settingsDialog");widget<QComboBox>(*settings,"settingsTheme")->setCurrentIndex(0);settings->reject();check(window.current().settings.dark,"Cancel preserves settings");
@@ -69,6 +72,21 @@ int main(int argc,char** argv) {
         {
             downshift::QueueManager queue(database);downshift::MainWindow window(queue);window.show();wait([&]{return window.ready();});check(window.current().settings.dark && window.current().entries.size()==1,"Settings/history reopening");check(window.current().entries[0].status==downshift::QueueStatus::Completed,"Completed history reopening");check(window.current().entries[0].progress.averageBytesPerSecond>0 && window.current().entries[0].progress.elapsedSeconds>0,"History retains worker metrics");
             auto future=queue.deleteCompleted(window.current().entries[0].id);wait([&]{return future.wait_for(std::chrono::seconds(0))==std::future_status::ready;});future.get();wait([&]{return window.current().entries.empty();});check(!QFileInfo::exists(file),"Delete worker removes completed file");
+        }
+        {
+            const auto viewDatabase=QDir(root).filePath("view-fixtures.sqlite");
+            {
+                downshift::QueueStore store(viewDatabase);
+                for(int index=0;index<4;++index){downshift::QueueEntry row;row.id=QString::number(index).rightJustified(32,'0');row.url="https://example.invalid/view-fixture";row.destination=QDir(root).filePath(QString("view-%1.bin").arg(index));row.created=index==0 ? 100:index==1 ? 200:300;row.updated=row.created;row.status=index<2 ? downshift::QueueStatus::Completed:index==2 ? downshift::QueueStatus::Failed:downshift::QueueStatus::Paused;row.progress.totalBytes=index==1 ? 1000:index==2 ? 700:200;store.save(row.id,QJsonDocument(row.json()).toJson(QJsonDocument::Compact));}
+            }
+            downshift::QueueManager queue(viewDatabase);downshift::MainWindow window(queue);window.show();wait([&]{return window.ready() && window.current().entries.size()==4;});
+            auto* table=widget<QTableWidget>(window,"downloadTable");auto* view=widget<QComboBox>(window,"viewDownloads");
+            const auto rowId=[&](int row){return table->item(row,0)->data(Qt::UserRole).toString().right(1);};
+            check(rowId(0)=="3","Newest first, including creation-order ties");table->selectRow(0);view->setCurrentIndex(1);check(rowId(0)=="0","Oldest first");check(rowId(table->currentRow())=="3","Sort preserves selection by download ID");view->setCurrentIndex(2);check(rowId(0)=="1","Largest known size first");
+            const auto navigation=window.findChildren<QPushButton*>("navigation");
+            for(int page=0;page<4;++page){navigation[page]->click();for(int mode=0;mode<3;++mode){view->setCurrentIndex(mode);int visible=0;for(int row=0;row<4;++row)if(!table->isRowHidden(row)){++visible;const auto id=rowId(row);check(page==0 || (page==1 && id=="3") || (page==2 && (id=="0" || id=="1")) || (page==3 && id=="2"),"Sorted view respects sidebar page");}check(visible==(page==0 ? 4:page==2 ? 2:1),"Page visible count survives all sorts");}}
+            navigation[0]->click();view->setCurrentIndex(0);widget<QLineEdit>(window,"searchField")->setText("view-3.bin");check(!table->isRowHidden(0) && table->isRowHidden(1),"Search follows sorted download IDs");widget<QLineEdit>(window,"searchField")->clear();
+            view->showPopup();QApplication::processEvents();check(view->view()->grab().save(QDir(shots).filePath("view-popup.bmp"),"BMP"),"View popup render");view->hidePopup();check(window.grab().save(QDir(shots).filePath("sorted-history.bmp"),"BMP"),"Sorted history render");
         }
         std::cout<<"GUI checks passed: "<<checks<<"; heartbeat ticks="<<beats<<"; longest event gap="<<maximumGap<<" seconds\n";
         return 0;

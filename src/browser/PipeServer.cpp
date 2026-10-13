@@ -54,7 +54,7 @@ void PipeServer::run(std::stop_token stop) {
 }
 QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) {
     validate(request);const auto command=request.value("command").toString();
-    if(command=="ping"){(void)queue_.snapshot().get();return {{"state","ready"}};}
+    if(command=="ping"){(void)queue_.snapshot().get();return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"capabilities",QJsonObject{{"serverFilename",true}}}};}
     if(command=="open"){open_();return {{"state","ready"}};}
     if(command=="blocked"){open_();if(blocked_)blocked_();return {{"state","blocked"}};}
     if(command=="media"){
@@ -72,7 +72,12 @@ QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) 
         if(inspection.total && request.contains("total") && expected>=0 && static_cast<std::uint64_t>(expected)!=inspection.total)throw std::runtime_error("The public file size differs from Chrome's download.");
         const auto mime=request.value("mime").toString();
         if((inspection.contentType.starts_with("text/html") || inspection.contentType.starts_with("application/xhtml")) && !mime.startsWith("text/html") && !mime.startsWith("application/xhtml"))throw std::runtime_error("The server returned a webpage instead of this file. Authentication may be required.");
-        return queue_.prepare(key,url,request.value("filename").toString(),inspection,mime).get();
+        auto filename=request.value("filename").toString();
+        if(request.value("serverFilename").toBool() && !inspection.filename.empty() && inspection.filename!="download"){
+            const auto suggested=QString::fromUtf8(inspection.filename.c_str());
+            if(suggested.size()<=160)filename=suggested;
+        }
+        return queue_.prepare(key,url,filename,inspection,mime.isEmpty() ? QString::fromStdString(inspection.contentType):mime).get();
     }
     return queue_.handoff(key,command,request.value("prompt").toBool()).get();
 }

@@ -1,6 +1,7 @@
 #include "core/DownloadQueue/QueueManager.h"
 #include "core/Runtime.h"
 #include "browser/PipeServer.h"
+#include "browser/NativeProtocol.h"
 #include "gui/MainWindow.h"
 #include <QApplication>
 #include <QCoreApplication>
@@ -12,9 +13,13 @@
 #include <QPixmap>
 #include <QLabel>
 #include <QPushButton>
+#include <QEvent>
 #include <iostream>
+class HiddenTestWindows final:public QObject { bool eventFilter(QObject* object,QEvent* event) override {if(event->type()==QEvent::Show)if(auto* widget=qobject_cast<QWidget*>(object);widget && widget->isWindow())widget->setAttribute(Qt::WA_DontShowOnScreen);return false;} };
 int main(int argc,char** argv) {
-    QApplication app(argc,argv);if(argc!=2)return 2;downshift::CurlRuntime curl;downshift::QueueManager queue(QDir(QString::fromLocal8Bit(argv[1])).filePath("queue.sqlite"));
+    QApplication app(argc,argv);if(argc!=2 && argc!=3)return 2;HiddenTestWindows hidden;
+    if(argc==3){if(QString::fromLatin1(argv[2])!="--isolated-browser-test")return 2;downshift::browser::useIsolatedTestPipe();app.installEventFilter(&hidden);}
+    downshift::CurlRuntime curl;downshift::QueueManager queue(QDir(QString::fromLocal8Bit(argv[1])).filePath("queue.sqlite"));
     auto s=queue.snapshot().get().settings;s.directory=QString::fromLocal8Bit(argv[1]);s.notifications=false;queue.configure(s).get();
     downshift::MainWindow window(queue);window.show();
     downshift::browser::PipeServer server(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();},Qt::QueuedConnection);},[&window](QString url,QString title){QMetaObject::invokeMethod(&window,[&window,url,title]{window.openVideo(url,title);},Qt::QueuedConnection);});for(int i=0;i<100 && !server.active();++i)std::this_thread::sleep_for(std::chrono::milliseconds(20));if(!server.active())return 3;

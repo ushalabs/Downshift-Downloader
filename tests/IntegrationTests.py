@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import gzip
 import http.server
 import os
 import pathlib
@@ -110,6 +111,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if case.startswith("status-"):
             self.headers_for(int(case[7:]), 0)
             return
+        if case=="rotating":
+            nonce=len(self.server.requests[case]);self.headers_for(302,0,[("Location",f"/range?nonce={nonce}")]);return
+        if case.startswith("probe-refused-") and raw_range=="bytes=0-0":
+            self.headers_for(int(case.rsplit('-',1)[1]),0);return
         if case in {"redirect", "redirect-loop", "redirect-ftp", "redirect-user", "downgrade"}:
             location = {"redirect": "/range", "redirect-loop": "/redirect-loop",
                         "redirect-ftp": "ftp://127.0.0.1/file", "redirect-user": f"http://secret:password@127.0.0.1:{self.server.server_port}/range",
@@ -144,6 +149,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             common += [("Accept-Ranges", "bytes")]
         range_match = re.fullmatch(r"bytes=(\d+)-(\d+)", raw_range or "")
         probe = raw_range == "bytes=0-0" and self.headers.get("If-Match") is None
+        capability_cases={"range-weak-tag","range-no-tag","weak-full-response","encoded-full-response","html-fallback"}
+        if case in capability_cases:
+            common += [("Content-Type","application/octet-stream")]
+            if not probe:
+                common=[(key,value) for key,value in common if key!="ETag"]
+                if case!="range-no-tag":common.append(("ETag","W/"+ETAG))
+            if raw_range is None:
+                if case=="weak-full-response":body+=b"different complete representation"
+                if case=="encoded-full-response":
+                    encoded=gzip.compress(body);self.headers_for(200,len(encoded),common+[("Content-Encoding","gzip")]);self.wfile.write(encoded);return
+                if case=="html-fallback":
+                    self.headers_for(200,13,[("Content-Type","text/html"),("ETag","W/"+ETAG)]);self.wfile.write(b"<html></html>");return
         ignore_range = case in {"ignore", "unknown-length", "chunked", "compressed", "short-stream", "duplicate-length", "ambiguous"}
         if case == "empty-416" and probe:
             self.headers_for(416, 0, [("Content-Range", "bytes */0")]); return
@@ -272,8 +289,18 @@ def main():
             run("one-byte", b"X")
             run("interim")
             run("redirect", LARGE)
-            for case in ("wrong-range", "wrong-total", "changed", "changed-200", "short-range", "long-range",
-                         "missing-range", "precondition", "segment-416", "segment-redirect", "compressed", "short-stream",
+            run("rotating",LARGE)
+            for status in (400,403,405,416,501):run(f"probe-refused-{status}",mode="streaming")
+            for case in ("wrong-range","wrong-total","long-range","missing-range","segment-416","segment-redirect"):
+                result,_=run(case,LARGE,"streaming")
+                assert "fallback=yes" in result.stdout
+                assert any(raw is None and validator==ETAG for raw,validator,_ in http.requests[case]), "Fallback full GET was not conditional"
+            for case in ("range-weak-tag","range-no-tag","weak-full-response","encoded-full-response"):
+                body=SMALL+(b"different complete representation" if case=="weak-full-response" else b"")
+                result,_=run(case,body,"streaming");assert "fallback=yes" in result.stdout
+                assert len([raw for raw,_,_ in http.requests[case] if raw and raw!="bytes=0-0"])==1, "Unverified range capability opened a parallel pool"
+            run("html-fallback",success=False,checksum=False)
+            for case in ("changed", "changed-200", "short-range", "precondition", "compressed", "short-stream",
                          "duplicate-length", "ambiguous", "redirect-loop", "redirect-ftp", "redirect-user", "disconnect"):
                 run(case, success=False, checksum=False)
             for status in (401, 403, 404, 429, 500, 503): run(f"status-{status}", success=False, checksum=False)

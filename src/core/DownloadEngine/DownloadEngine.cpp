@@ -62,6 +62,17 @@ void curlFailure(CURLcode code) {
     else if (code == CURLE_UNSUPPORTED_PROTOCOL || code == CURLE_URL_MALFORMAT || code == CURLE_LOGIN_DENIED) category = DownloadErrorCode::InvalidRequest;
     throw DownloadError(category, std::string("Transfer failed: ") + curl_easy_strerror(code));
 }
+bool sameResolvedResource(const std::string& first,const std::string& second) {
+    if(first==second)return true;
+    const auto identity=[](const std::string& address){
+        std::unique_ptr<CURLU,UrlDeleter> parsed(curl_url());char* raw=nullptr;
+        if(!parsed || curl_url_set(parsed.get(),CURLUPART_URL,address.c_str(),CURLU_DISALLOW_USER)!=CURLUE_OK)return std::string{};
+        curl_url_set(parsed.get(),CURLUPART_QUERY,nullptr,0);curl_url_set(parsed.get(),CURLUPART_FRAGMENT,nullptr,0);
+        if(curl_url_get(parsed.get(),CURLUPART_URL,&raw,0)!=CURLUE_OK)return std::string{};
+        std::unique_ptr<char,StringDeleter> text(raw);return std::string(raw);
+    };
+    const auto original=identity(first);return !original.empty() && original==identity(second);
+}
 void httpFailure(int status) {
     throw DownloadError(DownloadErrorCode::Http, "The server returned HTTP " + std::to_string(status) + ".");
 }
@@ -198,6 +209,9 @@ struct Transfer {
     bool probeRejected = false;
     bool rangeUnsupported = false;
     bool accepted = false;
+    bool decodedBody = false;
+    std::string expectedMime;
+    std::shared_ptr<bool> rangeCapability;
     std::exception_ptr exception;
     CURLcode result = CURLE_OK;
     std::stop_token stop;
@@ -205,6 +219,7 @@ struct Transfer {
     std::function<void(std::size_t, std::stop_token)> beforeWrite;
     std::uint32_t attempts = 0;
     bool freshHttp1 = false;
+    bool fullMetadata = false;
 
     Transfer(Kind value, FileWriter* file, std::stop_token token, Telemetry* observer = nullptr)
         : kind(value), writer(file), telemetry(observer), stop(token) {
@@ -234,6 +249,8 @@ struct Transfer {
         if (h.status < 200) return;
         if (h.status >= 300 && h.status < 400 && kind != Kind::Segment) return;
         if (kind == Kind::Probe) {
+            if(fullMetadata){if(h.status!=200)httpFailure(h.status);probeRejected=true;return;}
+            if(h.status==400 || h.status==403 || h.status==405 || h.status==416 || h.status==501){probeRejected=true;return;}
             if (h.status == 200 || (h.status == 416 && h.range && h.range->unsatisfied && h.range->total == 0)) {
                 probeRejected = true; return;
             }
@@ -242,21 +259,35 @@ struct Transfer {
                 (h.length && *h.length != 1)) { probeRejected = true; return; }
         } else if (kind == Kind::Segment) {
             if (h.status == 200) {
-                if (h.etag != etag) fail(DownloadErrorCode::Integrity, "The remote file changed during the download.");
+                if (strongEtag(h.etag) && h.etag != etag) fail(DownloadErrorCode::Integrity, "The remote file changed during the download.");
                 rangeUnsupported = true; return;
             }
+            if((h.status>=300 && h.status<400) || h.status==400 || h.status==403 || h.status==405 || h.status==416){rangeUnsupported=true;return;}
             if (h.status != 206) httpFailure(h.status);
+            // Only exact strong validators permit assembling independent ranges.
+            // A CDN weakening/omitting that validator is a capability mismatch,
+            // not proof that a complete, single-response download is impossible.
+            if(h.etag.empty() || !strongEtag(h.etag)){rangeUnsupported=true;return;}
+            if(h.etag!=etag)fail(DownloadErrorCode::Integrity,"The remote file version does not match the verified probe.");
             if (!identity(h) || !h.range || h.range->unsatisfied || h.range->first != assigned->first ||
                 h.range->last != assigned->last || h.range->total != *expectedTotal ||
-                (h.length && *h.length != assigned->size())) fail(DownloadErrorCode::Integrity, "The server returned an incorrect byte range.");
-            if (h.etag != etag) fail(DownloadErrorCode::Integrity, "The remote file version does not match the verified probe.");
+                (h.length && *h.length != assigned->size())) {rangeUnsupported=true;return;}
         } else {
             if (h.status != 200) httpFailure(h.status);
-            if (!identity(h) || h.rangePresent) fail(DownloadErrorCode::Protocol, "A complete, untransformed response is required for streaming.");
-            if (!etag.empty() && h.etag != etag) fail(DownloadErrorCode::Integrity, "The remote file changed before streaming.");
-            if (telemetry) telemetry->progress.totalBytes = h.length;
+            if(h.rangePresent || !(h.transferEncoding.empty() || h.transferEncoding=="chunked") ||
+                (h.length && !h.transferEncoding.empty()) || h.contentType.starts_with("multipart/byteranges"))
+                fail(DownloadErrorCode::Protocol,"A complete, unambiguous response is required for streaming.");
+            const auto html=[](const std::string& mime){return mime.starts_with("text/html") || mime.starts_with("application/xhtml");};
+            if(!expectedMime.empty() && !html(expectedMime) && html(h.contentType))fail(DownloadErrorCode::Protocol,"The server returned a webpage instead of the requested file.");
+            decodedBody=!h.encoding.empty() && h.encoding!="identity";
+            // A weak response cannot resume/assemble bytes, but a coherent full
+            // response can be accepted when the opaque validator still agrees.
+            const auto fullTag=h.etag.starts_with("W/") ? h.etag.substr(2):h.etag;
+            if (!etag.empty() && !fullTag.empty() && fullTag != etag) fail(DownloadErrorCode::Integrity, "The remote file changed before streaming.");
+            if (telemetry) telemetry->progress.totalBytes = decodedBody ? std::nullopt:h.length;
         }
         accepted = true;
+        if(kind==Kind::Segment && rangeCapability)*rangeCapability=true;
     }
 
     static std::size_t onHeader(char* data, std::size_t size, std::size_t count, void* context) noexcept {
@@ -282,7 +313,8 @@ struct Transfer {
             if (h.status >= 300 && h.status < 400 && self.kind != Kind::Segment) return bytes;
             if (!self.accepted) fail(DownloadErrorCode::Protocol, "Response data arrived without validated headers.");
             const auto bound = self.kind == Kind::Probe ? std::optional<std::uint64_t>(1) :
-                self.kind == Kind::Segment ? std::optional<std::uint64_t>(self.assigned->size()) : h.length;
+                self.kind == Kind::Segment ? std::optional<std::uint64_t>(self.assigned->size()) : self.decodedBody ? std::nullopt:h.length;
+            if(self.kind==Kind::Segment && bound && (self.received>*bound || bytes>*bound-self.received)){self.rangeUnsupported=true;return CURL_WRITEFUNC_ERROR;}
             if ((bound && (self.received > *bound || bytes > *bound - self.received)) ||
                 bytes > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - self.received) fail(DownloadErrorCode::Integrity, "The response exceeded its expected byte count.");
             if (self.writer) {
@@ -331,7 +363,7 @@ struct Transfer {
             option(easy.get(), CURLOPT_CAINFO, bundle.c_str());
         }
         option(easy.get(), CURLOPT_ACCEPT_ENCODING, "identity");
-        option(easy.get(), CURLOPT_HTTP_CONTENT_DECODING, 0L);
+        option(easy.get(), CURLOPT_HTTP_CONTENT_DECODING, kind==Kind::Stream ? 1L:0L);
         option(easy.get(), CURLOPT_HTTP_TRANSFER_DECODING, 1L);
         // Larger bounded receives reduce event-loop/socket overhead. Write callbacks
         // remain capped by libcurl; probes retain their small default buffer.
@@ -352,7 +384,7 @@ struct Transfer {
         option(easy.get(), CURLOPT_XFERINFOFUNCTION, &Transfer::onProgress);
         option(easy.get(), CURLOPT_XFERINFODATA, this);
         option(easy.get(), CURLOPT_NOPROGRESS, 0L);
-        if (kind == Kind::Probe) option(easy.get(), CURLOPT_RANGE, "0-0");
+        if (kind == Kind::Probe && !fullMetadata) option(easy.get(), CURLOPT_RANGE, "0-0");
         if (assigned) {
             const auto range = std::to_string(assigned->first) + "-" + std::to_string(assigned->last);
             option(easy.get(), CURLOPT_RANGE, range.c_str());
@@ -374,7 +406,7 @@ struct Transfer {
         curlFailure(result);
         if (!accepted || !collector.response.complete) httpFailure(collector.response.status);
         const auto expected = kind == Kind::Probe ? std::optional<std::uint64_t>(1) :
-            kind == Kind::Segment ? std::optional<std::uint64_t>(assigned->size()) : collector.response.length;
+            kind == Kind::Segment ? std::optional<std::uint64_t>(assigned->size()) : decodedBody ? std::nullopt:collector.response.length;
         if (expected && received != *expected) fail(DownloadErrorCode::Integrity, "The response ended before all expected bytes arrived.");
         // Only a fully validated response may publish its final short buffer.
         // Failed/pending responses discard their buffer and never enter a checkpoint.
@@ -491,12 +523,15 @@ private:
 DownloadEngine::Inspection DownloadEngine::inspect(const std::string& url,std::stop_token stop) const {
     DownloadOptions options; options.url=url; options.connectTimeoutMs=3000; options.transferTimeoutMs=8000;
     MultiSession session(1); auto transfer=std::make_unique<Transfer>(Kind::Probe,nullptr,stop);
-    transfer->configure(options,url,true); transfer=session.run(std::move(transfer),stop); transfer->verify();
+    transfer->configure(options,url,true); transfer=session.run(std::move(transfer),stop);
+    bool fullMetadata=transfer->probeRejected && transfer->collector.response.status>=400;
+    try{transfer->verify();}catch(const DownloadError& error){if(error.code()!=DownloadErrorCode::Protocol)throw;fullMetadata=true;}
+    if(fullMetadata){transfer=std::make_unique<Transfer>(Kind::Probe,nullptr,stop);transfer->fullMetadata=true;transfer->configure(options,url,true);transfer=session.run(std::move(transfer),stop);transfer->verify();}
     const auto& metadata=transfer->collector.response;
     if(metadata.status!=200 && metadata.status!=206)fail(DownloadErrorCode::InvalidRequest,"The server did not provide a downloadable public file.");
     char* effective=nullptr; if(curl_easy_getinfo(transfer->easy.get(),CURLINFO_EFFECTIVE_URL,&effective)!=CURLE_OK || !effective) fail(DownloadErrorCode::Network,"Unable to verify this download.");
     const bool segmented=!transfer->probeRejected && metadata.status==206 && metadata.range && strongEtag(metadata.etag);
-    return {segmented ? metadata.etag:std::string{},std::string(effective),metadata.range ? metadata.range->total:metadata.length.value_or(0),metadata.contentType};
+    return {segmented ? metadata.etag:std::string{},std::string(effective),metadata.range ? metadata.range->total:(metadata.encoding.empty() || metadata.encoding=="identity" ? metadata.length.value_or(0):0),metadata.contentType,metadata.disposition.empty() ? std::string{}:suggestedFilename(metadata.disposition)};
 }
 DownloadResult DownloadEngine::download(const DownloadOptions& options, std::stop_token stop) const {
     validateUrl(options.url);
@@ -591,6 +626,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         telemetry.update(0, true);
         std::mt19937 random(std::random_device{}());
         bool freshHttp1 = false;
+        std::string expectedMime;
         auto delayFor = [&](const Transfer& transfer) -> std::optional<std::uint32_t> {
             if (!transfer.retryable() || transfer.attempts >= options.maxRetries) return std::nullopt;
             return retryDelay(transfer.attempts, options.retryBaseMs, options.retryMaxWaitMs, transfer.serverDelay(), random());
@@ -606,18 +642,22 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         };
         auto request = [&](Kind kind, const std::string& url, const std::string& validator) {
             std::uint32_t attempt = 0;
+            bool fullMetadata=false;
             for (;;) {
                 telemetry.checkPause();
                 auto transfer = std::make_unique<Transfer>(kind, kind == Kind::Probe ? nullptr : &writer, stop, &telemetry);
                 transfer->etag = validator; transfer->attempts = attempt;
                 transfer->freshHttp1 = freshHttp1;
+                transfer->expectedMime = expectedMime;
+                transfer->fullMetadata=fullMetadata;
                 transfer->configure(options, url, true);
                 transfer = session.run(std::move(transfer), stop, &telemetry);
                 telemetry.record(transfer->easy.get(), kind == Kind::Probe ? 0 : transfer->received);
-                try { transfer->verify(); return transfer; }
-                catch (const DownloadError&) {
+                try { transfer->verify();if(kind==Kind::Probe && !fullMetadata && transfer->probeRejected && transfer->collector.response.status>=400){fullMetadata=true;continue;}return transfer; }
+                catch (const DownloadError& error) {
                     telemetry.checkPause();
                     if (stop.stop_requested()) throw;
+                    if(kind==Kind::Probe && !fullMetadata && error.code()==DownloadErrorCode::Protocol){fullMetadata=true;continue;}
                     const auto delay = delayFor(*transfer); if (!delay) throw;
                     freshHttp1 = freshHttp1 || transfer->transportFailed();
                     ++attempt; ++telemetry.metrics.retries;
@@ -632,13 +672,16 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         const std::string resolved(effective);
         validateUrl(resolved);
         const auto metadata = probe->collector.response;
+        expectedMime=metadata.contentType;
         const auto etag = strongEtag(metadata.etag) ? metadata.etag : std::string{};
-        if((!options.requiredEtag.empty() && (probe->probeRejected || etag!=options.requiredEtag)) ||
-            (!options.requiredResolvedUrl.empty() && resolved!=options.requiredResolvedUrl) ||
-            (options.requiredTotal && (!metadata.range || metadata.range->total!=*options.requiredTotal)))
+        const auto observedTag=metadata.etag.starts_with("W/") ? metadata.etag.substr(2):metadata.etag;
+        if((!options.requiredEtag.empty() && !observedTag.empty() && observedTag!=options.requiredEtag) ||
+            (!options.requiredResolvedUrl.empty() && !sameResolvedResource(resolved,options.requiredResolvedUrl)) ||
+            (options.requiredTotal && !etag.empty() && ((metadata.range && metadata.range->total!=*options.requiredTotal) ||
+                (!metadata.range && metadata.length && (metadata.encoding.empty() || metadata.encoding=="identity") && *metadata.length!=*options.requiredTotal))))
             fail(DownloadErrorCode::Integrity,"The browser download changed after acceptance. Your files were preserved; retry the link in Chrome.");
         if (resuming && (probe->probeRejected || metadata.status != 206 || etag != recovery.etag ||
-            !metadata.range || metadata.range->total != recovery.total || resolved != recovery.resolvedUrl ||
+            !metadata.range || metadata.range->total != recovery.total || !sameResolvedResource(resolved,recovery.resolvedUrl) ||
             (!recovery.lastModified.empty() && metadata.lastModified != recovery.lastModified)))
             fail(DownloadErrorCode::ResumeUnsafe, "The remote file or its range support changed. Use --restart; saved bytes were not modified.");
         DownloadResult result;
@@ -663,16 +706,20 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             SegmentScheduler scheduler(total, options.chunkBytes, std::move(savedRanges));
             struct PendingRetry { ByteRange range; std::uint32_t attempt; Clock::time_point due; };
             std::vector<PendingRetry> pending;
+            const auto rangeCapability=std::make_shared<bool>(false);
             auto hostNotBefore = Clock::time_point::min();
             telemetry.progress.chunkBytes = options.chunkBytes;
             auto fill = [&] {
                 if (Clock::now() < hostNotBefore) return;
-                while (session.count() < controller.target()) {
+                // Negotiate one real range before opening the rest of the pool.
+                // Tiny metadata probes can describe different CDN behavior.
+                const auto limit=*rangeCapability ? controller.target():1U;
+                while (session.count() < limit) {
                     const auto ready = std::find_if(pending.begin(), pending.end(), [](const auto& retry) { return retry.due <= Clock::now(); });
                     std::uint32_t attempt = 0;
                     std::optional<ByteRange> range;
                     if (ready != pending.end()) { range = ready->range; attempt = ready->attempt; pending.erase(ready); }
-                    else if (session.count() + pending.size() >= controller.target()) break;
+                    else if (session.count() + pending.size() >= limit) break;
                     if (!range) {
                         if (options.adaptiveChunks) {
                             auto chunk = controller.chunkSize(telemetry.speed.smoothed() > 0 ? telemetry.speed.smoothed() : telemetry.rateHint, telemetry.latency);
@@ -690,6 +737,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                     transfer->attempts = attempt;
                     transfer->expectedTotal = total;
                     transfer->etag = etag;
+                    transfer->rangeCapability=rangeCapability;
                     transfer->freshHttp1 = freshHttp1;
                     transfer->configure(options, resolved, false);
                     session.add(std::move(transfer));
@@ -763,7 +811,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                 return result;
             }
             // All easy handles are detached before truncating previously written ranges.
-            if (resuming) fail(DownloadErrorCode::ResumeUnsafe, "Range support disappeared during resumption. Saved data is retained; use --restart.");
+            if (resuming && telemetry.metrics.recoveredBytes) fail(DownloadErrorCode::ResumeUnsafe, "This server cannot continue verified ranges. Saved data is retained; choose Restart for a complete download.");
             recovery.completed.clear(); recovery.resumable = false;
             checkpoint(); // Invalidate reused bytes durably before truncation.
             writer.reset();
@@ -783,7 +831,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         recovery.resumable = false; recovery.resolvedUrl = resolved; recovery.etag = etag;
         recovery.lastModified = metadata.lastModified;
         recovery.status = RecoveryStatus::Active; checkpoint();
-        auto stream = request(Kind::Stream, resolved, etag);
+        auto stream = request(Kind::Stream, resolved,options.requiredEtag.empty() ? etag:options.requiredEtag);
         telemetry.progress.totalBytes = stream->received;
         telemetry.progress.verifiedBytes = stream->received;
         telemetry.networkDone();

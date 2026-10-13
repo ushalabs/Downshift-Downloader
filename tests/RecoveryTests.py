@@ -346,7 +346,9 @@ def main():
                 if fault.startswith("drop"): assert metrics["network_bytes"] > metrics["bytes"]
                 pass_case(scope + "-" + fault + "-retried")
 
-            server.configure(size=12 * 1048576, bps=0, fault="status-always", scope="range", fault_first=0)
+            # The first range now negotiates capability before parallel work.
+            # Fail a later range to exercise retention of already verified work.
+            server.configure(size=12 * 1048576, bps=0, fault="status-always", scope="range", fault_first=1048576)
             output = directory / "retry-exhausted-partial.bin"
             run(output, "--retries", "1", expected=1)
             record = inspect(output)
@@ -362,8 +364,8 @@ def main():
             pass_case("retry-after-respected")
 
             for name, status, after, retries, requests in [("exhaustion", 503, "", "2", 3), ("excessive-retry-after", 503, "1000", "3", 1),
-                    ("unauthorized", 401, "", "3", 1), ("forbidden", 403, "", "3", 1), ("not-found", 404, "", "3", 1), ("precondition", 412, "", "3", 1)]:
-                server.configure(size=1048576, bps=0, fault="status-always", scope="probe", status=status, retry_after=after)
+                    ("unauthorized", 401, "", "3", 1), ("forbidden", 403, "", "3", 2), ("not-found", 404, "", "3", 1), ("precondition", 412, "", "3", 1)]:
+                server.configure(size=1048576, bps=0, fault="status-always", scope="all" if status==403 else "probe", status=status, retry_after=after)
                 run(directory / (name + ".bin"), "--retries", retries, expected=1)
                 assert len(server.records) == requests
                 pass_case(name + "-bounded")

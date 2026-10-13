@@ -1,0 +1,11 @@
+{
+  "url": "https://www.youtube.com/watch?v=HyfC9nZvIJM",
+  "extensionVersion": "0.3.3",
+  "result": "Source refusal during video metadata discovery",
+  "httpStatus": 429,
+  "message": "Too Many Requests; sign in to confirm you are not a bot",
+  "logSha256": "60db57fe58c6a9e1e0fe30f2b6fa165b691676202a713b5fb1bfee6a7e002681",
+  "scope": "Real player overlay opened native dialog; no new complete video or quality list verified in this attempt",
+  "previousSuccessfulEvidence": "handoff-032-youtube-live.json",
+  "nativeDriverSha256": "9173d03a9b889b62246da6f7871e6a84074cbf4dc9ca85af2d860035b2dc5f81"
+}

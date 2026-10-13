@@ -1,0 +1,33 @@
+// Opt-in public file acceptance through actual Chrome and native save/start UI.
+const {createRequire}=require('node:module'),fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),crypto=require('node:crypto'),assert=require('node:assert/strict'),readline=require('node:readline');
+const requireTools=createRequire(path.join(process.env.DOWNSHIFT_NODE_MODULES,'package.json')),{chromium}=requireTools('playwright');
+const [chrome,driver,hostInput,python,output,target,reference]=process.argv.slice(2);
+const repo=path.resolve(__dirname,'..'),out=path.resolve(output),id='empnpdkfnffpcgnfgdndkbielplcoioe';
+const address=new URL(target);assert(/^https?:$/.test(address.protocol) && !address.username && !address.password);
+fs.mkdirSync(out,{recursive:true});const root=fs.mkdtempSync(path.join(out,'run-')),native=path.join(root,'native');fs.mkdirSync(native);
+const {host,extension}=require('./IsolatedBrowser.cjs').isolatedBrowser(repo,root,path.resolve(hostInput));
+const sha=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),expected=sha(reference),registry=path.join(repo,'tests/ChromeRegistry.py');
+let fixture,service,context;
+function lines(process){const queued=[],waiting=[];let closed=false;readline.createInterface({input:process.stdout}).on('line',line=>waiting.length?waiting.shift().resolve(line):queued.push(line));process.on('exit',()=>{closed=true;for(const reply of waiting.splice(0))reply.reject(Error('Child exited'));});return async()=>queued.length?queued.shift():closed?Promise.reject(Error('Child exited')):new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Child response timeout')),30000);waiting.push({resolve:line=>{clearTimeout(timer);resolve(line);},reject:error=>{clearTimeout(timer);reject(error);}});});}
+async function until(check,timeout=120000){const deadline=Date.now()+timeout;while(Date.now()<deadline){if(await check())return;await new Promise(resolve=>setTimeout(resolve,100));}throw Error('Public file acceptance timed out');}
+(async()=>{try{
+ const register=cp.spawnSync(python,[registry,'install',path.resolve(host),path.join(root,'host.json'),path.join(root,'registry.json'),'--isolated'],{encoding:'utf8'});assert.equal(register.status,0,register.stderr);
+ fixture=cp.spawn(python,[path.join(repo,'tests/ChromeFixture.py')],{stdio:['pipe','pipe','pipe']});const fixtureLine=lines(fixture),port=Number(await fixtureLine());
+ service=cp.spawn(driver,[native,'--isolated-browser-test'],{stdio:['pipe','pipe','pipe']});service.stderr.on('data',data=>process.stderr.write(data));const serviceLine=lines(service);assert.equal(await serviceLine(),'ready');
+ async function rows(){service.stdin.write('confirm\n');assert.equal(await serviceLine(),'confirmed');service.stdin.write('snapshot\n');return JSON.parse(await serviceLine());}
+ context=await chromium.launchPersistentContext(path.join(root,'profile'),{executablePath:path.resolve(chrome),headless:true,ignoreDefaultArgs:['--disable-extensions'],args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run']});
+ const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker',{timeout:15000});await worker.evaluate(()=>{globalThis.__created=[];chrome.downloads.onCreated.addListener(item=>globalThis.__created.push(item.id));});
+ const popup=await context.newPage();await popup.goto(`chrome-extension://${id}/popup.html`);await until(async()=>await popup.locator('#connection').textContent()==='Downshift is ready');assert.equal(await popup.locator('#enabled').isChecked(),true);
+ const page=await context.newPage();await page.goto(`http://127.0.0.1:${port}/page`);
+ await page.evaluate(target=>{const link=document.createElement('a');link.id='public-target';link.href=target;link.download=new URL(target).pathname.split('/').pop() || 'file.bin';link.textContent='Download public file';document.body.append(link);},target);
+ const started=Date.now();await page.locator('#public-target').click();let snapshot;
+ await until(async()=>{snapshot=await rows();const row=snapshot[0];if(row?.status===4)throw Error(row.error || 'Native public file failed');return row?.status===3;});
+ assert.equal(snapshot.length,1);assert.equal(sha(snapshot[0].destination),expected);assert.equal(await worker.evaluate(()=>globalThis.__created.length),0);assert.equal((await worker.evaluate(()=>chrome.downloads.search({}))).length,0);
+ const manifest=JSON.parse(fs.readFileSync(path.join(repo,'extension/manifest.json')));
+ const sources=['CMakeLists.txt','extension/background.js','extension/file-links.js','extension/handoff.js','src/browser/PipeServer.cpp','src/core/DownloadEngine/DownloadEngine.cpp','src/core/DownloadQueue/QueueManager.cpp','src/gui/MainWindow.cpp','src/gui/Controls.h','tests/IsolatedBrowser.cjs','tests/LiveFileCheck.cjs'];
+ const report={url:address.origin+address.pathname,extensionVersion:manifest.version,chromeVersion:context.browser().version(),seconds:(Date.now()-started)/1000,bytes:fs.statSync(snapshot[0].destination).size,sha256:expected,referenceSha256:sha(reference),status:'Completed',nativeBridge:'separate test host and pipe; normal registration untouched',chromeCreatedDownloads:0,queueRecords:1,driverSha256:sha(driver),sources:Object.fromEntries(sources.map(file=>[file,sha(path.join(repo,file))])),scope:'Actual trusted Chrome file link, native destination/start window, complete Internet file, persisted completion and independent curl-file hash; no execution or ISP-capacity claim'};
+ fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log('Public Chrome/native file verified:',report.bytes,'bytes;',report.seconds,'seconds; SHA-256:',expected);
+}finally{
+ if(context)await context.close();if(service && service.exitCode===null){service.stdin.write('exit\n');await new Promise(resolve=>{service.once('exit',resolve);setTimeout(resolve,5000);});if(service.exitCode===null)service.kill();}if(fixture && fixture.exitCode===null)fixture.kill();
+ const restored=cp.spawnSync(python,[registry,'restore',path.join(root,'registry.json'),'--isolated'],{encoding:'utf8'});assert.equal(restored.status,0,restored.stderr);
+}})().catch(error=>{console.error(error);process.exitCode=1;});

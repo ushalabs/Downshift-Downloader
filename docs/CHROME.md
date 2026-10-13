@@ -55,3 +55,9 @@ Direct handoff keys survive worker restart without persisting link URLs in exten
 Reload Downshift at chrome://extensions, refresh existing pages, then open its popup and confirm Version 0.3.2. The normal Chrome profile is not reloaded or changed by development tests. Old content scripts can survive navigation/update, so the worker also checks Chrome's current top-level YouTube tab URL. Player IDs use the same exact eleven-character rule as the native validator; malformed player title URLs cannot override the valid watch page. Native rejection is returned to the page instead of acknowledging a successful video window.
 
 API references: [download events, cancellation and erase](https://developer.chrome.com/docs/extensions/reference/api/downloads), [Manifest V3 webRequest restrictions](https://developer.chrome.com/docs/extensions/reference/api/webRequest).
+
+## Running-version coordination and test isolation (0.3.3)
+
+The popup detects an old worker or differing app/extension versions and offers Apply update. Apply it, restart the updated app when needed, and refresh existing pages. An absent worker response has a specific update message. Native prepare accepts an optional capability-gated server-filename choice; explicit download names are preserved.
+
+New browser/native tests use org.ushalabs.downshift.test, a separate per-user test pipe, hidden test windows, private queues and a copied extension with only its host name redirected. They never replace the normal org.ushalabs.downshift registration. The test host cannot launch the user's real app when its fixture is unavailable. Production keeps its original host, secure pipe, origin restriction and singleton. Test executables are not redistributed in portable packages. Earlier shared-pipe test notes remain historical; only rebuilding the running product EXE requires closing an idle app.

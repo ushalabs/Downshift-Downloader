@@ -23,13 +23,13 @@ export class HandoffController {
     if(!this.api.erase)return;
     for(const id of this.state.cleanup || [])try{await this.api.erase(id);this.state.cleanup=this.state.cleanup.filter(value=>value!==id);await this.save();}catch{}
   }
-  direct(url,filename) {return this.serial(async()=>{
+  direct(url,filename,preferServerFilename=true) {return this.serial(async()=>{
     if(!this.state.enabled)throw Error("Capture is off.");
     if((this.state.direct || []).length>=20)throw Error("Reconnect Downshift to finish pending link requests.");
-    if(this.api.ensureApp)await this.api.ensureApp();
+    const app=this.api.ensureApp ? await this.api.ensureApp():null;
     const key=this.api.key();this.state.direct=[...(this.state.direct || []),key];await this.save();
     try {
-      await this.native("prepare",{key,url,filename,total:"-1",mime:""});
+      await this.native("prepare",{key,url,filename,total:"-1",mime:"",...(preferServerFilename && app?.capabilities?.serverFilename ? {serverFilename:true}:{})});
       const answer=await this.native("commit",{key,browserNotStarted:true,prompt:true});
       if(answer.state!=="committed")throw Error("Commit not acknowledged");
       this.state.direct=this.state.direct.filter(value=>value!==key);this.state.notice="Opened in Downshift.";await this.save();return answer;
@@ -125,6 +125,6 @@ export class HandoffController {
   reconcile() {return this.serial(async()=>{for(const id of Object.keys(this.state.pending))await this.run(id);await this.reconcileDirect();await this.cleanHistory();});}
   configure(enabled) {this.requestedEnabled=!!enabled;return this.serial(async()=>{this.state.enabled=!!enabled;await this.save();if(!enabled){for(const id of Object.keys(this.state.pending))await this.keep(id);for(const id of this.state.overflow || [])try{await this.api.resume(id);}catch{}this.state.overflow=[];await this.save();}return this.summary();});}
   summary() {return {enabled:this.state.enabled,pending:Object.keys(this.state.pending).length+(this.state.direct || []).length,notice:this.state.notice};}
-  status() {return this.serial(async()=>{let connected=false;try{connected=(await this.native("ping")).state==="ready";}catch{}return {...this.summary(),connected};});}
+  status() {return this.serial(async()=>{let connected=false,appVersion="";try{const app=await this.native("ping");connected=app.state==="ready";appVersion=app.appVersion || "";}catch{}return {...this.summary(),connected,appVersion};});}
   leave() {return this.configure(false);}
 }

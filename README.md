@@ -2,7 +2,7 @@
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
-Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.2 repair adds consistent YouTube player validation, direct Chrome link handoff, partial-range pause recovery, responsive progress and bounded transport retries. Actual quality choices, separate quality files and modern pink controls remain.
+Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.3 repair negotiates server capabilities, falls back to complete responses when safe ranges are unavailable, and handles supported HTTP content encoding. Browser handoff, verified recovery, quality choices, newest-first history and rounded pink forms share one native application.
 
 ![Downshift pink desktop](assets/screenshots/downloads-pink.png)
 

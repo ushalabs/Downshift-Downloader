@@ -1,0 +1,28 @@
+{
+  "url": "https://app.prntscr.com/build/setup-lightshot.exe",
+  "extensionVersion": "0.3.3",
+  "chromeVersion": "155.0.8059.39",
+  "seconds": 2.811,
+  "bytes": 2786328,
+  "sha256": "928c2808421dfd487ffa697379548cbe682c0e13aeb595eb89973ba9c515b8a1",
+  "referenceSha256": "928c2808421dfd487ffa697379548cbe682c0e13aeb595eb89973ba9c515b8a1",
+  "status": "Completed",
+  "nativeBridge": "separate test host and pipe; normal registration untouched",
+  "chromeCreatedDownloads": 0,
+  "queueRecords": 1,
+  "driverSha256": "9173d03a9b889b62246da6f7871e6a84074cbf4dc9ca85af2d860035b2dc5f81",
+  "sources": {
+    "CMakeLists.txt": "5e84f06396ff4913434b65bcc3720de0ed663ef29b6ed96752aab1fed25ef92a",
+    "extension/background.js": "39f7f6b8a7dca5e78b39d69230194eb85d44edcb2d54cca778c7d6cf37b41182",
+    "extension/file-links.js": "b9c24226a14ff772df5b13c8aabda8000f8d8a4502226bf996837bc891227eec",
+    "extension/handoff.js": "e3586fe920538340e189611d67526548dc8b4e2354d3f05efe2e69357cd34716",
+    "src/browser/PipeServer.cpp": "545d25d8d3fe7c3e94ac8e7f17d0328070842747feef2f2588e83723b9f2be80",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "4bd35887d926bd3eda35161324bc6aa8b024d4a5a384f8364d3f3e42242251eb",
+    "src/core/DownloadQueue/QueueManager.cpp": "7ecb7e2125f3349bb54ce6e4db4c49e6b6534e5f3693dda5059e3b4c447e1dac",
+    "src/gui/MainWindow.cpp": "7836b849376beb2ca52efb1dc62204e9bd5b7298dba3fcdba4d9c4708248641b",
+    "src/gui/Controls.h": "d67607471e17cf2b006235671908d3af2a89323d800caa14849f102c3aa44e39",
+    "tests/IsolatedBrowser.cjs": "39a2c31ba97acbfe7d16c3c883392c5192794dc5a6748e5fdae11002773be7f9",
+    "tests/LiveFileCheck.cjs": "a034239c7f0731edab454e1b06d56b12b24c7a9b942228662552ed8bf55abe21"
+  },
+  "scope": "Actual trusted Chrome file link, native destination/start window, complete Internet file, persisted completion and independent curl-file hash; no execution or ISP-capacity claim"
+}

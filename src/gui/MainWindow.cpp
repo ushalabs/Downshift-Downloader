@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "MediaDialog.h"
 #include "Brand.h"
+#include "Controls.h"
 #include "core/DownloadQueue/VideoUrl.h"
 #include <QInputDialog>
 #include <QUrl>
@@ -15,6 +16,7 @@
 #include <QResizeEvent>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStatusBar>
@@ -25,6 +27,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 namespace downshift {
 namespace {
 QString bytes(std::uint64_t n) {
@@ -53,7 +56,7 @@ MainWindow::MainWindow(QueueManager& queue,QWidget* parent):QMainWindow(parent),
     auto* sidebar=new QWidget; sidebar->setObjectName("sidebar"); sidebar->setFixedWidth(150); auto* side=new QVBoxLayout(sidebar); side->setContentsMargins(12,22,12,16); side->setSpacing(8);
     auto* identity=new QLabel("Downshift"); identity->setObjectName("brand");side->addWidget(identity);side->addSpacing(24);
     const QStringList navigation={"All downloads","In progress","Completed","Needs attention"};
-    for(int i=0;i<navigation.size();++i) { auto* b=makeButton(navigation[i],"navigation");b->setCheckable(true);b->setAutoExclusive(true);b->setChecked(i==0); side->addWidget(b); connect(b,&QPushButton::clicked,this,[this,i]{filter_->setCurrentIndex(i);}); }
+    for(int i=0;i<navigation.size();++i) { auto* b=makeButton(navigation[i],"navigation");b->setCheckable(true);b->setAutoExclusive(true);b->setChecked(i==0); side->addWidget(b); connect(b,&QPushButton::clicked,this,[this,i]{page_=i;filter();table_->scrollToTop();}); }
     side->addStretch(); auto* settings=makeButton("Settings","settingsButton"); side->addWidget(settings); connect(settings,&QPushButton::clicked,this,&MainWindow::openSettings);
     auto* note=new QLabel("Native. Fast. Yours."); note->setObjectName("muted"); side->addWidget(note); shell->addWidget(sidebar);
     auto* content=new QWidget; auto* layout=new QVBoxLayout(content); layout->setContentsMargins(20,18,20,14); layout->setSpacing(12); shell->addWidget(content,1);
@@ -61,8 +64,9 @@ MainWindow::MainWindow(QueueManager& queue,QWidget* parent):QMainWindow(parent),
     auto* video=makeButton("Download video","videoButton");heading->insertWidget(heading->count()-1,video);connect(video,&QPushButton::clicked,this,[this]{bool accepted=false;const auto url=QInputDialog::getText(this,"Download video","Video page or public video link",QLineEdit::Normal,{},&accepted).trimmed();if(accepted && !url.isEmpty())openVideo(url,"Video");});
     auto* stats=new QHBoxLayout; summary_=new QLabel("Loading your downloads…"); summary_->setObjectName("summary"); speed_=new QLabel("0 B/s"); speed_->setObjectName("aggregateSpeed"); speed_->setMinimumWidth(150); speed_->setAlignment(Qt::AlignRight|Qt::AlignVCenter); stats->addWidget(summary_); stats->addStretch(); stats->addWidget(new QLabel("Total speed")); stats->addWidget(speed_); layout->addLayout(stats);
     auto* toolbar=new QHBoxLayout; search_=new QLineEdit; search_->setObjectName("searchField"); search_->setPlaceholderText("Search files or sources"); search_->setClearButtonEnabled(true); toolbar->addWidget(search_,1);
-    filter_=new QComboBox; filter_->setObjectName("filterField"); filter_->addItems(navigation); toolbar->addWidget(filter_); start_=makeButton("Resume","startButton"); pause_=makeButton("Pause","pauseButton"); cancel_=makeButton("Cancel","cancelButton"); more_=makeButton("More ⋯","moreButton"); for(auto* b:{start_,pause_,cancel_,more_}) toolbar->addWidget(b); layout->addLayout(toolbar);
-    connect(search_,&QLineEdit::textChanged,this,[this]{filter();}); connect(filter_,&QComboBox::currentIndexChanged,this,[this]{filter();});
+    view_=new QComboBox; view_->setObjectName("viewDownloads"); view_->setAccessibleName("View downloads");view_->addItems({"View downloads: Latest","View downloads: Oldest","View downloads: Size"});toolbar->addWidget(view_); start_=makeButton("Resume","startButton"); pause_=makeButton("Pause","pauseButton"); cancel_=makeButton("Cancel","cancelButton"); more_=makeButton("More ⋯","moreButton"); for(auto* b:{start_,pause_,cancel_,more_}) toolbar->addWidget(b); layout->addLayout(toolbar);
+    connect(search_,&QLineEdit::textChanged,this,[this]{filter();}); connect(view_,&QComboBox::currentIndexChanged,this,[this]{apply(current_);table_->scrollToTop();});
+    modernCombo(view_);
     connect(start_,&QPushButton::clicked,this,[this]{perform(QueueAction::Start);}); connect(pause_,&QPushButton::clicked,this,[this]{perform(QueueAction::Pause);}); connect(cancel_,&QPushButton::clicked,this,[this]{perform(QueueAction::Cancel);}); connect(more_,&QPushButton::clicked,this,&MainWindow::more);
     banner_=new QLabel;banner_->setTextFormat(Qt::PlainText); banner_->setObjectName("banner"); banner_->setWordWrap(true); banner_->hide(); layout->addWidget(banner_);
     auto* split=new QSplitter(Qt::Vertical); split->setChildrenCollapsible(false); layout->addWidget(split,1);
@@ -98,13 +102,22 @@ void MainWindow::apply(const QueueSnapshot& snapshot) {
         const auto old=std::find_if(current_.entries.begin(),current_.entries.end(),[&](const auto& row){return row.id==e.id;});
         if(old!=current_.entries.end() && old->status!=QueueStatus::Completed) { statusBar()->showMessage("Download complete: "+QFileInfo(e.destination).fileName(),10000); if(tray_->isVisible()) tray_->showMessage("Download complete",QFileInfo(e.destination).fileName(),QSystemTrayIcon::Information,5000); }
     }
+    const auto scrollPosition=table_->verticalScrollBar()->value();
     QString selection; if(const auto* e=selected()) selection=e->id;
     current_=snapshot; ready_=true; const QSignalBlocker blocked(table_); table_->setRowCount(static_cast<int>(snapshot.entries.size()));
+    table_->clearSelection();table_->setCurrentCell(-1,-1);
+    displayOrder_.resize(current_.entries.size());std::iota(displayOrder_.begin(),displayOrder_.end(),std::size_t{0});
+    std::sort(displayOrder_.begin(),displayOrder_.end(),[this](auto a,auto b){
+        const auto& first=current_.entries[a];const auto& second=current_.entries[b];
+        if(view_->currentIndex()==2 && first.progress.totalBytes.value_or(0)!=second.progress.totalBytes.value_or(0))return first.progress.totalBytes.value_or(0)>second.progress.totalBytes.value_or(0);
+        if(first.created!=second.created)return view_->currentIndex()==1 ? first.created<second.created:first.created>second.created;
+        return view_->currentIndex()==1 ? a<b:a>b;
+    });
     int running=0,queued=0; double speed=0;
     for(int row=0;row<table_->rowCount();++row) {
-        const auto& e=current_.entries[static_cast<std::size_t>(row)]; const auto& p=e.progress; const bool active=e.status==QueueStatus::Running;
+        const auto& e=current_.entries[displayOrder_[static_cast<std::size_t>(row)]]; const auto& p=e.progress; const bool active=e.status==QueueStatus::Running;
         if(active){++running;speed+=p.smoothedBytesPerSecond;} if(e.status==QueueStatus::Queued)++queued;
-        const auto percent=p.totalBytes && *p.totalBytes ? std::min(e.media && active ? 99.0:100.0,100.0*static_cast<double>(p.downloadedBytes)/static_cast<double>(*p.totalBytes)) : 0;
+        const auto percent=e.status==QueueStatus::Completed ? 100.0:p.totalBytes && *p.totalBytes ? std::min(e.media && active ? 99.0:100.0,100.0*static_cast<double>(p.downloadedBytes)/static_cast<double>(*p.totalBytes)) : 0;
         const QStringList text={e.media && e.status!=QueueStatus::Completed ? e.mediaTitle:QFileInfo(e.destination).fileName(),p.totalBytes ? bytes(*p.totalBytes):"—",bytes(p.downloadedBytes),"",active ? bytes(static_cast<std::uint64_t>(p.smoothedBytesPerSecond))+"/s":"—",active && p.etaSeconds ? duration(*p.etaSeconds):"—",active ? QString::number(p.activeRanges):"—",statusText(e.status),e.media ? "Video":e.priority>0 ? "High":e.priority<0 ? "Low":"Normal"};
         for(int col=0;col<9;++col) {
             if(col==3) continue; auto* item=table_->item(row,col); if(!item){item=new QTableWidgetItem;table_->setItem(row,col,item);} if(item->text()!=text[col]) item->setText(text[col]);
@@ -115,15 +128,16 @@ void MainWindow::apply(const QueueSnapshot& snapshot) {
         if(e.id==selection) table_->selectRow(row);
     }
     summary_->setText(QString("%1 active  ·  %2 queued  ·  %3 total").arg(running).arg(queued).arg(current_.entries.size())); speed_->setText(bytes(static_cast<std::uint64_t>(speed))+"/s"); table_->setVisible(!current_.entries.empty()); empty_->setVisible(current_.entries.empty()); filter(); details();
+    table_->verticalScrollBar()->setValue(scrollPosition);
 }
 const QueueEntry* MainWindow::selected() const {
     const auto row=table_->currentRow(); if(row<0 || !table_->item(row,0) || table_->isRowHidden(row)) return nullptr;
     const auto id=table_->item(row,0)->data(Qt::UserRole).toString(); const auto i=std::find_if(current_.entries.begin(),current_.entries.end(),[&](const auto& e){return e.id==id;}); return i==current_.entries.end() ? nullptr : &*i;
 }
 void MainWindow::filter() {
-    int navigationIndex=0;for(auto* button:findChildren<QPushButton*>("navigation"))button->setChecked(navigationIndex++==filter_->currentIndex());
+    int navigationIndex=0;for(auto* button:findChildren<QPushButton*>("navigation"))button->setChecked(navigationIndex++==page_);
     for(int row=0;row<table_->rowCount();++row) {
-        const auto& e=current_.entries[static_cast<std::size_t>(row)]; const int f=filter_->currentIndex();
+        const auto& e=current_.entries[displayOrder_[static_cast<std::size_t>(row)]]; const int f=page_;
         const bool status=f==0 || (f==1 && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued || e.status==QueueStatus::Paused)) || (f==2 && e.status==QueueStatus::Completed) || (f==3 && (e.status==QueueStatus::Failed || e.status==QueueStatus::Cancelled));
         const auto text=search_->text(); table_->setRowHidden(row,!status || (!e.destination.contains(text,Qt::CaseInsensitive) && !e.url.contains(text,Qt::CaseInsensitive)));
     } details();
@@ -156,12 +170,15 @@ void MainWindow::theme(bool dark) {
         "QPushButton#navigation:checked{background:%1;color:#db2777;border:0;border-radius:10px;font-weight:700;}"
         "QLineEdit,QComboBox,QSpinBox{font-family:Segoe UI;font-size:13px;border-radius:10px;padding:10px;min-height:20px;}"
         "QComboBox{padding-right:34px;} QComboBox::drop-down{width:30px;border:0;background:transparent;} QComboBox::down-arrow{image:url(:/branding/chevron.xpm);width:14px;height:14px;}"
-        "QComboBox QAbstractItemView{background:%4;border:1px solid %2;padding:6px;selection-background-color:%1;selection-color:%5;outline:0;}"
+        "QComboBox QAbstractItemView{background:%4;border:1px solid %2;border-radius:10px;padding:6px;selection-background-color:%1;selection-color:%5;outline:0;}"
+        "QComboBox QAbstractItemView::item{border:0;border-radius:7px;min-height:22px;margin:2px;padding:8px 12px;} QComboBox QAbstractItemView::item:selected{background:%1;color:#db2777;}"
+        "QMenu::item{border-radius:7px;margin:2px;} QPushButton:default{background:#db2777;color:white;border-color:#db2777;}"
         "QHeaderView::section{font-family:Segoe UI;font-size:12px;padding:10px 8px;} QTableWidget{border-radius:14px;}"
         "QWidget#detailsPanel{border-radius:14px;} QLabel#mediaTitle{font-family:Segoe UI;font-size:20px;font-weight:700;background:transparent;}"
         "QDialog QLabel{background:transparent;} QDialog#mediaDialog{background:%4;} QProgressBar{border-radius:7px;min-height:8px;} QProgressBar::chunk{border-radius:7px;background:#ec4899;}"
         "QScrollBar:vertical{background:transparent;width:9px;margin:2px;} QScrollBar::handle:vertical{background:%2;border-radius:4px;min-height:24px;}"
         "QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0;} QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical{background:transparent;}"
         ).arg(dark ? "#50253e":"#fce7f3",border,muted,surface,text));
+    qApp->setStyleSheet(styleSheet());
 }
 }

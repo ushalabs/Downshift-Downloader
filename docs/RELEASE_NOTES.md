@@ -1,3 +1,15 @@
+# Downshift 0.3.3 compatibility and history repair
+
+- Shared capability negotiation, one validated range before parallel fan-out, and safe full-response fallback for unreliable ranges/validators.
+- Bounded metadata discovery when servers reject range probes; supported whole-response content decoding; accurate final sizes.
+- Safe server filenames for unnamed links, explicit-name preservation, version coordination and clear update messages.
+- Newest-first history, Latest/Oldest/Size views on every sidebar page, preserved selected IDs and shared rounded pink forms/menus/dropdowns.
+- Browser checks use a separate test bridge, leaving the user's normal connection and history alone.
+
+Validation/publication results are recorded after success in DEVELOPMENT_PROGRESS.md. This is an unsigned preview; supported public HTTP/HTTPS transfer does not imply universal authenticated, browser-only or DRM support. No proprietary IDM implementation or general Internet-speed advantage is claimed.
+
+---
+
 # Downshift 0.3.2 reliability repair
 
 - Reject malformed YouTube player IDs and resolve a valid current watch page; return actual errors to the extension.

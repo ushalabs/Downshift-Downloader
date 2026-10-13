@@ -48,7 +48,9 @@ private:
     QString chromeStatus_="Not connected";
     QTableWidget* table_=nullptr;
     QLineEdit* search_=nullptr;
-    QComboBox* filter_=nullptr;
+    QComboBox* view_=nullptr;
+    int page_=0;
+    std::vector<std::size_t> displayOrder_;
     QLabel *summary_=nullptr,*speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
     std::vector<std::pair<QString,QLabel*>> detailLabels_;
     QPushButton *start_=nullptr,*pause_=nullptr,*cancel_=nullptr,*more_=nullptr;

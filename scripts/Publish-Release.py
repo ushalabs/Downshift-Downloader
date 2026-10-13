@@ -156,6 +156,10 @@ Extract the entire **windows-x64 ZIP**, run **Setup.cmd**, and open the Desktop 
 - Consistent eleven-character YouTube IDs, malformed player-link fallback and explicit native media errors.
 - Trusted direct file-link capture before Chrome starts; owned fallback cancellation rows removed after native commit confirmation.
 - Hash-verified partial-range Pause/Resume, callback progress, small-file initial pool tuning and bounded fresh HTTP/1.1 transport retries.
+- Shared server-capability negotiation: validate a real range, then use segmented transfer or a fresh complete response for unreliable range servers.
+- Complete-response content decoding, range-probe refusal handling and server-suggested filenames without URL-specific rules.
+- Latest-first history with Latest, Oldest and Size views on every sidebar page; shared rounded pink form and dropdown styling.
+- Extension/app version checks and an explicit extension update action; browser acceptance uses a separate test bridge.
 
 **Verified release producer:** [Windows CI]({run['html_url']}) built Release/Debug, passed all 14 groups in both with video tools installed, verified 13 extracted-package checks and preserved these exact artifacts. Separate local actual Chrome checks passed in both configurations. This publication independently verified archive/per-file hashes and the corresponding library source inventory.
 

@@ -11,7 +11,7 @@ def host(exe,request,origin=None,raw=None):
 def request(exe,command,**values):
     rc,result=host(exe,dict(version=1,command=command,**values));assert rc==0 and result["ok"],result;return result
 def start(exe,root):
-    p=subprocess.Popen([exe,str(root)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8",env=local_environment());assert p.stdout.readline().strip()=="ready";return p
+    p=subprocess.Popen([exe,str(root),"--isolated-browser-test"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8",env=local_environment());assert p.stdout.readline().strip()=="ready";return p
 def rows(p):p.stdin.write("snapshot\n");p.stdin.flush();return json.loads(p.stdout.readline())
 def close(p):p.stdin.write("exit\n");p.stdin.flush();p.communicate(timeout=15);assert p.returncode==0
 def main():
@@ -45,8 +45,8 @@ def main():
                 assert not host(exe,dict(version=1,command="prepare",key=uuid.uuid4().hex,url=url,filename=filename))[1]["ok"];checks+=1
             assert not host(exe,dict(version=1,command="prepare",key=uuid.uuid4().hex,url=url,filename="wrong-size.bin",total="10000000"))[1]["ok"];checks+=1
             assert request(exe,"prepare",key=uuid.uuid4().hex,url=url.replace("/range","/stream"),filename="stream.bin")["state"]=="prepared";checks+=1
-            # Changed preflight validator is rejected by the real download before completion.
-            changed=uuid.uuid4().hex;request(exe,"prepare",key=changed,url=url,filename="changed.bin");server.weak_etag=True;request(exe,"commit",key=changed,browserCancelled=True)
+            # A genuinely changed strong validator is still rejected.
+            changed=uuid.uuid4().hex;request(exe,"prepare",key=changed,url=url,filename="changed.bin");server.entity_tag='"different-version"';request(exe,"commit",key=changed,browserCancelled=True)
             end=time.monotonic()+10
             while time.monotonic()<end:
                 row=next(r for r in rows(p) if r["handoffKey"]==changed)
@@ -56,13 +56,28 @@ def main():
             p.stdin.write("remove "+accepted["downloadId"]+"\n");p.stdin.flush();json.loads(p.stdout.readline())
             assert request(exe,"status",key=key)["state"]=="committed" and request(exe,"prepare",**values)["state"]=="committed";checks+=1
             assert len(rows(p))==3 and (root/"Programs"/"browser.bin").exists();checks+=1
-            server.weak_etag=False;direct=uuid.uuid4().hex;request(exe,"prepare",key=direct,url=url,filename="direct.bin")
+            del server.entity_tag;server.weak_etag=False;direct=uuid.uuid4().hex;request(exe,"prepare",key=direct,url=url,filename="direct.bin")
             request(exe,"commit",key=direct,browserNotStarted=True);request(exe,"commit",key=direct,browserNotStarted=True)
             end=time.monotonic()+10
             while time.monotonic()<end:
                 if next(r for r in rows(p) if r["handoffKey"]==direct)["status"]==3:break
                 time.sleep(.05)
             assert file_sha256(root/"Programs"/"direct.bin")==expected_sha256(server.size);checks+=1
+            weak=uuid.uuid4().hex;request(exe,"prepare",key=weak,url=url,filename="weakened.bin");server.weak_etag=True;request(exe,"commit",key=weak,browserNotStarted=True)
+            end=time.monotonic()+10
+            while time.monotonic()<end:
+                row=next(r for r in rows(p) if r["handoffKey"]==weak)
+                if row["status"] in (3,4):break
+                time.sleep(.05)
+            assert row["status"]==3 and file_sha256(root/"Programs"/"weakened.bin")==expected_sha256(server.size);checks+=1
+            server.weak_etag=False;server.probe_status=405;server.suggested_filename="server-file.zip";named=uuid.uuid4().hex
+            request(exe,"prepare",key=named,url=url,filename="download",serverFilename=True);assert rows(p)[-1]["destination"]==str(root/"Zip"/"server-file.zip");checks+=1
+            request(exe,"commit",key=named,browserNotStarted=True);end=time.monotonic()+10
+            while time.monotonic()<end:
+                row=next(r for r in rows(p) if r["handoffKey"]==named)
+                if row["status"] in (3,4):break
+                time.sleep(.05)
+            assert row["status"]==3 and file_sha256(root/"Zip"/"server-file.zip")==expected_sha256(server.size);checks+=1
             close(p);p=None
             for file in root.glob("queue.sqlite*"):
                 if file.is_file():assert url.encode() not in file.read_bytes()

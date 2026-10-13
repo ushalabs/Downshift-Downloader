@@ -18,7 +18,7 @@
     // the durable downloads-API fallback.
     if(!link.hasAttribute('download') && !/\.(?:exe|msi|msix|zip|rar|7z|tar|gz|bz2|xz|iso|pdf|mp4|mkv|webm|mov|avi|mp3|m4a|wav|flac|ogg|docx?|xlsx?|pptx?|csv|txt|jpg|jpeg|png|gif|webp)(?:$)/i.test(url.pathname))return;
     event.preventDefault();event.stopImmediatePropagation();show('Opening download in Downshift…');
-    try{const answer=await chrome.runtime.sendMessage({type:'link',url:url.href,filename:link.getAttribute('download') || ''});show(answer?.ok ? 'Choose where to save this file in Downshift.' : answer?.error || 'Could not accept this link. Turn capture off to use Chrome.');}
+    try{const answer=await chrome.runtime.sendMessage({type:'link',url:url.href,filename:link.getAttribute('download') || ''});show(answer?.ok ? 'Choose where to save this file in Downshift.' : answer?.error || 'The extension worker did not reply. Open its popup, apply the update, and refresh this page.');}
     catch{show('Reload the Downshift extension and this page, then retry.');}
   },true);
 })();

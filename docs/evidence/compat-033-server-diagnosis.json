@@ -1,0 +1,24 @@
+{
+  "url": "https://app.prntscr.com/build/setup-lightshot.exe",
+  "probe": {
+    "status": 206,
+    "range": "0-0",
+    "bytes": 1,
+    "advertisedTotal": 2426543,
+    "etag": "\"694242ac-2506af\""
+  },
+  "rangeResponse": {
+    "status": 206,
+    "requested": "0-262143",
+    "bodyBytes": 620685,
+    "etag": "W/\"694242ac-2506af\"",
+    "framing": "chunked"
+  },
+  "fullResponse": {
+    "status": 200,
+    "bytes": 2786328,
+    "etag": "W/\"694242ac-2506af\"",
+    "sha256": "928c2808421dfd487ffa697379548cbe682c0e13aeb595eb89973ba9c515b8a1"
+  },
+  "scope": "Independent Windows curl observations; complete reference installer read/hashed, never executed; not an ISP-capacity benchmark"
+}

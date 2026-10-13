@@ -110,6 +110,7 @@ void QueueManager::run() {
             if(!e.media && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
             if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to continue in a video window.";save(e);}
             else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
+            e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();
             if(std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.id==e.id;})) invalid("Duplicate database download IDs.");
             entries_.push_back(std::move(e));
         }
@@ -234,7 +235,7 @@ void QueueManager::tick() {
     for(auto i=workers_.begin();i!=workers_.end();) {
         auto& w=*i->second; auto& e=entry(i->first); bool done;
         { std::lock_guard lock(w.mutex); e.progress=w.progress; done=w.done; if(done) { e.status=w.cancel ? QueueStatus::Cancelled : w.status; e.error=w.error; } }
-        if(done) { save(e); i=workers_.erase(i); } else ++i;
+        if(done) {e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();save(e); i=workers_.erase(i); } else ++i;
     }
 }
 void QueueManager::schedule() {
@@ -274,7 +275,7 @@ std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString f
         if(key.size()!=32 || std::any_of(key.begin(),key.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))invalid("Invalid handoff key.");
         if(filename.isEmpty() || filename.size()>160 || filename.contains('/') || filename.contains('\\') || filename=="." || filename=="..")invalid("Invalid browser filename.");
         QueueEntry e;e.id=QString::fromStdString(ResumeJournal::newId());e.url=url;e.origin=origin(url);e.handoffKey=key;e.status=QueueStatus::Prepared;e.created=QDateTime::currentSecsSinceEpoch();e.updated=e.created;
-        e.requiredEtag=QString::fromStdString(inspection.etag);e.requiredResolvedUrl=QString::fromStdString(inspection.resolvedUrl);if(!inspection.etag.empty())e.requiredTotal=inspection.total;if(inspection.total)e.progress.totalBytes=inspection.total;e.progress.resumable=!inspection.etag.empty();
+        e.requiredEtag=QString::fromStdString(inspection.etag);if(!inspection.etag.empty()){e.requiredResolvedUrl=QString::fromStdString(inspection.resolvedUrl);e.requiredTotal=inspection.total;}if(inspection.total)e.progress.totalBytes=inspection.total;e.progress.resumable=!inspection.etag.empty();
         const auto folder=QDir(settings_.directory).filePath(downloadCategory(filename,mime));if(!QDir().mkpath(folder))invalid("The download category folder could not be created.");
         const QFileInfo name(filename); bool assigned=false;
         for(int index=0;index<1000;++index) {

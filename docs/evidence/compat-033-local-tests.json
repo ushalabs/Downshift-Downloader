@@ -1,0 +1,15 @@
+{
+  "release": {
+    "passed": 14,
+    "total": 14,
+    "seconds": 182.69,
+    "logSha256": "21c2044db677ef097740770adf1eef808ae5bc2355ed405bd73cac974fb44718"
+  },
+  "debug": {
+    "passed": 14,
+    "total": 14,
+    "seconds": 227.45,
+    "logSha256": "cb048b3be1dc5e3ad196618bf5a7d3e6eb484975deec57de4efe34df8ec15d57"
+  },
+  "scope": "Local Windows MSVC suites with installed media helpers; controlled fixtures, no skipped groups; actual Chrome is separate evidence"
+}

@@ -1,0 +1,37 @@
+Downshift 0.3.0 - Windows 10/11 x64 portable
+
+1. Extract the entire ZIP to a permanent folder you can write to.
+2. Double-click Setup.cmd (no administrator rights needed).
+3. Open Downshift using the Desktop shortcut or Downshift.exe here.
+4. Chrome: chrome://extensions > Developer mode > Load unpacked > choose
+   this package's extension folder. Reload existing video tabs.
+5. Optional videos: double-click Enable-video.cmd. It downloads pinned,
+   checksum-verified upstream video tools. Internet is needed for this step.
+
+Keep the executable beside its DLLs, platforms and scripts folders.
+After moving the package, uninstall its integration from the original
+location first, then set up the new location. Never just copy the EXE.
+
+Default locations: Downloads\Videos, Downloads\Audios, Downloads\Zip,
+Downloads\Programs. Choose another location in any download window.
+Existing history is kept locally under your Windows user account.
+
+With capture enabled, unsupported or unavailable Chrome handoffs stay
+paused. Retry in the extension or turn capture off to use Chrome.
+Chrome can receive bytes or complete a file before an extension sees it.
+Private/authenticated/DRM/browser-only resources are not universal downloads.
+
+Uninstall.cmd removes this package's integration and restores prior
+registration/shortcut where still owned. It preserves downloads/history.
+Remove the extension in Chrome; delete this extracted app folder manually.
+
+Original Downshift source: MIT. Qt and other dependencies have separate
+licenses; see THIRD_PARTY_NOTICES.md and licenses. Qt DLL replacement and
+reverse engineering to debug library modifications are permitted. The
+matching dependency-source ZIP is provided beside the release binary.
+Optional video helpers are downloaded directly from upstream, not bundled.
+
+Source and documentation:
+https://github.com/ushalabs/Downshift-Download-Manager
+
+This unsigned preview has no Windows installer or automatic updater.

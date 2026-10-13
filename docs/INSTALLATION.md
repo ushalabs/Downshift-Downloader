@@ -2,7 +2,7 @@
 
 ## End-user installation
 
-No installer, portable package, or verified release binary is available yet. Standalone distribution is scheduled for Phase 9. End users will not require build tools once a verified distribution exists.
+No installer, portable package, or verified release binary is available yet. The Windows portable distribution includes its required runtime libraries. End users can follow [portable setup](PACKAGING.md); build tools are required only for source development.
 
 ## Development prerequisites
 
@@ -89,4 +89,4 @@ The same immutable baseline governs transitive dependencies. Manifest versions f
 
 ## Chrome integration
 
-The extension and separate Native Messaging host are implemented. Follow [Chrome setup](CHROME.md): register the built host for your Windows account, install the pinned local media helpers for video support, and load the project's extension folder in Chrome Developer mode. Supported file capture is on for fresh installs; check **Use Downshift for downloads** if an earlier off setting persists. Reload an existing extension and video tabs after upgrading to 0.2.0. Local registration is explicit; simply building or opening the app does not install the extension or register the host. Installer integration remains Phase 9.
+The extension and separate Native Messaging host are implemented. Follow [Chrome setup](CHROME.md): register the built host for your Windows account, install the pinned local media helpers for video support, and load the project's extension folder in Chrome Developer mode. Supported file capture is on for fresh installs; check **Use Downshift for downloads** if an earlier off setting persists. Reload an existing extension and video tabs after upgrading to 0.3.0. Local registration is explicit; simply building or opening the app does not install the extension or register the host. Portable setup registers the extracted host through Setup.cmd; no Windows installer is required.

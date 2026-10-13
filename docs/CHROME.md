@@ -1,6 +1,6 @@
 # Downshift for Chrome
 
-Phase 7 provides a Manifest V3 extension, a separate Windows Native Messaging host, and a staged handoff to the native queue. This is a local development installation; an installer and Chrome Web Store publication are later work.
+Phase 7 provides a Manifest V3 extension, a separate Windows Native Messaging host, and a staged handoff to the native queue. For the portable distribution run Setup.cmd and load its extension folder; see [portable setup](PACKAGING.md). The source-development setup is below. Chrome Web Store publication is not provided.
 
 ## Install locally
 

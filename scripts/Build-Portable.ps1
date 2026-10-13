@@ -50,6 +50,11 @@ if(Test-Path -LiteralPath $zip){Remove-Item -LiteralPath $zip}
 $extensionZip=Join-Path $OutputDirectory "Downshift-$version-chrome-extension.zip"
 if(Test-Path -LiteralPath $extensionZip){Remove-Item -LiteralPath $extensionZip}
 [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $root 'extension'),$extensionZip,[IO.Compression.CompressionLevel]::Optimal,$false)
+if(!$sourceDirty){
+    $applicationZip=Join-Path $OutputDirectory "Downshift-$version-application-source.zip"
+    & git -C $root archive --format=zip "--output=$applicationZip" $commit
+    if($LASTEXITCODE -ne 0){throw 'Application source archive failed.'}
+}
     $vcpkg=Join-Path $root '.tools\windows\vcpkg'
     $source=Join-Path $stage 'dependency-sources';New-Item -ItemType Directory -Path $source | Out-Null
     $baseline=(Get-Content (Join-Path $root 'vcpkg.json') -Raw|ConvertFrom-Json).'builtin-baseline'

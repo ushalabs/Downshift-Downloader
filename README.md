@@ -1,38 +1,49 @@
 # Downshift
 
-Downshift is a free, open-source native Windows download manager being developed in ten phases. The product name is **Downshift**; the executable is `Downshift.exe`.
+![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
-**Phases 1-8 are implemented and verified locally.** The adaptive native engine supports safe pause/resume, bounded retries, verified crash recovery, and streaming fallback. The encrypted persistent queue provides priorities, simultaneous downloads, origin limits, and bandwidth pacing. Native desktop controls and a Chrome extension connect to those workers. See [development progress](docs/DEVELOPMENT_PROGRESS.md) for acceptance results and [Chrome setup](docs/CHROME.md) for local browser installation. No direct IDM performance comparison has been performed.
+Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.0 preview adds a compact pink window, content folders, per-download destinations, player download controls and strict browser capture.
 
-## Implemented features
+![Downshift pink desktop](assets/screenshots/downloads-pink.png)
 
-- Native Qt 6 desktop with working download controls, live details, history/search, and compact, responsive pink/plum themes.
-- libcurl process lifetime management and multi-handle capability check.
-- SQLite integration with an in-memory 64-bit write/read check.
-- Windows x64 MSVC CMake presets and pinned vcpkg dependency baseline.
-- Dependency and Qt startup smoke tests, using the Windows and minimal platform plugins.
-- Windows build workflow for Debug and Release; local verification and separate CI status are recorded in the development progress document.
-- libcurl multi transfers with automatic tuning by default, fixed 1-16 connection limits, and adaptive 256 KiB-16 MiB chunks.
-- Actual `bytes=0-0` capability probe, exact range validation, and strong ETag/`If-Match` version checks.
-- Streaming for servers ignoring ranges or lacking a strong validator; safe restart if range support disappears.
-- 64-bit file writes, exclusive `.part` files, optional SHA-256 verification, and finalization without overwriting an existing file.
-- Controlled loopback HTTP/HTTPS integration tests and native file/protocol tests.
-- Live speed/ETA, structured measurements, process CPU/memory and file-call timings.
-- Console pause/resume, encrypted range checkpoints, local/remote revalidation, and recovery after forced termination.
-- Bounded transient retries with jitter/Retry-After and explicit archival restart when safe resume is unavailable.
-- Persistent SQLite queue/history/settings with user-scoped encryption, priorities, concurrency limits, and global/per-download pacing.
-- Manifest V3 Chrome extension, restricted Native Messaging/Windows IPC, durable handoff receipts, and strict enabled capture: failed handoffs stay paused until retry or explicit disable.
-- Content category folders (Videos, Audios, Zip, Programs), with a destination override on every download.
-- Default-on supported Chrome file capture and player download buttons, with YouTube/site extraction, video quality selection, speed/progress, and audio/video merging in native Qt windows. See [video setup and boundaries](docs/MEDIA.md).
-- Video history survives reopening; completion requires a verified saved video file, with its exact path and Open folder action. Failed/interrupted videos provide retry controls.
-- Bounded segmented write buffers, larger checksum reads, recovery-metadata contention handling, and structured I/O/checkpoint counters.
-- Reproducible paired loopback benchmarks: 180 independently verified 100 MB/1 GB/5 GB samples across fixed counts, automatic mode, streaming, and traffic caps. See [performance results](docs/PERFORMANCE.md) for measured gains, regressions, and limits.
+## Get started
 
-## Build
+Get the Windows x64 portable archive from [releases](https://github.com/ushalabs/Downshift-Download-Manager/releases). Extract the **whole ZIP** to a permanent writable folder and run **Setup.cmd**. Open the Desktop Downshift shortcut or Downshift.exe beside its DLLs. Windows 10/11 x64 is required; developer tools are not needed.
 
-Install Visual Studio 2022 Build Tools with the **Desktop development with C++** workload, MSVC v143, and a Windows 10/11 SDK. Install Git, CMake 3.25 or newer, and Python 3.10+ for the test servers. Python is not required by the native application. See [installation and development setup](docs/INSTALLATION.md).
+For Chrome, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted package's **extension** folder. Reload existing video pages. A previously installed extension needs **Reload** after an update. Capture defaults on for fresh installs; saved off preferences persist. [Full setup](docs/PACKAGING.md) and [Chrome recovery](docs/CHROME.md) explain moving or uninstalling the package.
 
-From PowerShell in the repository root:
+For video extraction/quality selection and merging, run **Enable-video.cmd** once. It downloads pinned, checksum-verified upstream yt-dlp, Deno and FFmpeg tools. These optional executables are not redistributed in the portable ZIP. Ordinary file downloads work immediately without them.
+
+## Downloads
+
+| Content | Initial destination |
+|---|---|
+| Videos | Downloads → Videos |
+| Audio | Downloads → Audios |
+| ZIP, RAR and other archives | Downloads → Zip |
+| Programs and all other files | Downloads → Programs |
+
+Choose another location for any download. Settings can change the base folder. Existing history/files are preserved. Categories use filename/media type, not full-content decoding. Chrome handoffs open Downshift and a destination window before native transfer starts. Video records appear in All downloads and Completed; completion requires a verified saved local video, with its actual path and Open folder action.
+
+Enabled capture promptly pauses Chrome and does not silently fall back when a handoff fails. Retry in the popup or turn capture off to use Chrome. Chrome may receive initial bytes or finish small files before its extension reports them; universal replacement cannot be guaranteed. Browser cookies/credentials are not imported. Authenticated, dangerous, incognito, browser-only, protected and unsupported resources have explicit limits. Player controls work on detected supported videos, including YouTube; they do not make every website or DRM stream downloadable. [Behavior and limits](docs/GENERAL_DOWNLOADS.md), [video support](docs/MEDIA.md).
+
+## Native engine and desktop
+
+- Adaptive segmented transfers with automatic tuning or fixed 1–16 connection limits; streaming for servers without safe range capability.
+- TLS verification, exact range/length checks, strong ETag pinning for resume, optional trusted SHA-256, exclusive partial files and completion without overwriting existing files.
+- Encrypted crash-recovery checkpoints, bounded transient retries, pause/resume and explicit safe restart when resumability is unavailable.
+- Persistent queue/history, priorities, file concurrency/site limits and global/per-file pacing; video tasks have a separate helper concurrency/rate budget.
+- Live progress/speed/ETA, searchable history, compact responsive pink/plum themes and wider details when maximized. Downloads are never executed automatically.
+
+## Verification and performance
+
+Local Release and Debug each pass 14 full test groups, including actual video fixture downloads with helpers installed, 12,239 engine unit checks and controlled HTTP/HTTPS/recovery/GUI/queue/protocol scenarios. Separate actual isolated Chrome checks pass in both configurations. Portable tests verify app-local libraries, startup without developer PATH, per-user setup and ownership-safe uninstall. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes local results, Windows CI and release verification; no fresh-VM or universal compatibility claim is made.
+
+Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
+
+## Build from source
+
+Install Visual Studio 2022/Build Tools with Desktop development with C++, MSVC v143 and a Windows SDK, plus Git, CMake 3.25+ and Python 3.10+ for tests. Node is used for extension controller tests. Python/Node are not required by the app.
 
 ```powershell
 ./scripts/Bootstrap.ps1
@@ -41,61 +52,16 @@ cmake --preset windows-msvc
 cmake --build --preset release --parallel 2
 ./scripts/Install-MediaTools.ps1 -Configuration Release
 ctest --preset release
+cmake --build --preset debug --parallel 2
+./scripts/Install-MediaTools.ps1 -Configuration Debug
+ctest --preset debug
 ./build/windows-msvc/Release/Downshift.exe
 ```
 
-The first configure builds the dependency set from source and can take substantial time and disk space. Run bootstrap and configure in the same PowerShell session so `VCPKG_ROOT` remains available. Bootstrap also finds Visual Studio's bundled CMake when it is absent from PATH.
+Bootstrap pins vcpkg to the manifest baseline and finds Visual Studio's bundled CMake. Keep bootstrap and configure in the same PowerShell session. The first source dependency build takes substantial time/space. Source developer details are in [installation](docs/INSTALLATION.md). Packaging a clean, tested Release uses `scripts/Build-Portable.ps1 -RequireClean` and `scripts/Test-Portable.ps1`.
 
-## Roadmap and phase gate
+## Documentation and license
 
-1. Native C++ foundation (completed locally).
-2. Segmented download engine (completed locally).
-3. Adaptive performance engine (completed locally).
-4. Resume and recovery (completed locally).
-5. Queue and persistence (completed locally).
-6. Modern desktop GUI (completed locally).
-7. Chrome integration (completed locally).
-8. Performance optimization (completed locally; user-requested browser/video improvements follow).
-9. Windows packaging.
-10. GitHub release.
+[Architecture](docs/ARCHITECTURE.md) · [desktop](docs/DESKTOP.md) · [queue](docs/QUEUE.md) · [recovery](docs/RECOVERY.md) · [tests](docs/TESTING.md) · [packaging](docs/PACKAGING.md) · [release notes](docs/RELEASE_NOTES.md) · [development progress](docs/DEVELOPMENT_PROGRESS.md).
 
-The current checkout is `main`. The user authorized the complete downloader update, Phase 9 packaging and Phase 10 release, with a verified commit/push for each stage. [Earlier Git instructions](docs/GIT_HANDOFF.md) are retained as history. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
-
-Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
-
-## Documentation
-
-- [Every-file downloads, default folders and browser limits](docs/GENERAL_DOWNLOADS.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Development progress](docs/DEVELOPMENT_PROGRESS.md)
-- [Setup and installation](docs/INSTALLATION.md)
-- [Benchmark status and methodology](docs/BENCHMARKS.md)
-- [Phase 8 optimization and paired measurements](docs/PERFORMANCE.md)
-- [IDM comparison availability](docs/IDM_COMPARISON.md)
-- [Manual Git steps: create main and merge](docs/GIT_HANDOFF.md)
-- [Third-party licensing](docs/THIRD_PARTY_NOTICES.md)
-- [Engine tests](docs/TESTING.md)
-- [Pause/resume and recovery](docs/RECOVERY.md)
-- [Persistent queue](docs/QUEUE.md)
-- [Desktop usage](docs/DESKTOP.md)
-- [Chrome setup and handoff recovery](docs/CHROME.md)
-
-## Download a file during development
-
-From the project folder, replace the URL and destination with your own values:
-
-```powershell
-./build/windows-msvc/Release/DownshiftDownload.exe 'https://example.com/file.zip' "$env:USERPROFILE\Downloads\file.zip" --progress
-```
-
-Use `--sha256` followed by a known digest for independent integrity verification. `--help` lists the options. The destination directory must exist. A fresh request requires absent destination/partial/recovery files. Press Ctrl+C to pause; use the identical URL/destination with `--resume` to reuse verified ranges. `--restart` archives old partials before downloading again. See [recovery](docs/RECOVERY.md) for validator requirements and unsupported cases. Completed destinations are never overwritten.
-
-Automatic mode adjusts future assignments after throughput trials; existing ranges drain safely. Use `--connections 4 --chunk-kib 4096` for the previous fixed baseline or `--connections 1`, `8`, or `16` for other limits. `--json` returns measured results. Benchmark reproduction and limitations are in [benchmarks](docs/BENCHMARKS.md).
-
-## Limitations
-
-Installers and release binaries belong to later phases. Chrome handoff supports public range-capable files with strong validators; browser login/cookies are not forwarded, and personalized resources should stay in Chrome. Its popup toggle defaults off and needs explicit local setup. Partial resume requires actual range support and an unchanged strong ETag; streaming and unverifiable partials need an explicit restart. Recovery records normally require the same Windows user/profile. Automatic tuning cannot guarantee the best throughput on every server. HTTP/3 is not enabled. An unframed response ending at EOF cannot independently prove its intended length; use a trusted SHA-256 when available. No download is executed automatically.
-
-## License
-
-Downshift source code uses the [MIT License](LICENSE). Dependencies retain their own licenses. Qt is dynamically linked; distribution must fulfill the applicable LGPL obligations and include all required dependency notices. See [third-party licensing](docs/THIRD_PARTY_NOTICES.md).
+Original Downshift source is [MIT](LICENSE). Libraries retain their own terms. Shared Qt uses the LGPLv3 option; the binary includes complete notices/license texts, and the matching release provides corresponding dependency sources/patches/build recipes. Library replacement is permitted. [Third-party notices](docs/THIRD_PARTY_NOTICES.md) and [library rebuilding](docs/REBUILD_LIBRARIES.md) describe the shipped inventory and replacement rights. The unsigned preview has no Windows installer, Chrome Web Store publication or automatic updater.

@@ -6,6 +6,9 @@ check(!publicUrl("javascript:alert(1)"));check(!publicUrl("https://name:secret@e
 check(youtubePage("https://www.youtube.com/watch?v=EEUVLOzuu8Q&list=abc")==="https://www.youtube.com/watch?v=EEUVLOzuu8Q");
 check(youtubePage("https://www.youtube.com/embed/EEUVLOzuu8Q")==="https://www.youtube.com/watch?v=EEUVLOzuu8Q");
 check(!youtubePage("https://youtube.com.evil.test/watch?v=EEUVLOzuu8Q"));
+check(!youtubePage("https://www.youtube.com/watch?v=undefined"));
+check(!youtubePage("https://youtu.be/undefined"));
+check(youtubePage("https://youtu.be/HyfC9nZvIJM?si=example")==="https://www.youtube.com/watch?v=HyfC9nZvIJM");
 let clock=0;const sources=new MediaSources(()=>clock);const sender={url:"https://example.com/watch",frameId:0,tab:{id:1,incognito:false}};
 const observe=(url,frame=0,tab=1)=>sources.observe({tabId:tab,frameId:frame,url,statusCode:200,responseHeaders:[{name:"Content-Type",value:"video/mp4"}]});
 observe("https://cdn.example.com/file.mp4");check(sources.resolve({source:"blob:any"},sender)==="https://cdn.example.com/file.mp4");
@@ -19,6 +22,7 @@ check(sources.resolve({page:"https://www.youtube.com/feed/recommended",videoPage
 check(!sources.resolve({page:"https://www.youtube.com/feed/recommended",source:"blob:video"},stale));
 check(!sources.resolve({page:"https://evil.test/watch?v=HyfC9nZvIJM"},stale));
 check(sources.resolve({page:"https://www.youtube.com/watch?v=EEUVLOzuu8Q",videoPage:"https://www.youtube.com/watch?v=HyfC9nZvIJM"},stale)==="https://www.youtube.com/watch?v=HyfC9nZvIJM");
+check(sources.resolve({page:"https://www.youtube.com/watch?v=HyfC9nZvIJM",videoPage:"https://www.youtube.com/watch?v=undefined"},stale)==="https://www.youtube.com/watch?v=HyfC9nZvIJM");
 clock=600001;check(sources.resolve({},sender)===sender.url);
 sources.tabs.clear();observe("https://cdn.example.com/foreign.mp4",2);check(sources.resolve({},sender)===sender.url);
 sources.tabs.clear();observe("https://cdn.example.com/segment.ts");observe("https://r1.googlevideo.com/videoplayback");check(sources.tabs.size===0);

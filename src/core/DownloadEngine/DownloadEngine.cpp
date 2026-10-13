@@ -204,6 +204,7 @@ struct Transfer {
     DownloadControl* control = nullptr;
     std::function<void(std::size_t, std::stop_token)> beforeWrite;
     std::uint32_t attempts = 0;
+    bool freshHttp1 = false;
 
     Transfer(Kind value, FileWriter* file, std::stop_token token, Telemetry* observer = nullptr)
         : kind(value), writer(file), telemetry(observer), stop(token) {
@@ -297,6 +298,10 @@ struct Transfer {
                 }
             }
             self.received += bytes;
+            // A paced curl callback can keep multi_perform busy for seconds.
+            // Publish bounded progress here as well, so the UI can observe and
+            // pause a transfer while its socket buffers are still draining.
+            if(self.writer && self.telemetry)self.telemetry->update(self.telemetry->progress.activeRanges);
             return bytes;
         } catch (...) { self.exception = std::current_exception(); return CURL_WRITEFUNC_ERROR; }
     }
@@ -331,7 +336,9 @@ struct Transfer {
         // Larger bounded receives reduce event-loop/socket overhead. Write callbacks
         // remain capped by libcurl; probes retain their small default buffer.
         if (kind == Kind::Segment) option(easy.get(), CURLOPT_BUFFERSIZE, 256 * 1024L);
-        option(easy.get(), CURLOPT_HTTP_VERSION, static_cast<long>(CURL_HTTP_VERSION_2TLS));
+        option(easy.get(), CURLOPT_HTTP_VERSION, static_cast<long>(freshHttp1 ? CURL_HTTP_VERSION_1_1 : CURL_HTTP_VERSION_2TLS));
+        // Do not reuse a stalled/malformed HTTP/2 connection on a transport retry.
+        if(freshHttp1)option(easy.get(), CURLOPT_FRESH_CONNECT, 1L);
         option(easy.get(), CURLOPT_USERAGENT, "Downshift");
         option(easy.get(), CURLOPT_NOSIGNAL, 1L);
         option(easy.get(), CURLOPT_CONNECTTIMEOUT_MS, options.connectTimeoutMs);
@@ -373,6 +380,18 @@ struct Transfer {
         // Failed/pending responses discard their buffer and never enter a checkpoint.
         if (writer) flushBuffered();
     }
+    void retainPausedPrefix(RecoveryRecord& recovery) {
+        // Exact range/strong-ETag headers bound every accepted body byte. On an
+        // explicit pause retain its prefix, then hash it before publishing a
+        // checkpoint; resume independently hashes it and revalidates the server.
+        if(kind!=Kind::Segment || !accepted || rangeUnsupported || !assigned || !collector.response.complete)return;
+        if(std::any_of(recovery.completed.begin(),recovery.completed.end(),[&](const auto& saved){return saved.range.first==assigned->first;}))return;
+        if(exception){try{std::rethrow_exception(exception);}catch(const DownloadError& error){if(error.code()!=DownloadErrorCode::Paused)return;}catch(...){return;}}
+        flushBuffered();
+        if(!written)return;
+        const ByteRange prefix{assigned->first,assigned->first+written-1};
+        recovery.completed.push_back({prefix,writer->sha256Range(prefix.first,prefix.size())});
+    }
     [[nodiscard]] bool retryable() const {
         const auto status = collector.response.status;
         const bool transientHttp = status == 408 || status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
@@ -390,6 +409,11 @@ struct Transfer {
         curl_off_t seconds = 0;
         curl_easy_getinfo(easy.get(), CURLINFO_RETRY_AFTER, &seconds);
         return static_cast<std::uint64_t>(std::max<curl_off_t>(0, seconds));
+    }
+    [[nodiscard]] bool transportFailed() const noexcept {
+        return !exception && (result==CURLE_HTTP2 || result==CURLE_HTTP2_STREAM ||
+            result==CURLE_RECV_ERROR || result==CURLE_SEND_ERROR || result==CURLE_GOT_NOTHING ||
+            result==CURLE_OPERATION_TIMEDOUT);
     }
 };
 
@@ -427,6 +451,9 @@ public:
         multiCheck(curl_multi_perform(handle_, &running));
     }
     void poll() { multiCheck(curl_multi_poll(handle_, nullptr, 0, 100, nullptr)); }
+    void retainPausedPrefixes(RecoveryRecord& recovery) {
+        for(auto& transfer:active_)transfer->retainPausedPrefix(recovery);
+    }
     std::vector<std::unique_ptr<Transfer>> completed() {
         std::vector<std::unique_ptr<Transfer>> result;
         int queued = 0;
@@ -563,6 +590,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         }
         telemetry.update(0, true);
         std::mt19937 random(std::random_device{}());
+        bool freshHttp1 = false;
         auto delayFor = [&](const Transfer& transfer) -> std::optional<std::uint32_t> {
             if (!transfer.retryable() || transfer.attempts >= options.maxRetries) return std::nullopt;
             return retryDelay(transfer.attempts, options.retryBaseMs, options.retryMaxWaitMs, transfer.serverDelay(), random());
@@ -582,6 +610,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                 telemetry.checkPause();
                 auto transfer = std::make_unique<Transfer>(kind, kind == Kind::Probe ? nullptr : &writer, stop, &telemetry);
                 transfer->etag = validator; transfer->attempts = attempt;
+                transfer->freshHttp1 = freshHttp1;
                 transfer->configure(options, url, true);
                 transfer = session.run(std::move(transfer), stop, &telemetry);
                 telemetry.record(transfer->easy.get(), kind == Kind::Probe ? 0 : transfer->received);
@@ -590,6 +619,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                     telemetry.checkPause();
                     if (stop.stop_requested()) throw;
                     const auto delay = delayFor(*transfer); if (!delay) throw;
+                    freshHttp1 = freshHttp1 || transfer->transportFailed();
                     ++attempt; ++telemetry.metrics.retries;
                     if (kind == Kind::Stream) { writer.reset(); telemetry.progress.downloadedBytes = telemetry.progress.verifiedBytes = 0; }
                     wait(*delay);
@@ -660,6 +690,7 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                     transfer->attempts = attempt;
                     transfer->expectedTotal = total;
                     transfer->etag = etag;
+                    transfer->freshHttp1 = freshHttp1;
                     transfer->configure(options, resolved, false);
                     session.add(std::move(transfer));
                 }
@@ -677,9 +708,12 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
                     telemetry.record(transfer->easy.get(), transfer->received);
                     try { transfer->verify(); }
                     catch (const DownloadError&) {
+                        if(options.control && options.control->pauseRequested())
+                            for(const auto& paused:done)paused->retainPausedPrefix(recovery);
                         telemetry.checkPause();
                         if (stop.stop_requested()) throw;
                         const auto delay = delayFor(*transfer); if (!delay) throw;
+                        freshHttp1 = freshHttp1 || transfer->transportFailed();
                         telemetry.progress.downloadedBytes -= transfer->written;
                         pending.push_back({*transfer->assigned, transfer->attempts + 1, Clock::now() + std::chrono::milliseconds(*delay)});
                         if (transfer->collector.response.status == 429 || transfer->collector.response.status == 503)
@@ -764,13 +798,21 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
         result.metrics.cleanupPending = !journal.remove();
         return result;
     } catch (...) {
-        // Detach writers before checkpointing. Failed/incomplete ranges never enter the ledger.
+        // A pause retains bounded, hash-verified prefixes even before a range
+        // finishes. Other incomplete/failed responses remain uncheckpointed.
+        if(journalActive && recovery.resumable && options.control && options.control->pauseRequested()) {
+            try{session.retainPausedPrefixes(recovery);}catch(...){}
+        }
         session.clear(&telemetry);
         if (journalActive) {
             recovery.status = options.control && options.control->pauseRequested() ? RecoveryStatus::Paused : RecoveryStatus::Failed;
             try {
                 std::sort(recovery.completed.begin(), recovery.completed.end(), [](const auto& a, const auto& b) { return a.range.first < b.range.first; });
                 writer.flush(); checkpoint();
+                if(options.control && options.control->pauseRequested()) {
+                    std::uint64_t retained=0;for(const auto& range:recovery.completed)retained+=range.range.size();
+                    telemetry.progress.downloadedBytes=telemetry.progress.verifiedBytes=retained;
+                }
             } catch (...) {} // Preserve the original failure and the last durable checkpoint.
         }
         if (options.control && options.control->pauseRequested()) {

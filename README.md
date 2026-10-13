@@ -2,7 +2,7 @@
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
-Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.1 repair adds verified YouTube transfers, actual resolution choices, separate quality files and modern pink controls with an original globe/download icon.
+Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.2 repair adds consistent YouTube player validation, direct Chrome link handoff, partial-range pause recovery, responsive progress and bounded transport retries. Actual quality choices, separate quality files and modern pink controls remain.
 
 ![Downshift pink desktop](assets/screenshots/downloads-pink.png)
 
@@ -37,7 +37,7 @@ Enabled capture promptly pauses Chrome and does not silently fall back when a ha
 
 ## Verification and performance
 
-Local Release and Debug each pass 14 full test groups, including actual video fixture downloads with helpers installed, 12,239 engine unit checks and controlled HTTP/HTTPS/recovery/GUI/queue/protocol scenarios. Separate actual isolated Chrome checks pass in both configurations. Portable tests verify app-local libraries, startup without developer PATH, per-user setup and ownership-safe uninstall. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes local results, Windows CI and release verification; no fresh-VM or universal compatibility claim is made.
+Local Release and Debug each pass 14 full test groups, including actual video fixture downloads with helpers installed, 12,241 engine unit checks and controlled HTTP/HTTPS/recovery/GUI/queue/protocol scenarios. Separate actual isolated Chrome checks pass in both configurations. Portable tests verify app-local libraries, startup without developer PATH, per-user setup and ownership-safe uninstall. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes local results, Windows CI and release verification; no fresh-VM or universal compatibility claim is made.
 
 Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
 

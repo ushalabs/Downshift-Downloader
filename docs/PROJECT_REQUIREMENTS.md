@@ -1260,3 +1260,7 @@ Never automatically advance between phases.
 The user controls phase progression. You control engineering implementation within the approved phase.
 
 **START PHASE 1 NOW.**
+
+## Follow-up reliability request (2026-10-13)
+
+Fix the extension player action that opens Downshift without a usable YouTube URL; prevent avoidable Chrome download starts and cancelled history entries; investigate slow ordinary transfers and preserve partial progress through Pause/Resume. The user confirmed clicking Downshift's overlay, but did not identify the current failing video's URL. Earlier verified main/publishing authorization remains applicable; preserve user files/history.

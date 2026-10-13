@@ -6,11 +6,14 @@ export function publicUrl(value) {
 export function youtubePage(value) {
   const address = publicUrl(value); if (!address) return null;
   const url = new URL(address);
-  if (url.hostname === "youtu.be") return address;
+  if (url.hostname === "youtu.be") {
+    const id=url.pathname.split('/')[1];
+    return /^[\w-]{11}$/.test(id || '') ? `https://www.youtube.com/watch?v=${id}` : null;
+  }
   if (!/(^|\.)youtube\.com$/.test(url.hostname)) return null;
-  const match = url.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]{6,})/);
+  const match = url.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]{11})(?:\/|$)/);
   const id = url.searchParams.get("v") || match?.[1];
-  return id && /^[\w-]{6,}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
+  return id && /^[\w-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
 }
 export class MediaSources {
   constructor(now = () => Date.now()) { this.tabs = new Map(); this.now = now; }

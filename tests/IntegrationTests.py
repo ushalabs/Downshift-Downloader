@@ -58,12 +58,23 @@ class Fixture(http.server.ThreadingHTTPServer):
         self.peak = defaultdict(int)
         self.first_completed = threading.Event()
         self.http_port = 0
+        self.broken_h2 = False
+        self.protocols = []
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     def handle(self):
         try:
+            if self.server.broken_h2:
+                protocol = self.connection.selected_alpn_protocol()
+                with self.server.lock: self.server.protocols.append(protocol)
+                if protocol == "h2":
+                    self.connection.recv(24)
+                    # Valid empty SETTINGS followed by illegal DATA on stream 0.
+                    self.connection.sendall(bytes.fromhex("000000040000000000000000000000000000"))
+                    time.sleep(1)
+                    return
             super().handle()
         except (ConnectionError, ssl.SSLError):
             pass  # Intentional client aborts can also occur between keep-alive requests.
@@ -205,11 +216,17 @@ def main():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(fixtures / "localhost-cert.pem", fixtures / "localhost-key.pem")
     https.socket = context.wrap_socket(https.socket, server_side=True)
+    broken = Fixture()
+    broken.broken_h2 = True
+    broken_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    broken_context.load_cert_chain(fixtures / "localhost-cert.pem", fixtures / "localhost-key.pem")
+    broken_context.set_alpn_protocols(["h2", "http/1.1"])
+    broken.socket = broken_context.wrap_socket(broken.socket, server_side=True)
     proxy = ThreadingHTTPServer(("127.0.0.1", 0), Tunnel)
     proxy.daemon_threads = True
     proxy.target_port = https.server_port
     proxy.tunnels = 0
-    threads = [threading.Thread(target=server.serve_forever, daemon=True) for server in (http, https, proxy)]
+    threads = [threading.Thread(target=server.serve_forever, daemon=True) for server in (http, https, proxy, broken)]
     for thread in threads: thread.start()
     count = 0
     local_environment = {key: value for key, value in os.environ.items() if not key.lower().endswith("_proxy")}
@@ -268,6 +285,8 @@ def main():
             run("credentials", success=False, checksum=False, url=f"http://secret:password@127.0.0.1:{http.server_port}/range")
             secure = f"https://localhost:{https.server_port}"
             ca = ("--ca-bundle", str(fixtures / "test-ca.pem"))
+            run("broken-http2", LARGE, url=f"https://localhost:{broken.server_port}/range", extra=(*ca, "--retries", "1"))
+            assert broken.protocols[0] == "h2" and "http/1.1" in broken.protocols, broken.protocols
             run("range", LARGE, url=secure + "/range", extra=ca)
             run("ignore", mode="streaming", url=secure + "/ignore", extra=ca)
             proxy_environment = dict(os.environ)
@@ -297,7 +316,7 @@ def main():
             assert result.returncode == 0 and not cancelled.exists(), f"Cancellation failed: {result.stderr}"
             count += 1; print("PASS cooperative-cancellation", flush=True)
     finally:
-        for server in (http, https, proxy): server.shutdown(); server.server_close()
+        for server in (http, https, proxy, broken): server.shutdown(); server.server_close()
         for thread in threads: thread.join(2)
     print(f"{count} loopback HTTP/HTTPS scenarios passed.", flush=True)
 

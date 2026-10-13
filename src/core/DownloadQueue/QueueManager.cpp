@@ -166,6 +166,10 @@ std::future<void> QueueManager::action(QString id,QueueAction action) { return s
     }
     if(action==QueueAction::Remove) { store_->erase(id); std::erase_if(entries_,[&](const auto& row){return row.id==id;}); return; }
     if(e.status==QueueStatus::Completed) invalid("This download is already complete.");
+    if(action==QueueAction::Start && e.status==QueueStatus::Paused && e.error.startsWith("Download paused") && e.progress.resumable && e.progress.downloadedBytes && !e.progress.verifiedBytes && QFileInfo::exists(e.destination+".part.resume")) {
+        ResumeJournal journal(path(e.destination));
+        if(journal.load().completed.empty())invalid("This earlier pause has no reusable checkpoint. Choose Restart explicitly; the old partial is preserved.");
+    }
     if(action==QueueAction::Pause) e.status=QueueStatus::Paused;
     else if(action==QueueAction::Cancel) e.status=QueueStatus::Cancelled;
     else { e.existing=action==QueueAction::Restart ? ExistingDownload::Restart : QFileInfo::exists(e.destination+".part.resume") ? ExistingDownload::Resume : ExistingDownload::New; e.status=QueueStatus::Queued; e.error.clear(); }
@@ -242,6 +246,7 @@ void QueueManager::schedule() {
         int host=0; for(const auto& [id,w]:workers_) if(entry(id).origin==e->origin) ++host;
         if(host>=std::min(settings_.perHost,settings_.hostConnections)) continue;
         auto w=std::make_unique<Worker>(); auto* mailbox=w.get();
+        if(e->existing==ExistingDownload::Resume){w->progress=e->progress;w->progress.stage=DownloadStage::Probe;w->progress.activeRanges=0;w->progress.smoothedBytesPerSecond=w->progress.instantaneousBytesPerSecond=0;}
         DownloadOptions options; options.url=e->url.toStdString(); options.destination=path(e->destination); options.existing=e->existing; options.control=&mailbox->control;
         options.requiredEtag=e->requiredEtag.toStdString();options.requiredResolvedUrl=e->requiredResolvedUrl.toStdString();options.requiredTotal=e->requiredTotal;
         options.automaticConnections=settings_.automatic; options.maxConnections=static_cast<std::uint32_t>(std::min(settings_.connections,std::max(1,settings_.hostConnections/settings_.perHost)));

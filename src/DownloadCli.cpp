@@ -129,7 +129,7 @@ int wmain(int argc, wchar_t* argv[]) {
         }
         if (jsonProgress || progress || pauseAfter) options.onProgress = [=](const downshift::DownloadProgress& p) {
             if (pauseAfter && p.stage == downshift::DownloadStage::Downloading &&
-                (p.verifiedBytes >= pauseAfter || (!p.resumable && p.downloadedBytes >= pauseAfter))) control.requestPause();
+                p.downloadedBytes >= pauseAfter) control.requestPause();
             if (jsonProgress) { progressJson(p); return; }
             if (!progress) return;
             std::cerr << std::fixed << std::setprecision(2) << p.downloadedBytes / 1048576.0 << " MiB, "

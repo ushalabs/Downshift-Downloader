@@ -9,12 +9,12 @@ function fixture(options={}) {
       f.log.push(request.command);if(f.offline || options.missing)throw Error();let state=f.receipt;
       if(request.command==="ping")state="ready";
       if(request.command==="prepare"){
-        assert(f.item.paused);if(options.prepareFails)throw Error();if(f.receipt==="unknown")f.receipt="prepared";state=f.receipt;
+        assert(options.direct || f.item.paused);if(options.prepareFails)throw Error();if(f.receipt==="unknown")f.receipt="prepared";state=f.receipt;
         if(options.completedDuringPrepare)f.item.state="complete";
         if(options.disableDuringPrepare)f.disablePromise=f.controller.configure(false);
       }
       if(request.command==="commit"){
-        assert.equal(f.item.error,"USER_CANCELED");assert.equal(request.browserCancelled,true);
+        if(options.direct){assert.equal(request.browserNotStarted,true);assert.equal(request.browserCancelled,undefined);}else{assert.equal(f.item.error,"USER_CANCELED");assert.equal(request.browserCancelled,true);}
         if(options.offlineAtCommit && !f.recovered){f.offline=true;throw Error();}
         if(f.receipt==="prepared"){f.receipt="committed";f.commits++;}state=f.receipt;
         if(options.lostCommit && !f.lost){f.lost=true;throw Error();}
@@ -51,4 +51,9 @@ for(const options of [{missing:true},{prepareFails:true},{cancelFails:true}]){
  if(!options.missing){await f.controller.configure(false);check(!f.item.paused,"Explicit off restores Chrome");}
 }
 {const f=fixture();f.api.strict=true;f.controller=new HandoffController(f.api);f.item.url="blob:unsupported";await f.controller.candidate(f.item);check(f.item.paused && f.saved.pending[1].phase==="blocked","Browser-only downloads held with explicit error");await f.controller.configure(false);check(!f.item.paused,"Off restores unsupported browser-only download");}
+{const f=fixture();f.api.erase=async()=>{assert.equal(f.receipt,'committed');f.log.push('erase');};await f.controller.candidate(f.item);check(f.log.indexOf('erase')>f.log.indexOf('commit'),'Erase only after acknowledged native commit');check(f.saved.cleanup.length===0,'Cleanup receipt drained');}
+{const f=fixture({lostCommit:true});let erased=0;f.api.erase=async()=>{erased++;};await f.controller.candidate(f.item);check(erased===0,'Uncertain commit retains Chrome recovery');await f.controller.reconcile();check(erased===1 && f.commits===1,'Recovery confirms ownership before erasing');}
+{const f=fixture({direct:true});await f.controller.direct('https://files.example/file.bin','file.bin');check(f.commits===1 && !f.log.includes('pause') && !f.log.includes('cancel'),'Direct link never starts or cancels Chrome');check(f.saved.direct.length===0,'Direct receipt finished');}
+{const f=fixture({direct:true,lostCommit:true});await f.controller.direct('https://files.example/file.bin','file.bin');check(f.commits===1 && f.saved.direct.length===0,'Direct lost acknowledgment reconciles without duplicate');}
+{const f=fixture({direct:true,prepareFails:true});await assert.rejects(f.controller.direct('https://files.example/file.bin','file.bin'));check(f.commits===0 && f.saved.direct.length===0 && !f.log.includes('cancel'),'Failed direct preparation leaves browser untouched');}
 console.log(`Extension state checks passed: ${checks}`);

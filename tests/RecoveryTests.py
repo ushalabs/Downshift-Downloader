@@ -171,6 +171,33 @@ def main():
             assert all(r["if_match"] == '"version-1"' for r in server.records)
             pass_case("pause-resume-cross-process")
 
+            # Pause before the first assigned range completes, as on small slow
+            # Internet files. Retain prefixes rather than resetting progress.
+            server.configure(size=4*1048576,bps=2*1048576)
+            output=directory / "partial-range-pause.bin"
+            run(output,"--connections","1","--chunk-kib","4096","--pause-after-mib","1",expected=3)
+            record=inspect(output)
+            assert record["ranges"] and sum(b-a+1 for a,b in record["ranges"])>=1048576
+            assert all(b+1<record["total"] for a,b in record["ranges"])
+            server.configure(size=4*1048576,bps=8*1048576)
+            metrics=run(output,"--resume")
+            assert metrics["recovered_bytes"]>=1048576
+            no_reused_ranges(record,server.records)
+            pass_case("pause-retains-incomplete-range-prefix")
+
+            server.configure(size=16*1048576,bps=2*1048576)
+            output=directory / "parallel-prefix-pause.bin"
+            paused=run(output,"--connections","4","--chunk-kib","4096","--pause-after-mib","1",expected=3)
+            samples=[json.loads(line) for line in paused.stderr.splitlines() if line.startswith('{')]
+            record=inspect(output)
+            retained=sum(b-a+1 for a,b in record["ranges"])
+            assert retained>=max(sample['downloaded_bytes'] for sample in samples), "Parallel paused prefixes were discarded"
+            server.configure(size=16*1048576,bps=16*1048576)
+            metrics=run(output,"--resume")
+            assert metrics["recovered_bytes"]==retained
+            no_reused_ranges(record,server.records)
+            pass_case("pause-retains-all-parallel-prefixes")
+
             output, record = pause("repeated-pause")
             server.configure()
             run(output, "--resume", "--pause-after-mib", "8", expected=3)

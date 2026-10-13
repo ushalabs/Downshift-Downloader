@@ -36,7 +36,11 @@ void validate(const QJsonObject& request) {
         if(!request.value("title").isString() || request.value("title").toString().size()>200 || request.value("title").toString().contains(QChar(0)))fail();
     }else if(command=="commit" || command=="abort" || command=="status"){
         allowed.insert("key");if(!hexadecimal(request.value("key").toString()))fail();
-        if(command=="commit"){allowed.unite({"browserCancelled","prompt"});if(request.value("browserCancelled")!=QJsonValue(true) || (request.contains("prompt") && !request.value("prompt").isBool()))fail();}
+        if(command=="commit"){
+            allowed.unite({"browserCancelled","browserNotStarted","prompt"});
+            const bool cancelled=request.value("browserCancelled")==QJsonValue(true),notStarted=request.value("browserNotStarted")==QJsonValue(true);
+            if(cancelled==notStarted || (request.contains("browserCancelled") && !request.value("browserCancelled").isBool()) || (request.contains("browserNotStarted") && !request.value("browserNotStarted").isBool()) || (request.contains("prompt") && !request.value("prompt").isBool()))fail();
+        }
     }else if(command!="ping" && command!="open" && command!="blocked")fail();
     for(auto i=request.begin();i!=request.end();++i)if(!allowed.contains(i.key()))fail();
 }

@@ -129,6 +129,8 @@ void performance() {
     fixed.observe(1, 0, true, true);
     require(fixed.target() == 16 && fixed.changes() == 0, "Manual mode was modified.");
     require(AdaptiveController(1, 16, true).target() == 1, "Tiny file opened excess connections.");
+    require(AdaptiveController(4*1024*1024,16,true).target()==8,"Small Internet file did not open its bounded initial pool.");
+    require(AdaptiveController(4*1024*1024,3,true).target()==3,"Small file ignored the configured connection limit.");
     require(gain.chunkSize(1, 0) == 256 * 1024 && gain.chunkSize(1e12, 1) == 16 * 1024 * 1024, "Chunk limits failed.");
     require(gain.chunkSize(8 * 1024 * 1024, 0.2) > gain.chunkSize(8 * 1024 * 1024, 0), "Latency was not considered in sizing.");
 }

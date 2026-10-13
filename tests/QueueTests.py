@@ -88,9 +88,11 @@ def main():
         # Per-download cap, pause/recovery, cancellation, removal preserves files.
         slow=d.call("add",url=url,destination=str(root/"slow.bin"),speedLimit=str(256*1024))["id"]
         wait(d,lambda rows:any(r["id"]==slow and int(r["downloaded"])>100000 for r in rows))
-        d.call("action",id=slow,action=1); wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==2)
+        d.call("action",id=slow,action=1); paused=wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==2)
+        retained=int(next(r for r in paused if r["id"]==slow)["verified"]);assert retained>0;checks+=1
         assert (root/"slow.bin.part").exists(); checks+=1
-        d.call("action",id=slow,action=0); wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==1)
+        d.call("action",id=slow,action=0); resumed=wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==1)
+        assert int(next(r for r in resumed if r["id"]==slow)["downloaded"])>=retained;checks+=1
         d.call("action",id=slow,action=2); wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==5)
         d.call("action",id=slow,action=4); assert (root/"slow.bin.part").exists(); checks+=2
         d.call("action",id=ids[0],action=4); assert (root/"file0.bin").exists(); checks+=1

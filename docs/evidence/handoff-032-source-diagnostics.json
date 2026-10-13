@@ -1,0 +1,289 @@
+{
+  "url": "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-723.exe",
+  "referenceCurl": {
+    "httpStatus": 206,
+    "bytes": 1048576,
+    "seconds": 50.074675,
+    "bytesPerSecond": 20940
+  },
+  "native": [
+    {
+      "connections": 2,
+      "exitCode": 1,
+      "seconds": 60.78099999995902,
+      "final": {
+        "stage": 1,
+        "downloaded_bytes": 786432,
+        "network_bytes": 786432,
+        "verified_bytes": 0,
+        "elapsed_seconds": 60.6916974,
+        "instant_bps": 0,
+        "smoothed_bps": 26574.86207059651,
+        "average_bps": 12957.818510444231,
+        "active_ranges": 2,
+        "target_connections": 2,
+        "chunk_bytes": 962278,
+        "recovered_bytes": 0,
+        "resumable": true,
+        "total_bytes": 3849112,
+        "eta_seconds": 115.24725855072909
+      }
+    },
+    {
+      "connections": 8,
+      "exitCode": 3,
+      "seconds": 32.5,
+      "final": {
+        "stage": 4,
+        "downloaded_bytes": 1368032,
+        "network_bytes": 1368032,
+        "verified_bytes": 1368032,
+        "elapsed_seconds": 32.44328,
+        "instant_bps": 2708548.831814441,
+        "smoothed_bps": 199559.67318202456,
+        "average_bps": 42166.88324978239,
+        "active_ranges": 0,
+        "target_connections": 8,
+        "chunk_bytes": 262144,
+        "recovered_bytes": 0,
+        "resumable": true,
+        "total_bytes": 3849112,
+        "eta_seconds": 12.43277241558183
+      }
+    }
+  ],
+  "scope": "Diagnostic observations only: two/eight-connection runs differed in outcome and overlapped real YouTube traffic. Reference curl and native source were the same public WinRAR URL. Not a controlled speed comparison or ISP-capacity test.",
+  "subsequentAttempts": [
+    {
+      "logSha256": "50c4a421be07485ba4567f890f439510d26a693b498ba710ca96e64cf17b0854",
+      "records": [
+        {
+          "exitCode": 3,
+          "seconds": 52.907000000122935,
+          "final": {
+            "stage": 4,
+            "downloaded_bytes": 1411472,
+            "network_bytes": 1411472,
+            "verified_bytes": 1411472,
+            "elapsed_seconds": 52.8543619,
+            "instant_bps": 5092705.380448492,
+            "smoothed_bps": 207961.6646575357,
+            "average_bps": 26704.929342832536,
+            "active_ranges": 0,
+            "target_connections": 8,
+            "chunk_bytes": 262144,
+            "recovered_bytes": 0,
+            "resumable": true,
+            "total_bytes": 3849112,
+            "eta_seconds": 11.721583417858401
+          }
+        },
+        {
+          "exitCode": 1,
+          "seconds": 24.405999999959022,
+          "final": {
+            "stage": 1,
+            "downloaded_bytes": 1751436,
+            "network_bytes": 339964,
+            "verified_bytes": 1489292,
+            "elapsed_seconds": 24.2371854,
+            "instant_bps": 0,
+            "smoothed_bps": 28511.88344539969,
+            "average_bps": 14026.546168186673,
+            "active_ranges": 8,
+            "target_connections": 8,
+            "chunk_bytes": 262144,
+            "recovered_bytes": 1411472,
+            "resumable": true,
+            "total_bytes": 3849112,
+            "eta_seconds": 73.57198986931374
+          }
+        },
+        {
+          "stage": 1,
+          "downloaded_bytes": 1751436,
+          "network_bytes": 339964,
+          "verified_bytes": 1489292,
+          "elapsed_seconds": 23.9583747,
+          "instant_bps": 249066.8922619222,
+          "smoothed_bps": 32776.97585836073,
+          "average_bps": 14189.777238937664,
+          "active_ranges": 8,
+          "target_connections": 8,
+          "chunk_bytes": 262144,
+          "recovered_bytes": 1411472,
+          "resumable": true,
+          "total_bytes": 3849112,
+          "eta_seconds": 63.998460659235164
+        },
+        {
+          "stage": 1,
+          "downloaded_bytes": 1751436,
+          "network_bytes": 339964,
+          "verified_bytes": 1489292,
+          "elapsed_seconds": 24.2371854,
+          "instant_bps": 0,
+          "smoothed_bps": 28511.88344539969,
+          "average_bps": 14026.546168186673,
+          "active_ranges": 8,
+          "target_connections": 8,
+          "chunk_bytes": 262144,
+          "recovered_bytes": 1411472,
+          "resumable": true,
+          "total_bytes": 3849112,
+          "eta_seconds": 73.57198986931374
+        }
+      ],
+      "success": false,
+      "error": "Timeout",
+      "scope": "Development Internet attempt; no completed final file claimed"
+    },
+    {
+      "logSha256": "0f664b4548bf877a8138397cb8c124d5352b7ae7b2ebe40ba969a7fa43b129c7",
+      "records": [
+        {
+          "exitCode": 3,
+          "seconds": 64.98499999986961,
+          "final": {
+            "stage": 4,
+            "downloaded_bytes": 1137277,
+            "network_bytes": 1268349,
+            "verified_bytes": 1137277,
+            "elapsed_seconds": 64.9430837,
+            "instant_bps": 880642.0771402327,
+            "smoothed_bps": 120554.65414355377,
+            "average_bps": 19530.16284011164,
+            "active_ranges": 0,
+            "target_connections": 8,
+            "chunk_bytes": 262144,
+            "recovered_bytes": 0,
+            "resumable": true,
+            "total_bytes": 3849112,
+            "eta_seconds": 22.49465206686096
+          }
+        },
+        {
+          "exitCode": 1,
+          "seconds": 174.31199999991804,
+          "final": {
+            "stage": 1,
+            "downloaded_bytes": 2124408,
+            "network_bytes": 1970171,
+            "verified_bytes": 1993336,
+            "elapsed_seconds": 173.8658065,
+            "instant_bps": 0,
+            "smoothed_bps": 0.0003852237620410618,
+            "average_bps": 11331.561045040791,
+            "active_ranges": 6,
+            "target_connections": 8,
+            "chunk_bytes": 262144,
+            "recovered_bytes": 1137277,
+            "resumable": true,
+            "total_bytes": 3849112,
+            "eta_seconds": 4477148530.147422
+          }
+        },
+        {
+          "stage": 1,
+          "downloaded_bytes": 2124408,
+          "network_bytes": 1970171,
+          "verified_bytes": 1993336,
+          "elapsed_seconds": 173.5399881,
+          "instant_bps": 0,
+          "smoothed_bps": 0.0004533813327680949,
+          "average_bps": 11352.83585973693,
+          "active_ranges": 6,
+          "target_connections": 8,
+          "chunk_bytes": 262144,
+          "recovered_bytes": 1137277,
+          "resumable": true,
+          "total_bytes": 3849112,
+          "eta_seconds": 3804091336.248703
+        },
+        {
+          "stage": 1,
+          "downloaded_bytes": 2124408,
+          "network_bytes": 1970171,
+          "verified_bytes": 1993336,
+          "elapsed_seconds": 173.8658065,
+          "instant_bps": 0,
+          "smoothed_bps": 0.0003852237620410618,
+          "average_bps": 11331.561045040791,
+          "active_ranges": 6,
+          "target_connections": 8,
+          "chunk_bytes": 262144,
+          "recovered_bytes": 1137277,
+          "resumable": true,
+          "total_bytes": 3849112,
+          "eta_seconds": 4477148530.147422
+        }
+      ],
+      "success": false,
+      "error": "Timeout",
+      "scope": "Development Internet attempt; no completed final file claimed"
+    },
+    {
+      "logSha256": "2134acf6671a6efbdef0196ed95eb92f9edfd6aecb1f0c96bd59555550d2978f",
+      "records": [
+        {
+          "exitCode": 1,
+          "seconds": 176.0,
+          "final": {
+            "stage": 1,
+            "downloaded_bytes": 786432,
+            "network_bytes": 1441792,
+            "verified_bytes": 0,
+            "elapsed_seconds": 175.7888654,
+            "instant_bps": 0,
+            "smoothed_bps": 8643.061291893022,
+            "average_bps": 8201.839159262247,
+            "active_ranges": 8,
+            "target_connections": 8,
+            "chunk_bytes": 262144,
+            "recovered_bytes": 0,
+            "resumable": true,
+            "total_bytes": 3849112,
+            "eta_seconds": 354.35129944904105
+          }
+        },
+        {
+          "stage": 1,
+          "downloaded_bytes": 786432,
+          "network_bytes": 1441792,
+          "verified_bytes": 0,
+          "elapsed_seconds": 175.5247989,
+          "instant_bps": 0,
+          "smoothed_bps": 9862.997083316666,
+          "average_bps": 8214.178332837275,
+          "active_ranges": 8,
+          "target_connections": 8,
+          "chunk_bytes": 262144,
+          "recovered_bytes": 0,
+          "resumable": true,
+          "total_bytes": 3849112,
+          "eta_seconds": 310.5222453305341
+        },
+        {
+          "stage": 1,
+          "downloaded_bytes": 786432,
+          "network_bytes": 1441792,
+          "verified_bytes": 0,
+          "elapsed_seconds": 175.7888654,
+          "instant_bps": 0,
+          "smoothed_bps": 8643.061291893022,
+          "average_bps": 8201.839159262247,
+          "active_ranges": 8,
+          "target_connections": 8,
+          "chunk_bytes": 262144,
+          "recovered_bytes": 0,
+          "resumable": true,
+          "total_bytes": 3849112,
+          "eta_seconds": 354.35129944904105
+        }
+      ],
+      "success": false,
+      "error": "Timeout",
+      "scope": "Development Internet attempt; no completed final file claimed"
+    }
+  ]
+}

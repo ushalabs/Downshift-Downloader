@@ -18,13 +18,15 @@ const until=async(test,timeout=120000)=>{const end=Date.now()+timeout;while(Date
   assert.equal(await read(),'ready');
   const command=async value=>{service.stdin.write(value+'\n');return JSON.parse(await read());};
   const extension=path.join(repo,'extension');context=await chromium.launchPersistentContext(path.join(root,'profile'),{executablePath:chrome,headless:true,ignoreDefaultArgs:['--disable-extensions'],args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run']});
-  const page=await context.newPage();await page.goto('https://www.youtube.com/results?search_query=The+100+That+Changed+Pakistan+T20+Cricket',{waitUntil:'domcontentloaded',timeout:60000});
+  const page=await context.newPage();const searchReady=await page.goto('https://www.youtube.com/results?search_query=The+100+That+Changed+Pakistan+T20+Cricket',{waitUntil:'domcontentloaded',timeout:60000}).then(()=>true).catch(()=>false);
   const link=page.locator(`a#video-title[href*="${videoId}"]`).first();let spa=false;
-  if(await link.waitFor({state:'visible',timeout:15000}).then(()=>true).catch(()=>false)){
+  if(searchReady && await link.waitFor({state:'visible',timeout:15000}).then(()=>true).catch(()=>false)){
     await page.evaluate(()=>globalThis.__downshiftDocumentProbe='initial-search');await link.click();await page.waitForURL(`**/watch?v=${videoId}*`,{timeout:30000});
     spa=await page.evaluate(()=>globalThis.__downshiftDocumentProbe==='initial-search');
   }else await page.goto(`https://www.youtube.com/watch?v=${videoId}`,{waitUntil:'domcontentloaded',timeout:60000});
   await until(async()=>await page.locator('[data-downshift-video]').first().isVisible());
+  // A malformed player title link must not override the valid watch page.
+  const malformedPlayerTitle=await page.evaluate(()=>{const player=document.querySelector('.html5-video-player');if(!player)return false;let link=player.querySelector('a.ytp-title-link');if(!link){link=document.createElement('a');link.className='ytp-title-link';player.append(link);}link.href='https://www.youtube.com/watch?v=undefined';return true;});assert(malformedPlayerTitle);
   await page.screenshot({path:path.join(output,'youtube-player.png')});
   await page.locator('[data-downshift-video]').first().click({position:{x:65,y:17}});
   await until(async()=>{const tasks=await command('media');return tasks[0]?.ready;});
@@ -40,8 +42,8 @@ const until=async(test,timeout=120000)=>{const end=Date.now()+timeout;while(Date
   const info=JSON.parse(probe.stdout);assert(info.streams.some(s=>s.codec_type==='video' && s.height<=144));assert(info.streams.some(s=>s.codec_type==='audio'));assert(Math.abs(Number(info.format.duration)-713)<3);
   const digest=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   const fingerprint=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const sources=['extension/media.js','extension/video-button.js','src/gui/MediaDialog.cpp','src/gui/MainWindow.cpp','src/gui/Dialogs.cpp','src/core/DownloadQueue/QueueManager.cpp','tests/LiveYouTubeCheck.cjs'];
-  const report={url:`https://www.youtube.com/watch?v=${videoId}`,chromeVersion:context.browser().version(),sameDocumentNavigation:spa,qualities:task.qualities,selected:'144p',file,bytes:fs.statSync(file).size,sha256:digest,duration:Number(info.format.duration),streams:info.streams.map(s=>({codec_type:s.codec_type,codec_name:s.codec_name,width:s.width,height:s.height})),historyStatus:'Completed',nativeDriverSha256:fingerprint(driver),sources:Object.fromEntries(sources.map(file=>[file,fingerprint(path.join(repo,file))])),scope:'Real YouTube page, trusted extension-player click, actual native dialog, full video+audio transfer, merge, verified persisted completion and independent ffprobe/hash'};
+  const sources=['extension/media.js','extension/video-button.js','src/gui/MediaDialog.cpp','src/gui/MainWindow.cpp','src/gui/Dialogs.cpp','src/core/DownloadQueue/QueueManager.cpp','src/browser/PipeServer.cpp','src/core/DownloadEngine/DownloadEngine.cpp','src/core/ConnectionManager/AdaptiveController.h','tests/LiveYouTubeCheck.cjs'];
+  const report={url:`https://www.youtube.com/watch?v=${videoId}`,chromeVersion:context.browser().version(),sameDocumentNavigation:spa,malformedPlayerTitle,extensionVersion:JSON.parse(fs.readFileSync(path.join(repo,"extension/manifest.json"))).version,qualities:task.qualities,selected:'144p',file,bytes:fs.statSync(file).size,sha256:digest,duration:Number(info.format.duration),streams:info.streams.map(s=>({codec_type:s.codec_type,codec_name:s.codec_name,width:s.width,height:s.height})),historyStatus:'Completed',nativeDriverSha256:fingerprint(driver),sources:Object.fromEntries(sources.map(file=>[file,fingerprint(path.join(repo,file))])),scope:'Real YouTube page, trusted extension-player click, actual native dialog, full video+audio transfer, merge, verified persisted completion and independent ffprobe/hash'};
   fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));await command('media-shot '+path.join(output,'youtube-completed.bmp'));
   console.log('Full YouTube download verified:',file,'bytes:',report.bytes,'duration:',report.duration);
 }finally{

@@ -1,3 +1,17 @@
+# Downshift 0.3.2 reliability repair
+
+- Reject malformed YouTube player IDs and resolve a valid current watch page; return actual errors to the extension.
+- Capture trusted direct file links before Chrome starts. Remove owned cancelled fallback entries only after native confirmation.
+- Preserve validated, hashed partial ranges on Pause, and reuse them safely on Resume. Earlier pauses without checkpoints require explicit Restart.
+- Publish progress during paced callbacks, tune the initial connection pool for small ordinary files, and use fresh HTTP/1.1 on bounded transport retries.
+- Preserve downloads, encrypted history, category folders, per-download destinations and the compact pink desktop.
+
+Development users must reload the extension and refresh existing pages; its popup displays Version 0.3.2. Files remain in C:/Users/HP/Desktop/Projects/Downshift, with the existing Desktop shortcut. Public package/source verification is recorded after actual success in DEVELOPMENT_PROGRESS.md. Historical release tags/assets are immutable.
+
+Chrome interception cannot universally precede unknown/script-generated downloads. A displayed notification cannot always be suppressed. Server/network conditions limit throughput: the same slow WinRAR source independently delivered about 20 KB/s. This unsigned preview makes no 3 MB/s, universal YouTube/site or clean-VM guarantee. See CHROME.md, GENERAL_DOWNLOADS.md and TESTING.md for scope and evidence.
+
+---
+
 # Downshift 0.3.1 repair preview
 
 Windows 10/11 x64 portable preview with manual unpacked Chrome setup. This repair prioritizes the user's failed YouTube download; it preserves saved files and encrypted history.

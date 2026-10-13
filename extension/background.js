@@ -1,5 +1,5 @@
 import {HandoffController} from "./handoff.js";
-import {MediaSources} from "./media.js";
+import {MediaSources,publicUrl} from "./media.js";
 const mediaSources = new MediaSources();
 async function ensureApp() {
   const request = command=>chrome.runtime.sendNativeMessage("org.ushalabs.downshift",{version:1,command});
@@ -23,6 +23,7 @@ const controller=new HandoffController({
   },
   item:async id=>(await chrome.downloads.search({id}))[0],
   pause:id=>chrome.downloads.pause(id),resume:id=>chrome.downloads.resume(id),cancel:id=>chrome.downloads.cancel(id),
+  erase:id=>chrome.downloads.erase({id}),
   restart:item=>chrome.downloads.download({url:item.finalUrl || item.url,filename:(item.filename || "download.bin").split(/[\\/]/).pop(),conflictAction:"uniquify",saveAs:false})
 });
 const quiet=promise=>promise.catch(()=>{});
@@ -38,15 +39,28 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(sender.id!==chrome.runtime.id || !message || typeof message.type!=="string")return false;
   let task;
   if(message.type==="media") {
-    const url = mediaSources.resolve(message,sender);
-    if(!url) { reply({ok:false,error:"This player has no supported public video address."});return false; }
     task = (async()=>{
+      let current=message;
+      // Existing content scripts can outlive an extension update/navigation.
+      // For a top-level YouTube player also consult Chrome's current tab URL.
+      if(sender.frameId===0 && sender.tab?.id!==undefined){
+        try{const tab=await chrome.tabs.get(sender.tab.id);if(/(^|\.)youtube\.com$/.test(new URL(tab.url).hostname))current={...message,page:tab.url};}catch{}
+      }
+      const url=mediaSources.resolve(current,sender);
+      if(!url)throw Error("This player has no supported public video address. Refresh its video page and retry.");
       const opening = await controller.native("open");
       for(let attempt=0;attempt<8;attempt++) {
         try { return await controller.native("media",{url,title:String(message.title || "Video").slice(0,200)}); }
         catch(error) { if(opening.state!=="opening" || attempt===7)throw error;await new Promise(resolve=>setTimeout(resolve,400)); }
       }
     })();
+  }
+  else if(message.type==="link") {
+    const url=publicUrl(message.url);
+    if(!url || !publicUrl(sender.url) || sender.tab?.incognito){reply({ok:false,error:"This link cannot be captured."});return false;}
+    let pathName=new URL(url).pathname.split('/').pop();try{pathName=decodeURIComponent(pathName);}catch{}
+    const name=String(message.filename || pathName || "download.bin").split(/[\\/]/).pop().replace(/[<>:"|?*\x00-\x1f]/g,'_').slice(0,150);
+    task=controller.direct(url,name || "download.bin");
   }
   else if(message.type==="status")task=controller.status();
   else if(message.type==="configure")task=controller.configure(message.enabled);
@@ -55,6 +69,6 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   else if(message.type==="reconcile")task=controller.reconcile().then(()=>controller.status());
   else if(message.type==="retry")task=controller.retry().then(()=>controller.status());
   else return false;
-  task.then(value=>reply({ok:true,...value})).catch(()=>reply({ok:false,error:"Downshift is unavailable. Open the app and try again."}));return true;
+  task.then(value=>reply({ok:true,...value})).catch(error=>reply({ok:false,error:String(error?.message || "Downshift is unavailable. Open the app and try again.").slice(0,240)}));return true;
 });
 quiet(controller.reconcile());

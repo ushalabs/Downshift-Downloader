@@ -14,7 +14,9 @@ public:
     AdaptiveController(std::uint64_t total, std::uint32_t maximum, bool automatic)
         : maximum_(maximum), automatic_(automatic) {
         if (maximum == 0 || maximum > 16) throw std::invalid_argument("Invalid connection limit.");
-        const std::uint32_t initial = total <= 1024 * 1024 ? 1 : total < 32 * 1024 * 1024 ? 2 : 4;
+        // Small Internet files otherwise finish assigning two large ranges
+        // before a slow server gives the controller an opportunity to expand.
+        const std::uint32_t initial = total <= 1024 * 1024 ? 1 : total < 32 * 1024 * 1024 ? 8 : 4;
         target_ = automatic ? std::min(initial, maximum) : maximum;
     }
     [[nodiscard]] std::uint32_t target() const noexcept { return target_; }

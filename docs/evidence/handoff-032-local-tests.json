@@ -1,0 +1,46 @@
+{
+  "version": "0.3.2",
+  "environment": "Local Windows 11 x64 / MSVC",
+  "configurations": {
+    "release": {
+      "passed": 14,
+      "total": 14,
+      "seconds": 154.11,
+      "logSha256": "57c89af3a063a8f66fef7411c4c5ace3e6df76efa1caecfee1dccfa0a252dc4d",
+      "binaries": {
+        "Downshift.exe": "94bf444fbf4dab69a2598981da759ccc57927039de1861a0adda50aaaec014b9",
+        "DownshiftDownload.exe": "564b076a162ed4276ac206bf4e0dbdda6783d1c0914a5978f6be68c0f727f104",
+        "DownshiftNativeHost.exe": "752f45d159890971c4f7cbfb13f9f04f4fe2dc48c2d93d778a27f1d989557462",
+        "downshift_browser_tests.exe": "b923390c845a60ac984bca53ddb4ee8b55a53c42649cd6999e0b587d756f14f7"
+      }
+    },
+    "debug": {
+      "passed": 14,
+      "total": 14,
+      "seconds": 175.7,
+      "logSha256": "42ce81fd20439ed860ea301597f9e37cd3177f27b529bff10d23828820d6e31d",
+      "binaries": {
+        "Downshift.exe": "4ab7c3bc171b93ff00c6354b84bbc6c6b8ac40d6ff1f0455304462ff92840cb1",
+        "DownshiftDownload.exe": "f4787c0d976259ae990b03dfb2ef036e5ceaf20439cd94801a189c357dfac4c4",
+        "DownshiftNativeHost.exe": "623db32b507ebce5104aca671eedb8a5a9e88f88eb3893507d0af19ff9d7019a",
+        "downshift_browser_tests.exe": "bcd85d2307e5199c6757e301f59e5785e63538e61db4a03a0241f1a607c49251"
+      }
+    }
+  },
+  "sources": {
+    "CMakeLists.txt": "5c9295ad15fa8dc300a7f66ba50ffadc7744f06ca8412474233a7e01727ad37c",
+    "extension/background.js": "0b6e76af30cf8ef9711a6d9124fd217d1546557e0257eb6ebf18149f49384080",
+    "extension/handoff.js": "496e030f1a1459208e369be5a1a28177c803c6a4361c272762b6cfc9db667db4",
+    "extension/media.js": "3f551c6fc597b7945530796f0f417e6ddead756ec4046653e1d8ff141cf67e23",
+    "extension/file-links.js": "2a5a9ec2ef36135429360718689df90a54ec0a3196a7ed333b2dc393c2dadd65",
+    "extension/video-button.js": "01420b206a4b65904117c35c2db1438ef2b2ed69ec5655bbaa201b857b6c8f9c",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "de4f25df4bca7ff437ac8cbb59f05e5b0c24355697f1e851e1e3e0e60f739db7",
+    "src/core/DownloadQueue/QueueManager.cpp": "780a23430b8ce69c9ef53a672746b049059e497e259d5261d254e083cace4c02",
+    "src/core/ConnectionManager/AdaptiveController.h": "7b07f83a0b0d6ed034d03875361bdada63c55f158c2caf03fb6c078c540c0929",
+    "src/browser/PipeServer.cpp": "9e9e531697feb75135edef91db3f21bd08b0e95198f622a63f9e2d3c890192d2",
+    "src/browser/NativeProtocol.cpp": "7848d6531420648e488cacdeeabc44b070a80e2a78a20a70513ff38c6f66a85b",
+    "tests/RecoveryTests.py": "350b766d4a1cbccc032d9d732aeb957da6f52006cfdda20b0a85104faef545ad",
+    "tests/IntegrationTests.py": "70f9c51da7437463ff1f0e2446efd82ea02a100b01022a3b9d42049bf8f7c5d8"
+  },
+  "scope": "Complete controlled suites including actual media fixture downloads, TLS malformed HTTP/2 fallback, incomplete/parallel pause checkpoints and cross-process resume; no Internet or clean-VM performance claim"
+}

@@ -11,7 +11,7 @@ class ChromeHandler(Handler):
         if self.path.startswith("/video.mp4") and getattr(self.server,'media_file',None):
             payload=self.server.media_file.read_bytes();self.send_response(200);self.send_header('Content-Type','video/mp4');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith("/page"):
-            html=b'''<!doctype html><html><title>Downshift browser fixture</title><body><h1>Local download checks</h1><a id="public" href="/range?kind=public" download>Public file</a><a id="auth" href="/range?kind=auth" download>Authenticated file</a><a id="stream" href="/stream?kind=stream" download>Streaming file</a><a id="restart" href="/range?kind=restart" download>Worker restart file</a></body></html>'''
+            html=b'''<!doctype html><html><title>Downshift browser fixture</title><body><h1>Local download checks</h1><a id="public" href="/range?kind=public">Public file</a><a id="auth" href="/range?kind=auth">Authenticated file</a><a id="stream" href="/stream?kind=stream">Streaming file</a><a id="restart" href="/range?kind=restart">Worker restart file</a><a id="direct" href="/range?kind=direct" download="direct.bin">Direct file</a></body></html>'''
             self.send_response(200);self.send_header("Content-Type","text/html");self.send_header("Content-Length",str(len(html)));self.end_headers();self.wfile.write(html);return
         query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
         if query.get("kind")==["auth"] and "fixture_session=authorized" not in self.headers.get("Cookie",""):

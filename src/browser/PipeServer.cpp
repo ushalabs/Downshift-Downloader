@@ -59,7 +59,9 @@ QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) 
     if(command=="blocked"){open_();if(blocked_)blocked_();return {{"state","blocked"}};}
     if(command=="media"){
         if(!media_)throw std::runtime_error("Video downloads are unavailable in this application.");
-        media_(request.value("url").toString(),request.value("title").toString());return {{"state","video-dialog"}};
+        auto url=request.value("url").toString();
+        if(youtubeHost(QUrl(url).host())){url=youtubeVideo(url);if(url.isEmpty())throw std::runtime_error("This player has no valid YouTube video address. Refresh the video page and retry.");}
+        media_(url,request.value("title").toString());return {{"state","video-dialog"}};
     }
     const auto key=request.value("key").toString();
     if(command=="prepare") {

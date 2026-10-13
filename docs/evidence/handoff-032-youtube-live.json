@@ -1,0 +1,48 @@
+{
+  "url": "https://www.youtube.com/watch?v=HyfC9nZvIJM",
+  "chromeVersion": "155.0.8059.39",
+  "sameDocumentNavigation": true,
+  "malformedPlayerTitle": true,
+  "extensionVersion": "0.3.2",
+  "qualities": [
+    "Best available",
+    "1080p",
+    "720p",
+    "480p",
+    "360p",
+    "240p",
+    "144p"
+  ],
+  "selected": "144p",
+  "file": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\handoff-032-accepted-youtube\\run-Wy7ceY\\native\\Videos\\The 100 That Changed Pakistan T20 Cricket [HyfC9nZvIJM] [144p].mkv",
+  "bytes": 17905892,
+  "sha256": "2743cbd436b3a97229c9ccf634ca4b9efb34962e1ace60ce0459b9283ee04d0d",
+  "duration": 713.247,
+  "streams": [
+    {
+      "codec_type": "video",
+      "codec_name": "vp9",
+      "width": 256,
+      "height": 144
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac"
+    }
+  ],
+  "historyStatus": "Completed",
+  "nativeDriverSha256": "b923390c845a60ac984bca53ddb4ee8b55a53c42649cd6999e0b587d756f14f7",
+  "sources": {
+    "extension/media.js": "3f551c6fc597b7945530796f0f417e6ddead756ec4046653e1d8ff141cf67e23",
+    "extension/video-button.js": "01420b206a4b65904117c35c2db1438ef2b2ed69ec5655bbaa201b857b6c8f9c",
+    "src/gui/MediaDialog.cpp": "df38e04cbf1e3c0f272b349b4556f2848a537ddcf5fca63f21c508feb95f1126",
+    "src/gui/MainWindow.cpp": "38debdff7bb2f528688a802af75af2cd87c58e17a1e1fafb263d6b601b32637d",
+    "src/gui/Dialogs.cpp": "a87393a7955f79d914869f00a707698bbfbe71af11cf2bc3d909788ff246da4d",
+    "src/core/DownloadQueue/QueueManager.cpp": "780a23430b8ce69c9ef53a672746b049059e497e259d5261d254e083cace4c02",
+    "src/browser/PipeServer.cpp": "9e9e531697feb75135edef91db3f21bd08b0e95198f622a63f9e2d3c890192d2",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "de4f25df4bca7ff437ac8cbb59f05e5b0c24355697f1e851e1e3e0e60f739db7",
+    "src/core/ConnectionManager/AdaptiveController.h": "7b07f83a0b0d6ed034d03875361bdada63c55f158c2caf03fb6c078c540c0929",
+    "tests/LiveYouTubeCheck.cjs": "063650d5f68eaad4f0894b28afdda17b024b31d5e9c04089b7bfd8efa97fe545"
+  },
+  "scope": "Real YouTube page, trusted extension-player click, actual native dialog, full video+audio transfer, merge, verified persisted completion and independent ffprobe/hash"
+}

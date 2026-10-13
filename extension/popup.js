@@ -5,5 +5,5 @@ async function refresh(){display(await request({type:"status"}));}
 $("enabled").addEventListener("change",async()=>{await request({type:"configure",enabled:$("enabled").checked});await refresh();});
 $("open").addEventListener("click",async()=>{await request({type:"open"});await refresh();});
 $("leave").addEventListener("click",async()=>{await request({type:"leave"});await refresh();});
-$("retry").addEventListener("click",async()=>{await request({type:"reconcile"});await refresh();});
+$("retry").addEventListener("click",async()=>{await request({type:"retry"});await refresh();});
 refresh();

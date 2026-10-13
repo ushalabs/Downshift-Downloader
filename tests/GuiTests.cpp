@@ -33,6 +33,7 @@ int main(int argc,char** argv) {
     try {
         {
             downshift::QueueManager queue(database);downshift::MainWindow window(queue);window.show();wait([&]{return window.ready();});check(!window.current().settings.dark,"Light must be default");
+            check(window.width()<950 && window.height()<650,"Compact default window");check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact columns adapt");window.resize(1200,750);QApplication::processEvents();check(!window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Expanded window shows connection details");window.resize(860,570);
             last=std::chrono::steady_clock::now();measuring=true;
             widget<QPushButton>(window,"addButton")->click();auto* add=widget<QDialog>(window,"addDialog");
             widget<QLineEdit>(*add,"addUrl")->setText(url);widget<QLineEdit>(*add,"addDestination")->setText(file);widget<QLineEdit>(*add,"addSha256")->setText(sha);widget<QSpinBox>(*add,"addSpeedLimit")->setValue(256);widget<QPushButton>(*add,"addSubmit")->click();

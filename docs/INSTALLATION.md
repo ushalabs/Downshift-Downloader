@@ -89,4 +89,4 @@ The same immutable baseline governs transitive dependencies. Manifest versions f
 
 ## Chrome integration
 
-The Phase 7 extension and separate Native Messaging host are implemented. Follow [Chrome setup](CHROME.md): register the built host for your Windows account, load the project's extension folder in Chrome Developer mode, open Downshift, and enable the popup toggle. Local registration is explicit; simply building or opening the app does not install the extension or register the host. Installer integration remains Phase 9.
+The extension and separate Native Messaging host are implemented. Follow [Chrome setup](CHROME.md): register the built host for your Windows account, install the pinned local media helpers for video support, and load the project's extension folder in Chrome Developer mode. Supported file capture is on for fresh installs; check **Use Downshift for downloads** if an earlier off setting persists. Reload an existing extension and video tabs after upgrading to 0.2.0. Local registration is explicit; simply building or opening the app does not install the extension or register the host. Installer integration remains Phase 9.

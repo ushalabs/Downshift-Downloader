@@ -5,6 +5,7 @@
 #include <sddl.h>
 #include <QJsonDocument>
 #include <QSet>
+#include <QUrl>
 #include <vector>
 #include <algorithm>
 #include <cstring>
@@ -25,13 +26,18 @@ QJsonObject parse(const QByteArray& data) {if(data.isEmpty() || data.size()>maxi
 void validate(const QJsonObject& request) {
     if(request.value("version")!=QJsonValue(1) || !request.value("command").isString())fail();const auto command=request.value("command").toString();QSet<QString> allowed={"version","command"};
     if(command=="prepare"){
-        allowed.unite({"key","url","filename","total"});if(!hexadecimal(request.value("key").toString()))fail();
+        allowed.unite({"key","url","filename","total","mime"});if(!hexadecimal(request.value("key").toString()))fail();
+        if(request.contains("mime") && (!request.value("mime").isString() || request.value("mime").toString().size()>120 || request.value("mime").toString().contains(QChar(0))))fail();
         const auto url=request.value("url").toString(),name=request.value("filename").toString();if(url.isEmpty() || url.size()>32768 || url.contains(QChar(0)) || name.isEmpty() || name.size()>160 || name.contains(QChar(0)))fail();
         if(request.contains("total")){bool valid=false;const auto n=request.value("total").toString().toLongLong(&valid);if(!valid || n < -1)fail();}
+    }else if(command=="media"){
+        allowed.unite({"url","title"});const auto address=request.value("url").toString();const QUrl url(address);
+        if(address.isEmpty() || address.size()>32768 || address.contains(QChar(0)) || !url.isValid() || (url.scheme()!="https" && url.scheme()!="http") || url.host().isEmpty() || !url.userInfo().isEmpty())fail();
+        if(!request.value("title").isString() || request.value("title").toString().size()>200 || request.value("title").toString().contains(QChar(0)))fail();
     }else if(command=="commit" || command=="abort" || command=="status"){
         allowed.insert("key");if(!hexadecimal(request.value("key").toString()))fail();
-        if(command=="commit"){allowed.insert("browserCancelled");if(request.value("browserCancelled")!=QJsonValue(true))fail();}
-    }else if(command!="ping" && command!="open")fail();
+        if(command=="commit"){allowed.unite({"browserCancelled","prompt"});if(request.value("browserCancelled")!=QJsonValue(true) || (request.contains("prompt") && !request.value("prompt").isBool()))fail();}
+    }else if(command!="ping" && command!="open" && command!="blocked")fail();
     for(auto i=request.begin();i!=request.end();++i)if(!allowed.contains(i.key()))fail();
 }
 QJsonObject send(const QJsonObject& request) {

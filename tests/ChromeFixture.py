@@ -8,6 +8,8 @@ class ChromeHandler(Handler):
     def do_GET(self):
         import sys
         print("Chrome fixture request range="+str(self.headers.get("Range")),file=sys.stderr,flush=True)
+        if self.path.startswith("/video.mp4") and getattr(self.server,'media_file',None):
+            payload=self.server.media_file.read_bytes();self.send_response(200);self.send_header('Content-Type','video/mp4');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith("/page"):
             html=b'''<!doctype html><html><title>Downshift browser fixture</title><body><h1>Local download checks</h1><a id="public" href="/range?kind=public" download>Public file</a><a id="auth" href="/range?kind=auth" download>Authenticated file</a><a id="stream" href="/stream?kind=stream" download>Streaming file</a><a id="restart" href="/range?kind=restart" download>Worker restart file</a></body></html>'''
             self.send_response(200);self.send_header("Content-Type","text/html");self.send_header("Content-Length",str(len(html)));self.end_headers();self.wfile.write(html);return
@@ -29,5 +31,7 @@ class ChromeServer(ControlledServer):
     def __init__(self):
         super().__init__();self.RequestHandlerClass=ChromeHandler
 if __name__=="__main__":
+    import pathlib,sys
     server=ChromeServer();server.configure(4*1024*1024,per_connection_bps=1024*1024)
+    if len(sys.argv)>1:server.media_file=pathlib.Path(sys.argv[1])
     print(server.server_port,flush=True);server.serve_forever()

@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-13",
+  "releaseFullBeforeGuiRefinements": {
+    "log": "build/history-release-tests.log",
+    "passed": 14,
+    "seconds": 180.39
+  },
+  "releaseGuiAfterRetryFolderRefinements": {
+    "log": "build/history-final-release-targeted.log",
+    "passed": 4,
+    "seconds": 115.88
+  },
+  "finalDebugFull": {
+    "log": "build/history-debug-tests.log",
+    "passed": 14,
+    "seconds": 232.34
+  },
+  "finalReleaseMedia": {
+    "log": "build/history-final-release-media.log",
+    "guiChecks": 45,
+    "independentValidation": "Direct SHA-256; both saved MP4/merged DASH outputs contain audio/video and expected duration"
+  },
+  "sources": {
+    "src/core/DownloadQueue/QueueManager.h": "2befe7a85f82b0df1fda884f0515077f7e5dc5b1bf2fc5beefad0e4447f9837e",
+    "src/core/DownloadQueue/QueueManager.cpp": "4e3189ef5662875d6867c36ece8f2f1bdfeec100f4cb0408e78645ed75f5e520",
+    "src/gui/MainWindow.cpp": "4ff87681c6ec6ad2991d801bb739e6103a5a557e9c3658033a15ad24d188e343",
+    "src/gui/MainWindow.h": "2da050dca7ba00d560b634f52ea1795d56eba7847ec7745bb43313aea2de2d3b",
+    "src/gui/Dialogs.cpp": "a64a5a1396f66eb70cf379f7845f5bd82a36fea1d6fbf8544c245f9aea9c2c46",
+    "src/gui/MediaDialog.cpp": "2ffd3d4ed5fdd7877ffb2c25c4872b28f7f55cb94dc33f83e40811eb1a879214",
+    "src/gui/MediaDialog.h": "320e2b9ef2decbb9de057b6738d9b4ed0cea8bd7877135ce7972041736cd1a44",
+    "tests/MediaTests.cpp": "62302c9b02bf13631fba2894efbdd37b658671843744ab98856b2469b039b01f",
+    "tests/MediaIntegration.py": "fa89a50cf835af59e6e800ba5104d78c2b5d77a96dfc75fc1e15b738a60be395",
+    "tests/ChromeTests.cjs": "a0e5497c50e6649f4133287a5eb1d0b247b860e3364be0a1de5e797adfc640fe"
+  },
+  "executables": {
+    "build\\windows-msvc\\Release\\Downshift.exe": "2ec124cbfb4504bbb37b55614c3188cd85292d4c74a2d3f1cd6f2d60b3e5707e",
+    "build\\windows-msvc\\Release\\downshift_media_tests.exe": "cd94d3398be31c594408baf5de516c65f17b5c19766bdcaa15eca1bb7555f447",
+    "build\\windows-msvc\\Release\\downshift_browser_tests.exe": "0b16214d1f98e13ad93ec558ed6564d062d2f56e8f21909bd62b5d7f7b577e42",
+    "build\\windows-msvc\\Debug\\Downshift.exe": "b6a358b4d35201d7e3a3793bb2654ab88e333f9a1e1e457eb14eaafabaa68560",
+    "build\\windows-msvc\\Debug\\downshift_media_tests.exe": "1abce31d5a532f4e54a48f15caebbc9fa03eb5dc4919a942ddd59afb3cceadb3",
+    "build\\windows-msvc\\Debug\\downshift_browser_tests.exe": "f418778b6ce68b78024e4027a1f2a9df0344d5edd3adf76f3e711e8ae57365f0"
+  },
+  "limits": [
+    "Earlier specific missing video and manually chosen destination remain unidentified.",
+    "No reconstruction of previously unrecorded video history.",
+    "Container/stream verification is not full decoding or a trusted-source checksum.",
+    "No packaging, Git mutations, public video transfer or speed benchmark."
+  ],
+  "excludedDiagnostics": [
+    "Early targeted invocation overlapped initial build.",
+    "Initial Chrome run stalled while normal app owned exclusive user pipe.",
+    "Intermediate compile diagnostic: constructor folder parameter clashed with layout variable; fixed before accepted builds."
+  ]
+}

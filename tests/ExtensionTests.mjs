@@ -3,7 +3,7 @@ import {HandoffController,eligible} from "../extension/handoff.js";
 let checks=0;
 function fixture(options={}) {
   const f={saved:{enabled:true,pending:{},bypass:[]},item:{id:1,state:"in_progress",paused:false,url:"https://files.example/file.bin",filename:"C:\\Downloads\\file.bin",totalBytes:1048576,mime:"application/octet-stream",danger:"safe"},receipt:"unknown",log:[],commits:0,restarts:0,offline:false};
-  f.api={ownId:"own",key:()=>"0123456789abcdef0123456789abcdef",load:async()=>structuredClone(f.saved),save:async state=>{f.saved=structuredClone(state);assert(!JSON.stringify(state).includes("https://"));},item:async()=>structuredClone(f.item),
+  f.api={strict:false,chooseLocation:false,ownId:"own",key:()=>"0123456789abcdef0123456789abcdef",load:async()=>structuredClone(f.saved),save:async state=>{f.saved=structuredClone(state);assert(!JSON.stringify(state).includes("https://"));},item:async()=>structuredClone(f.item),
     pause:async()=>{f.log.push("pause");f.item.paused=true;},resume:async()=>{f.log.push("resume");f.item.paused=false;},cancel:async()=>{assert.equal(f.receipt,"prepared");f.log.push("cancel");if(options.cancelFails)throw Error();f.item.state="interrupted";f.item.error="USER_CANCELED";},restart:async()=>{f.log.push("restart");f.restarts++;},
     native:async request=>{
       f.log.push(request.command);if(f.offline || options.missing)throw Error();let state=f.receipt;
@@ -43,5 +43,12 @@ for(const options of [{missing:true},{prepareFails:true},{cancelFails:true},{com
 {
   const f=fixture({disableDuringPrepare:true});await f.controller.candidate(f.item);await f.disablePromise;check(f.receipt==="aborted" && !f.item.paused && !f.log.includes("cancel"),"Disable during preflight keeps Chrome");
 }
-for(const overrides of [{url:"blob:abc"},{url:"data:abc"},{filename:"installer.exe"},{filename:"script.ps1"},{mime:"text/html"},{danger:"dangerous"},{incognito:true},{byExtensionId:"own"},{totalBytes:10},{state:"complete"}])check(!eligible({...fixture().item,...overrides},"own"),"Unsupported browser download rejected");
+for(const overrides of [{url:"blob:abc"},{url:"data:abc"},{danger:"dangerous"},{incognito:true},{byExtensionId:"own"},{state:"complete"}])check(!eligible({...fixture().item,...overrides},"own"),"Unsupported browser download rejected");
+for(const overrides of [{filename:"installer.exe"},{filename:"script.ps1"},{totalBytes:10}])check(eligible({...fixture().item,...overrides},"own"),"Chrome-safe public files are candidates regardless of extension or size");
+for(const options of [{missing:true},{prepareFails:true},{cancelFails:true}]){
+ const f=fixture(options);f.api.strict=true;f.controller=new HandoffController(f.api);await f.controller.candidate(f.item);
+ check(f.commits===0 && f.item.paused,"Strict failure holds browser download");check(!f.log.includes("resume") && !f.restarts,"No Chrome fallback while enabled");
+ if(!options.missing){await f.controller.configure(false);check(!f.item.paused,"Explicit off restores Chrome");}
+}
+{const f=fixture();f.api.strict=true;f.controller=new HandoffController(f.api);f.item.url="blob:unsupported";await f.controller.candidate(f.item);check(f.item.paused && f.saved.pending[1].phase==="blocked","Browser-only downloads held with explicit error");await f.controller.configure(false);check(!f.item.paused,"Off restores unsupported browser-only download");}
 console.log(`Extension state checks passed: ${checks}`);

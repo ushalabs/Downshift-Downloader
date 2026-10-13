@@ -1,0 +1,135 @@
+{
+  "scope": "User-requested default browser capture and video controls before packaging",
+  "fullRegressionBeforeFinalGuiCleanup": {
+    "release": {
+      "groups": 14,
+      "seconds": 118.79,
+      "log": "build/video-release-tests.log",
+      "logSha256": "a47f1dff7a898c3f30d1b07194196126f638dfef9045e7f05b9f39299ab6950c"
+    },
+    "debug": {
+      "groups": 14,
+      "seconds": 130.47,
+      "log": "build/video-debug-tests.log",
+      "logSha256": "e592d282928a3e2c1332b6c5fa7ef70049383a4eb8f4a8a36e078a8c4f8f559c"
+    }
+  },
+  "finalRebuiltGuiChecks": {
+    "release": {
+      "groups": 4,
+      "seconds": 48.36,
+      "log": "build/video-final-release-targeted.log",
+      "logSha256": "b0c5b3f18e2c72b9fd581d1f15fcdedd454bf746e00d334e71b5b215a8467ec7"
+    },
+    "debug": {
+      "groups": 4,
+      "seconds": 39.62,
+      "log": "build/video-final-debug-targeted.log",
+      "logSha256": "7cdee2b980df0c0328d1f41dbe84a17833dc4a25625cc7d6af17c450a415a5e3"
+    }
+  },
+  "guiCleanup": "No synchronous helper file-existence probes on GUI; image/storyboard formats excluded from quality choices. Engine/queue/protocol unaffected.",
+  "mediaChecks": 19,
+  "mediaModelChecks": 18,
+  "browserNativeChecks": 30,
+  "handoffChecks": 29,
+  "realChromeChecksEach": 12,
+  "realChromeBuildStage": "Before final GUI-only cleanup; reports retain original tested fingerprints. Final affected GUI groups retested in both rebuilt configurations.",
+  "youtube": {
+    "videoId": "EEUVLOzuu8Q",
+    "formats": 154,
+    "maximumHeight": 1080,
+    "selectedStreamProbe": {
+      "ok": true,
+      "streams": [
+        {
+          "height": 1080,
+          "video": "av01.0.09M.08",
+          "audio": "none",
+          "status": 206,
+          "bytesRead": 1024
+        },
+        {
+          "height": null,
+          "video": "none",
+          "audio": "opus",
+          "status": 206,
+          "bytesRead": 1024
+        }
+      ]
+    },
+    "buttonVisible": true,
+    "screenshot": "assets/screenshots/youtube-player.png",
+    "scope": "Metadata and bounded GET availability plus visible real-site overlay; no whole-video Internet speed claim."
+  },
+  "finalBinaries": {
+    "build/windows-msvc/Release/Downshift.exe": "ecb22afaab8bc6bdcdeee2a78af3a82e862b6c310e08f788ec0e2ac5066f4588",
+    "build/windows-msvc/Debug/Downshift.exe": "90811a490d649d355df59d711258051ff63be883ef268c4869cfe456fe63f1a0",
+    "build/windows-msvc/Release/DownshiftNativeHost.exe": "c9eabe293037e90af1b2de4dc9769f6a40677ef30b5c22c18d0f6fc32c074d95",
+    "build/windows-msvc/Debug/DownshiftNativeHost.exe": "9d9eb9a7648d2161ffa341e8d4a3e138549e5e13aaa86c6c1ac33a7f3b0e4426"
+  },
+  "finalSources": {
+    "extension/background.js": "da70295825e47cfa73d42ffdb715bb16e0a0fcf8cd4610d529d1ec0f57de01e2",
+    "extension/handoff.js": "92721b471fdb420b20b615e6d85c6b370eade799fb4609e9f18f28b832d5164f",
+    "extension/manifest.json": "24ca48675adc193acce14444070bb731019315a4a7b7979cc22f41900865cb81",
+    "extension/media.js": "3c10f11aeb396f84c756e22a4227bdbd2d1a1bdf1d334f6da3a430f98c75e6d0",
+    "extension/package.json": "a90fc33418afa2b9cbf4768524b021135b965ecdf993457505bfae3ac44a8428",
+    "extension/popup.css": "e8f9ea1bc832912e0b58161629c08e4e134ef6bb12461bb8d826c60706537c75",
+    "extension/popup.html": "b679927fb973caa8e0bf27801b62cd8f523b6879e4c370f332e0921c11e63951",
+    "extension/popup.js": "dc02cc197947696f6b5611a7de707b9a1f2878b2bda6903503afc6998d6cef2c",
+    "extension/video-button.js": "7eb429530f250be81c6842ce19ffe1f681c22c50cafee49a84aa620628072f47",
+    "src/DownloadCli.cpp": "867b4e232e4b87f80ff55643b10b5e20ebe1d7deacc522dc3d330fd5eeafd5e6",
+    "src/browser/NativeHost.cpp": "99c1ee1f512f7d1938619b95f6b534ed61dcac275ddfdd1b89d1989661068983",
+    "src/browser/NativeProtocol.cpp": "5bff658304c2b6b9090ae35040b61537df63693c12c5be05f4487536567e0dc1",
+    "src/browser/NativeProtocol.h": "973bb85d303fb476a7c08ee5777891e8ac1e5c9b13e13328b90ab0ea0b29df59",
+    "src/browser/PipeServer.cpp": "e7d494a3dc73ae61019410c358ec8baed8651cbe15d56330cbf0f3cad78c3417",
+    "src/browser/PipeServer.h": "ed55e218ed5af4e31c7df62557d4b9ab74ae87685fa415387971806123f67694",
+    "src/core/ConnectionManager/AdaptiveController.h": "5d848adbac3cca1a89d51d511bcd171f8cf2ba627d63d986035e5937b9812f1b",
+    "src/core/ConnectionManager/RetryPolicy.h": "2f34e02456963dfb90784b58d40cb1cbea9c48f89e5bd2645a4639437e7d8735",
+    "src/core/ConnectionManager/SpeedTracker.h": "1a538de6e43820a70ef129b3fe713b49c3dcc8b75cb2e435a7391e626fad0923",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "e5ac39752a7c94af9662a60c5afc50de94926b11ef2cf846d99372b1e7e95fbe",
+    "src/core/DownloadEngine/DownloadEngine.h": "21d2d18528b3bf02da29c5115af21cea85ced7a6f739a484ae52c2091a9fc756",
+    "src/core/DownloadEngine/HttpResponse.cpp": "18d4ad3eb927520bf39123de13eed4f5cc470ca89997c05c2a8212187308f10e",
+    "src/core/DownloadEngine/HttpResponse.h": "2fddfdd2e3a4e6474069a96e6028470a1ed8cd55861e05358a27d0c96d3d5ade",
+    "src/core/DownloadQueue/QueueManager.cpp": "aa17b1834889038077011ad1fae8543f6d42ba1cffb1f2bfdf896062cc6e9e43",
+    "src/core/DownloadQueue/QueueManager.h": "b3a84d2bf62097c02241d8d6755f258bee313dfb43919f5137b3b3975f723368",
+    "src/core/FileWriter/FileWriter.cpp": "978defa36f71c5b8c265d46d24f215c61000b67d5f4f4d9e814fdc712a3fc188",
+    "src/core/FileWriter/FileWriter.h": "c1eedd3f96784d04bbe8279ac7670c59410a571fbfad4d21a2ca494371e1fd7f",
+    "src/core/ResumeManager/ResumeJournal.cpp": "8b336201722a6a063728d948e3e3d7c2cf44e8b1679bcf23d06658b36529b06a",
+    "src/core/ResumeManager/ResumeJournal.h": "9a7c4aa999a37f526437d4efef03be1ab6dac8d246419c16fe5e08695b579134",
+    "src/core/Runtime.cpp": "9ad1dd47c0ea0517f30e674fc49cdf95cdd395ec1feff9dc5ab8dd348121d4a6",
+    "src/core/Runtime.h": "b920aa34f8f6902ddb2d999f680deb4f472edffbf9d2c529f7ca5f26a42a605f",
+    "src/core/SegmentScheduler/SegmentScheduler.h": "139fc9e4a0a3647a7c93eac2f8728d2bdcad2809570c211c7bb59d892f4b826b",
+    "src/database/QueueStore.cpp": "c75de05804e13e94c6ba9feea95df044a4b2cb5f7c89d37d624d208dd5270c76",
+    "src/database/QueueStore.h": "9b85725de8ad4497325415a02be7ea1bdef701342db1898c479f71773d1f41ba",
+    "src/gui/Dialogs.cpp": "6831555136aba023880c75a2b16270925bd68416aee68d52a780060e9d312823",
+    "src/gui/MainWindow.cpp": "6c635ca1fbd91ab49f29309937d5db2c8e708c5616fef0d34f02dfe75db047d6",
+    "src/gui/MainWindow.h": "88ffed25f9e4beff12cc611eb1caaae95249d188431327c3965b4c25f5e5f38a",
+    "src/gui/MediaDialog.cpp": "432f56e89f67418a4321c9e0df7bf63567013b3e06f248bfa5786f64bfd9f11e",
+    "src/gui/MediaDialog.h": "c8c968faacfd83b2efb2ecf9319da1fab139e6b7c4e666229850d43a4462dd03",
+    "src/main.cpp": "c82b6199ba8e3efb28137dfcdf8213af73c5d7156a71321c357b9ab72b066752",
+    "tests/BrowserDriver.cpp": "4f590d87d61491c60ac878d1f029049c9463820020d89c74346f70c3e04c0a96",
+    "tests/BrowserTests.py": "cc513df22b58dc9825eebf7754c14033e69bfd31eacf5fc225a210564dd8902e",
+    "tests/BufferedTests.py": "7251db921cf039ce6bbf959b6b9f66cbe5d544e49d5dae5856d756ab030f6183",
+    "tests/ChromeFixture.py": "8b501d724fd75e222244f6bbe660cdca6e39669751a8ea43c943164b752ec339",
+    "tests/ChromeRegistry.py": "0b2cb1d95a56626e1bf56704272fc9daa019cd82746769e11d5eed61e6e0c5fc",
+    "tests/ChromeTests.cjs": "e380d1aa2985a06288c4f556b71f3bf2e7205dfca98e9cc53edfa929a095c5dd",
+    "tests/EngineTests.cpp": "e053e7515391637435eae8e1688bfa7c0e432d92d278aaca7f30e58fa706d367",
+    "tests/ExtensionTests.mjs": "6d22a4813356216091069a4caa6402ef3c2d22ce0091f7b8fd6fd971e099abf8",
+    "tests/FoundationTests.cpp": "090d0ced954541859d12502051a6db0c732221c50d3e0b7a783b7128c494821d",
+    "tests/GuiIntegration.py": "bd215006ab48be34a1722549c83c62f1b275e756a1e9661f9b92aea5986c3695",
+    "tests/GuiTests.cpp": "ea8a7e09422fb7e0c76c10e5f8ad855beb857c413f7fc7551fed8e617e839c52",
+    "tests/IntegrationTests.py": "3aefbb7acee5b19796c1f2cb226d85b50b2211ecb3dec0f7f2aecbdea6bef93c",
+    "tests/MediaExtensionTests.mjs": "a4d008399a31586fcb36005ac18b91269553b08745dc5b5b3f514c3377e3b0ee",
+    "tests/MediaIntegration.py": "bb1910bceb1e402e7c2ac28d2fb52916756113ea09de9a3a771dbfc2f18da26a",
+    "tests/MediaTests.cpp": "1e64f1bb8d7219971e0d7606dca8b74127270a9ac3239b3afd5a7ee03a262551",
+    "tests/PerformanceServer.py": "c2dd46b73ee9a9aa5e5154e3eea49daaebb096ee36ec2a51c8abef18e51674ac",
+    "tests/PerformanceTests.py": "99c3b3db2926222338bbeff2094994e4ed5e9b14c4b743f116b287f33e04e028",
+    "tests/QueueDriver.cpp": "4ccf496e91b5575eec59e640c12d6423512584d01a069edbbf414fe3a19c227e",
+    "tests/QueueTests.py": "d9d39c8c6103107e053c0f885b2899f09d7b6cb372825d572a23794078b60ad3",
+    "tests/RecoveryTests.py": "0d3e8f87f652ebdfdd0da35819a37b32a99448dd4f1ad6a03eab84f03e981c6f"
+  },
+  "gitOperations": "None; uncommitted on user main branch",
+  "packaging": "Unstarted",
+  "ci": "Not executed"
+}

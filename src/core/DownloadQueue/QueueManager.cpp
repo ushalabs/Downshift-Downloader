@@ -1,4 +1,5 @@
 #include "QueueManager.h"
+#include "Categories.h"
 #include "database/QueueStore.h"
 #include "core/FileWriter/FileWriter.h"
 #include "core/ResumeManager/ResumeJournal.h"
@@ -47,11 +48,13 @@ QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
     return s;
 }
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
+    {"media",media},{"mediaTitle",mediaTitle},{"mediaFolder",mediaFolder},
     {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"},
     {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)},
     {"handoffKey",handoffKey},{"requiredEtag",requiredEtag},{"requiredResolvedUrl",requiredResolvedUrl},{"requiredTotal",requiredTotal ? QString::number(*requiredTotal):QString()}}; }
 QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString(); e.origin=downshift::origin(e.url);
+    e.media=o.value("media").toBool();e.mediaTitle=o.value("mediaTitle").toString();e.mediaFolder=o.value("mediaFolder").toString();
     e.error=o.value("error").toString(); e.sha256=o.value("sha256").toString(); e.status=static_cast<QueueStatus>(o.value("status").toInt(-1)); e.priority=o.value("priority").toInt();
     e.created=o.value("created").toString().toLongLong(); e.updated=o.value("updated").toString().toLongLong(); e.existing=static_cast<ExistingDownload>(o.value("existing").toInt(-1)); e.speedLimit=o.value("speedLimit").toString().toULongLong();
     e.progress.downloadedBytes=o.value("downloaded").toString().toULongLong(); e.progress.verifiedBytes=o.value("verified").toString().toULongLong();
@@ -103,7 +106,8 @@ void QueueManager::run() {
         for(const auto& row:store_->load()) {
             auto e=QueueEntry::fromJson(object(row));
             if(!e.handoffKey.isEmpty() && (!receipts_.contains(e.handoffKey) || receipts_.at(e.handoffKey).value("downloadId")!=e.id))invalid("Missing or mismatched browser handoff receipt.");
-            if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
+            if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to continue in a video window.";save(e);}
+            else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
             if(std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.id==e.id;})) invalid("Duplicate database download IDs.");
             entries_.push_back(std::move(e));
         }
@@ -135,6 +139,8 @@ std::future<QString> QueueManager::add(QString url,QString dest,int priority,boo
     return submit([this,url=std::move(url),dest=std::move(dest),priority,start,sha256=std::move(sha256),speedLimit] {
         if(entries_.size()>=10000 || priority < -1 || priority > 1 || speedLimit > 10ULL*1024*1024*1024) invalid("Queue limit or invalid download options.");
         QueueEntry e; e.url=url; e.origin=origin(url); e.destination=destination(dest); e.sha256=sha256.toLower();
+        const auto parent=QFileInfo(e.destination).absolutePath();
+        for(const auto& category:QStringList{"Videos","Audios","Zip","Programs"})if(parent.compare(QDir(settings_.directory).filePath(category),Qt::CaseInsensitive)==0 && !QDir().mkpath(parent))invalid("The category folder could not be created.");
         if(!e.sha256.isEmpty() && (e.sha256.size()!=64 || std::any_of(e.sha256.begin(),e.sha256.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))) invalid("SHA-256 must contain 64 hexadecimal characters.");
         for(const auto& old:entries_) if(old.destination.compare(e.destination,Qt::CaseInsensitive)==0) invalid("A download already owns this destination. Choose a different filename.");
         if(QFileInfo::exists(e.destination) || QFileInfo::exists(e.destination+".part") || QFileInfo::exists(e.destination+".part.resume")) invalid("The destination or its partial already exists. Choose a different filename.");
@@ -144,6 +150,7 @@ std::future<QString> QueueManager::add(QString url,QString dest,int priority,boo
 }
 std::future<void> QueueManager::action(QString id,QueueAction action) { return submit([this,id=std::move(id),action] {
     auto& e=entry(id); const auto worker=workers_.find(id);
+    if(e.media && (action!=QueueAction::Remove || e.status==QueueStatus::Running)) invalid("Use the video window to stop this task, or Retry video to retry it.");
     if(e.status==QueueStatus::Prepared) invalid("Chrome still owns this handoff. Leave it in Chrome or cancel the pending handoff.");
     if(!e.handoffKey.isEmpty() && receipts_.at(e.handoffKey).value("state")=="aborted" && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("This browser handoff was aborted. Add a fresh download link instead.");
     if(action==QueueAction::HighPriority || action==QueueAction::NormalPriority || action==QueueAction::LowPriority) { e.priority=action==QueueAction::HighPriority ? 1 : action==QueueAction::LowPriority ? -1 : 0; save(e); return; }
@@ -161,7 +168,7 @@ std::future<void> QueueManager::action(QString id,QueueAction action) { return s
     save(e);
 }); }
 std::future<void> QueueManager::rename(QString id,QString dest) { return submit([this,id=std::move(id),dest=std::move(dest)] {
-    auto& e=entry(id); if(workers_.contains(id) || e.status==QueueStatus::Completed || QFileInfo::exists(e.destination+".part")) invalid("Only an unstarted download can be renamed.");
+    auto& e=entry(id); if(e.media || workers_.contains(id) || e.status==QueueStatus::Completed || QFileInfo::exists(e.destination+".part")) invalid("Only an unstarted file download can be renamed.");
     const auto d=destination(dest); for(const auto& old:entries_) if(old.id!=id && old.destination.compare(d,Qt::CaseInsensitive)==0) invalid("Another download owns that destination.");
     if(QFileInfo::exists(d) || QFileInfo::exists(d+".part") || QFileInfo::exists(d+".part.resume")) invalid("The destination already exists.");
     e.destination=d; save(e);
@@ -182,6 +189,39 @@ std::future<void> QueueManager::configure(QueueSettings s) { return submit([this
     store_->settings(QJsonDocument(s.json()).toJson(QJsonDocument::Compact)); settings_=s; budget_->configure(s.speedLimit);
 }); }
 std::future<QueueSnapshot> QueueManager::snapshot() { return submit([this] { tick(); return QueueSnapshot{entries_,settings_,{}}; }); }
+std::future<QString> QueueManager::categoryFolder(QString filename,QString mime) {return submit([this,filename=std::move(filename),mime=std::move(mime)]{const auto folder=QDir(settings_.directory).filePath(downloadCategory(filename,mime));if(!QDir().mkpath(folder))invalid("The download category folder could not be created.");return folder;});}
+std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString title) {
+    return submit([this,url=std::move(url),folder=std::move(folder),title=std::move(title)] {
+        if(entries_.size()>=10000 || !QFileInfo(folder).isDir()) invalid("Select an existing video folder, or remove old history if it is full.");
+        QueueEntry e;e.url=url;e.origin=origin(url);e.media=true;e.mediaTitle=title.left(300);
+        e.mediaFolder=QFileInfo(folder).canonicalFilePath();e.destination=e.mediaFolder;
+        for(const auto& old:entries_)if(old.media && old.status==QueueStatus::Running && old.url==url && old.mediaFolder.compare(e.mediaFolder,Qt::CaseInsensitive)==0)invalid("This video is already downloading into that folder.");
+        e.id=QString::fromStdString(ResumeJournal::newId());e.status=QueueStatus::Running;e.created=QDateTime::currentSecsSinceEpoch();save(e);entries_.push_back(e);return e.id;
+    });
+}
+std::future<void> QueueManager::mediaProgress(QString id,DownloadProgress progress) {
+    return submit([this,id=std::move(id),progress] {auto& e=entry(id);if(e.media && e.status==QueueStatus::Running)e.progress=progress;});
+}
+std::future<void> QueueManager::finishMedia(QString id,QueueStatus status,QString file,QString error) {
+    return submit([this,id=std::move(id),status,file=std::move(file),error=std::move(error)] {
+        auto& e=entry(id);if(!e.media || e.status!=QueueStatus::Running)invalid("This video task is no longer active.");
+        if(status!=QueueStatus::Completed && status!=QueueStatus::Failed && status!=QueueStatus::Cancelled)invalid("Invalid video result.");
+        if(status==QueueStatus::Completed) {
+            // Completion is durable only for a nonempty, ordinary file in the chosen folder.
+            // The asynchronous ffprobe stage in MediaDialog verifies playable video first.
+            const auto d=destination(file);const QFileInfo info(d);
+            if(!info.isAbsolute() || info.absoluteDir().canonicalPath().compare(e.mediaFolder,Qt::CaseInsensitive)!=0 || info.suffix()=="part")invalid("No final video was saved in the chosen folder.");
+            for(const auto& old:entries_)if(!old.media && old.destination.compare(d,Qt::CaseInsensitive)==0)invalid("Another download owns this video filename.");
+            const auto handle=CreateFileW(path(d).c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+            if(handle==INVALID_HANDLE_VALUE)invalid("The final video file is missing or unavailable.");
+            BY_HANDLE_FILE_INFORMATION attributes{};LARGE_INTEGER size{};
+            const bool valid=GetFileInformationByHandle(handle,&attributes) && !(attributes.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)) && GetFileSizeEx(handle,&size) && size.QuadPart>0;
+            CloseHandle(handle);if(!valid)invalid("The final video is empty or is not a regular file.");
+            e.destination=d;e.progress.downloadedBytes=static_cast<std::uint64_t>(size.QuadPart);e.progress.totalBytes=e.progress.downloadedBytes;
+        }
+        e.status=status;e.error=error;e.progress.smoothedBytesPerSecond=0;e.progress.activeRanges=0;e.progress.etaSeconds.reset();save(e);
+    });
+}
 void QueueManager::tick() {
     for(auto i=workers_.begin();i!=workers_.end();) {
         auto& w=*i->second; auto& e=entry(i->first); bool done;
@@ -190,7 +230,7 @@ void QueueManager::tick() {
     }
 }
 void QueueManager::schedule() {
-    std::vector<QueueEntry*> pending; for(auto& e:entries_) if(e.status==QueueStatus::Queued) pending.push_back(&e);
+    std::vector<QueueEntry*> pending; for(auto& e:entries_) if(!e.media && e.status==QueueStatus::Queued) pending.push_back(&e);
     std::stable_sort(pending.begin(),pending.end(),[](auto* a,auto* b){return a->priority>b->priority;});
     for(auto* e:pending) {
         if(workers_.size()>=static_cast<std::size_t>(settings_.simultaneous)) break;
@@ -215,19 +255,20 @@ void QueueManager::schedule() {
         }); } catch(...) { workers_.erase(id); e->status=QueueStatus::Failed; e->error="Unable to create a download worker."; save(*e); }
     }
 }
-std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection) {
-    return submit([this,key=std::move(key),url=std::move(url),filename=std::move(filename),inspection=std::move(inspection)] {
+std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime) {
+    return submit([this,key=std::move(key),url=std::move(url),filename=std::move(filename),inspection=std::move(inspection),mime=std::move(mime)] {
         const auto hash=QString::fromLatin1(QCryptographicHash::hash(url.toUtf8(),QCryptographicHash::Sha256).toHex());
         if(const auto i=receipts_.find(key);i!=receipts_.end()) {if(i->second.value("urlHash")!=hash)invalid("This handoff key belongs to another request.");return QJsonObject{{"state",i->second.value("state")},{"downloadId",i->second.value("downloadId")}};}
         if(entries_.size()>=10000 || receipts_.size()>=10000)invalid("The browser handoff/history limit has been reached.");
         if(key.size()!=32 || std::any_of(key.begin(),key.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))invalid("Invalid handoff key.");
         if(filename.isEmpty() || filename.size()>160 || filename.contains('/') || filename.contains('\\') || filename=="." || filename=="..")invalid("Invalid browser filename.");
         QueueEntry e;e.id=QString::fromStdString(ResumeJournal::newId());e.url=url;e.origin=origin(url);e.handoffKey=key;e.status=QueueStatus::Prepared;e.created=QDateTime::currentSecsSinceEpoch();e.updated=e.created;
-        e.requiredEtag=QString::fromStdString(inspection.etag);e.requiredResolvedUrl=QString::fromStdString(inspection.resolvedUrl);e.requiredTotal=inspection.total;e.progress.totalBytes=inspection.total;e.progress.resumable=true;
+        e.requiredEtag=QString::fromStdString(inspection.etag);e.requiredResolvedUrl=QString::fromStdString(inspection.resolvedUrl);if(!inspection.etag.empty())e.requiredTotal=inspection.total;if(inspection.total)e.progress.totalBytes=inspection.total;e.progress.resumable=!inspection.etag.empty();
+        const auto folder=QDir(settings_.directory).filePath(downloadCategory(filename,mime));if(!QDir().mkpath(folder))invalid("The download category folder could not be created.");
         const QFileInfo name(filename); bool assigned=false;
         for(int index=0;index<1000;++index) {
             const auto candidate=index ? name.completeBaseName()+" ("+QString::number(index)+")"+(name.suffix().isEmpty() ? "":"."+name.suffix()):filename;
-            const auto dest=destination(QDir(settings_.directory).filePath(candidate));
+            const auto dest=destination(QDir(folder).filePath(candidate));
             if(QFileInfo::exists(dest) || QFileInfo::exists(dest+".part") || QFileInfo::exists(dest+".part.resume") || std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.destination.compare(dest,Qt::CaseInsensitive)==0;}))continue;
             e.destination=dest;assigned=true;break;
         }
@@ -238,12 +279,12 @@ std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString f
         receipts_.emplace(key,receipt);entries_.push_back(e);return QJsonObject{{"state","prepared"},{"downloadId",e.id}};
     });
 }
-std::future<QJsonObject> QueueManager::handoff(QString key,QString command) {return submit([this,key=std::move(key),command=std::move(command)] {
+std::future<QJsonObject> QueueManager::handoff(QString key,QString command,bool prompt) {return submit([this,key=std::move(key),command=std::move(command),prompt] {
     const auto i=receipts_.find(key);if(i==receipts_.end())return QJsonObject{{"state","unknown"}};
     auto receipt=i->second;const auto state=receipt.value("state").toString();const auto id=receipt.value("downloadId").toString();
     if(command!="status" && command!="commit" && command!="abort")invalid("Unsupported browser operation.");
     if(state=="prepared" && command!="status") {
-        auto e=entry(id);e.status=command=="commit" ? QueueStatus::Queued:QueueStatus::Cancelled;e.updated=QDateTime::currentSecsSinceEpoch();receipt["state"]=command=="commit" ? "committed":"aborted";
+        auto e=entry(id);e.status=command=="commit" ? (prompt ? QueueStatus::Paused:QueueStatus::Queued):QueueStatus::Cancelled;e.error=prompt && command=="commit" ? "Choose where to save this download.":QString();e.updated=QDateTime::currentSecsSinceEpoch();receipt["state"]=command=="commit" ? "committed":"aborted";
         try{store_->handoff(e.id,QJsonDocument(e.json()).toJson(QJsonDocument::Compact),key,QJsonDocument(receipt).toJson(QJsonDocument::Compact));}catch(...){fatal_=std::current_exception();throw;}
         entry(id)=e;i->second=receipt;
     }

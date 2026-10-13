@@ -1,6 +1,18 @@
 import {HandoffController} from "./handoff.js";
+import {MediaSources} from "./media.js";
+const mediaSources = new MediaSources();
+async function ensureApp() {
+  const request = command=>chrome.runtime.sendNativeMessage("org.ushalabs.downshift",{version:1,command});
+  const opened=await request("open");if(!opened?.ok)throw Error("Could not open Downshift");
+  for(let attempt=0;attempt<8;attempt++) {try{if((await request("ping")).ok)return;}catch{}await new Promise(resolve=>setTimeout(resolve,400));}
+  throw Error("Downshift is still starting");
+}
+chrome.webRequest.onHeadersReceived.addListener(details=>mediaSources.observe(details), {urls:["http://*/*","https://*/*"]}, ["responseHeaders"]);
+chrome.tabs.onRemoved.addListener(id=>mediaSources.tabs.delete(id));
 const controller=new HandoffController({
   ownId:chrome.runtime.id,
+  captureEnabled:async()=>(await chrome.storage.local.get("handoffState")).handoffState?.enabled!==false,
+  ensureApp,
   load:async()=>(await chrome.storage.local.get("handoffState")).handoffState,
   save:async state=>chrome.storage.local.set({handoffState:state}),
   key:()=>crypto.randomUUID().replaceAll("-",""),
@@ -25,11 +37,23 @@ chrome.runtime.onInstalled.addListener(()=>{chrome.alarms.create("downshift-reco
 chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(sender.id!==chrome.runtime.id || !message || typeof message.type!=="string")return false;
   let task;
-  if(message.type==="status")task=controller.status();
+  if(message.type==="media") {
+    const url = mediaSources.resolve(message,sender);
+    if(!url) { reply({ok:false,error:"This player has no supported public video address."});return false; }
+    task = (async()=>{
+      const opening = await controller.native("open");
+      for(let attempt=0;attempt<8;attempt++) {
+        try { return await controller.native("media",{url,title:String(message.title || "Video").slice(0,200)}); }
+        catch(error) { if(opening.state!=="opening" || attempt===7)throw error;await new Promise(resolve=>setTimeout(resolve,400)); }
+      }
+    })();
+  }
+  else if(message.type==="status")task=controller.status();
   else if(message.type==="configure")task=controller.configure(message.enabled);
   else if(message.type==="leave")task=controller.leave();
   else if(message.type==="open")task=controller.serial(()=>controller.native("open"));
   else if(message.type==="reconcile")task=controller.reconcile().then(()=>controller.status());
+  else if(message.type==="retry")task=controller.retry().then(()=>controller.status());
   else return false;
   task.then(value=>reply({ok:true,...value})).catch(()=>reply({ok:false,error:"Downshift is unavailable. Open the app and try again."}));return true;
 });

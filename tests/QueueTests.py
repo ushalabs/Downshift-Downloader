@@ -48,6 +48,8 @@ def main():
         d=Driver(exe,db)
         settings=d.call("snapshot")["settings"]; settings.update(directory=str(root),simultaneous=2,perHost=2,hostConnections=4,connections=4,automatic=False,speedLimit=str(1024*1024))
         d.call("configure",settings=settings)
+        for filename,mime,category in [('clip.MP4','','Videos'),('song.mp3','','Audios'),('archive.rar','','Zip'),('setup.exe','','Programs'),('paper.pdf','','Programs'),('unknown.bin','audio/ogg','Audios'),('unknown.bin','video/mp4','Videos')]:
+            folder=pathlib.Path(d.call('category',filename=filename,mime=mime)['folder']);assert folder==root/category and folder.is_dir();checks+=1
         ids=[]
         for i in range(3): ids.append(d.call("add",url=url,destination=str(root/f"file{i}.bin"),sha256=expected_sha256(server.size))["id"])
         checks+=1

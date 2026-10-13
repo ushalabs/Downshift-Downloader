@@ -1,4 +1,10 @@
+# Git history and current authorization
+
+The latest request authorizes assistant commits/pushes to the existing main branch for the downloader update, Phase 9 and Phase 10. Earlier manual commands below are historical; main already exists. No branch recreation or force push is needed.
+
 # Phase 8: your Git steps
+
+Update after the browser/video request: the user has committed Phase 8 as `a65468d` and the active checkout is now `main`. The new browser/video changes remain uncommitted for the user. The Phase 8 instructions below are historical; do not repeat branch-creation commands against the existing `main`. No assistant Git mutations were performed during this update.
 
 All Phase 8 Git operations belong to you. The prepared changes are in `C:\Users\HP\Desktop\Projects\Downshift` on `dev/phase-01-foundation`. The verified Phase 7 checkpoint is `017390e3167f0f6dad40f2671ae29f8f894d456a`. The instructions below create `main` at that checkpoint and merge the new Phase 8 development commit into it, preserving both branches and all previous history.
 

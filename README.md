@@ -6,7 +6,7 @@ Downshift is a free, open-source native Windows download manager being developed
 
 ## Implemented features
 
-- Native Qt 6 desktop with working download controls, live details, history/search, and light/dark themes.
+- Native Qt 6 desktop with working download controls, live details, history/search, and compact, responsive pink/plum themes.
 - libcurl process lifetime management and multi-handle capability check.
 - SQLite integration with an in-memory 64-bit write/read check.
 - Windows x64 MSVC CMake presets and pinned vcpkg dependency baseline.
@@ -21,7 +21,10 @@ Downshift is a free, open-source native Windows download manager being developed
 - Console pause/resume, encrypted range checkpoints, local/remote revalidation, and recovery after forced termination.
 - Bounded transient retries with jitter/Retry-After and explicit archival restart when safe resume is unavailable.
 - Persistent SQLite queue/history/settings with user-scoped encryption, priorities, concurrency limits, and global/per-download pacing.
-- Manifest V3 Chrome extension, restricted Native Messaging/Windows IPC, durable handoff receipts, and tested browser fallback for unsupported or unavailable transfers.
+- Manifest V3 Chrome extension, restricted Native Messaging/Windows IPC, durable handoff receipts, and strict enabled capture: failed handoffs stay paused until retry or explicit disable.
+- Content category folders (Videos, Audios, Zip, Programs), with a destination override on every download.
+- Default-on supported Chrome file capture and player download buttons, with YouTube/site extraction, video quality selection, speed/progress, and audio/video merging in native Qt windows. See [video setup and boundaries](docs/MEDIA.md).
+- Video history survives reopening; completion requires a verified saved video file, with its exact path and Open folder action. Failed/interrupted videos provide retry controls.
 - Bounded segmented write buffers, larger checksum reads, recovery-metadata contention handling, and structured I/O/checkpoint counters.
 - Reproducible paired loopback benchmarks: 180 independently verified 100 MB/1 GB/5 GB samples across fixed counts, automatic mode, streaming, and traffic caps. See [performance results](docs/PERFORMANCE.md) for measured gains, regressions, and limits.
 
@@ -36,6 +39,7 @@ From PowerShell in the repository root:
 ./scripts/Test-Environment.ps1
 cmake --preset windows-msvc
 cmake --build --preset release --parallel 2
+./scripts/Install-MediaTools.ps1 -Configuration Release
 ctest --preset release
 ./build/windows-msvc/Release/Downshift.exe
 ```
@@ -51,16 +55,17 @@ The first configure builds the dependency set from source and can take substanti
 5. Queue and persistence (completed locally).
 6. Modern desktop GUI (completed locally).
 7. Chrome integration (completed locally).
-8. Performance optimization.
+8. Performance optimization (completed locally; user-requested browser/video improvements follow).
 9. Windows packaging.
 10. GitHub release.
 
-The user approved Phase 8 after the completed Phase 5-7 batch. All Phase 8 Git operations belong to the user; [the Git handoff](docs/GIT_HANDOFF.md) explains committing the verified changes, creating `main`, and merging the existing development branch. Phase 9 packaging requires further approval. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
+The current checkout is `main`. The user authorized the complete downloader update, Phase 9 packaging and Phase 10 release, with a verified commit/push for each stage. [Earlier Git instructions](docs/GIT_HANDOFF.md) are retained as history. See [development progress](docs/DEVELOPMENT_PROGRESS.md) and [project requirements](docs/PROJECT_REQUIREMENTS.md).
 
 Active local project directory: `C:\Users\HP\Desktop\Projects\Downshift`.
 
 ## Documentation
 
+- [Every-file downloads, default folders and browser limits](docs/GENERAL_DOWNLOADS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development progress](docs/DEVELOPMENT_PROGRESS.md)
 - [Setup and installation](docs/INSTALLATION.md)

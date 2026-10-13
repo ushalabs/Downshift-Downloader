@@ -466,11 +466,10 @@ DownloadEngine::Inspection DownloadEngine::inspect(const std::string& url,std::s
     MultiSession session(1); auto transfer=std::make_unique<Transfer>(Kind::Probe,nullptr,stop);
     transfer->configure(options,url,true); transfer=session.run(std::move(transfer),stop); transfer->verify();
     const auto& metadata=transfer->collector.response;
-    if(transfer->probeRejected || metadata.status!=206 || !metadata.range || !strongEtag(metadata.etag) ||
-        metadata.contentType.starts_with("text/html") || metadata.contentType.starts_with("application/xhtml"))
-        fail(DownloadErrorCode::InvalidRequest,"This download needs Chrome or lacks verified public range support. It was left in Chrome.");
+    if(metadata.status!=200 && metadata.status!=206)fail(DownloadErrorCode::InvalidRequest,"The server did not provide a downloadable public file.");
     char* effective=nullptr; if(curl_easy_getinfo(transfer->easy.get(),CURLINFO_EFFECTIVE_URL,&effective)!=CURLE_OK || !effective) fail(DownloadErrorCode::Network,"Unable to verify this download.");
-    return {metadata.etag,std::string(effective),metadata.range->total};
+    const bool segmented=!transfer->probeRejected && metadata.status==206 && metadata.range && strongEtag(metadata.etag);
+    return {segmented ? metadata.etag:std::string{},std::string(effective),metadata.range ? metadata.range->total:metadata.length.value_or(0),metadata.contentType};
 }
 DownloadResult DownloadEngine::download(const DownloadOptions& options, std::stop_token stop) const {
     validateUrl(options.url);

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Downshift VERSION 0.1.0 LANGUAGES CXX)
+project(Downshift VERSION 0.3.0 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Downshift requires Windows and the MSVC C++ toolchain.")
@@ -60,6 +60,8 @@ add_library(downshift_gui STATIC
     src/gui/MainWindow.cpp
     src/gui/MainWindow.h
     src/gui/Dialogs.cpp
+    src/gui/MediaDialog.cpp
+    src/gui/MediaDialog.h
 )
 target_link_libraries(downshift_gui PUBLIC downshift_queue Qt6::Widgets)
 target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)
@@ -91,6 +93,7 @@ if(BUILD_TESTING)
     find_program(NODE_EXECUTABLE NAMES node)
     if(NODE_EXECUTABLE)
         add_test(NAME browser.extension COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/ExtensionTests.mjs")
+        add_test(NAME browser.media COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaExtensionTests.mjs")
         set_tests_properties(browser.extension PROPERTIES TIMEOUT 30)
     else()
         message(STATUS "Node.js unavailable: extension state checks require a separate Node test run.")
@@ -102,6 +105,13 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserTests.py" "$<TARGET_FILE:downshift_native_host>" "$<TARGET_FILE:downshift_browser_tests>")
     set_tests_properties(browser.native PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
     add_executable(downshift_gui_tests tests/GuiTests.cpp)
+    add_executable(downshift_media_tests tests/MediaTests.cpp)
+    target_link_libraries(downshift_media_tests PRIVATE downshift_browser downshift_gui)
+    target_compile_options(downshift_media_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME gui.media COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaIntegration.py" "$<TARGET_FILE:downshift_media_tests>"
+        "${CMAKE_CURRENT_BINARY_DIR}/media-shots/$<CONFIG>")
+    set_tests_properties(gui.media PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
     target_link_libraries(downshift_gui_tests PRIVATE downshift_gui)
     target_compile_options(downshift_gui_tests PRIVATE /W4 /permissive- /utf-8)
     add_test(NAME gui.integration COMMAND Python3::Interpreter

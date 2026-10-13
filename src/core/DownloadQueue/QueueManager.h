@@ -24,6 +24,8 @@ struct QueueSettings {
 struct QueueEntry {
     QString id, url, destination, origin, error, sha256;
     QString handoffKey, requiredEtag, requiredResolvedUrl;
+    bool media = false;
+    QString mediaTitle, mediaFolder;
     std::optional<std::uint64_t> requiredTotal;
     QueueStatus status = QueueStatus::Queued;
     int priority = 0;
@@ -48,8 +50,12 @@ public:
     std::future<void> deleteCompleted(QString id);
     std::future<void> configure(QueueSettings settings);
     std::future<QueueSnapshot> snapshot();
-    std::future<QJsonObject> prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection);
-    std::future<QJsonObject> handoff(QString key,QString command);
+    std::future<QString> categoryFolder(QString filename,QString mime={});
+    std::future<QString> beginMedia(QString url, QString folder, QString title);
+    std::future<void> mediaProgress(QString id, DownloadProgress progress);
+    std::future<void> finishMedia(QString id, QueueStatus status, QString file, QString error);
+    std::future<QJsonObject> prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime={});
+    std::future<QJsonObject> handoff(QString key,QString command,bool prompt=false);
 private:
     struct Worker;
     template<class F> auto submit(F function) -> std::future<decltype(function())> {

@@ -14,7 +14,8 @@ int main(int argc,char** argv) {
         try {
             const auto command=QJsonDocument::fromJson(QByteArray::fromStdString(line)).object(); const auto op=command.value("op").toString();
             if(op=="exit") break;
-            if(op=="add") response["id"]=queue.add(command.value("url").toString(),command.value("destination").toString(),command.value("priority").toInt(),command.value("start").toBool(true),command.value("sha256").toString(),command.value("speedLimit").toString().toULongLong()).get();
+            if(op=="category")response["folder"]=queue.categoryFolder(command.value("filename").toString(),command.value("mime").toString()).get();
+            else if(op=="add") response["id"]=queue.add(command.value("url").toString(),command.value("destination").toString(),command.value("priority").toInt(),command.value("start").toBool(true),command.value("sha256").toString(),command.value("speedLimit").toString().toULongLong()).get();
             else if(op=="action") queue.action(command.value("id").toString(),static_cast<downshift::QueueAction>(command.value("action").toInt())).get();
             else if(op=="rename") queue.rename(command.value("id").toString(),command.value("destination").toString()).get();
             else if(op=="configure") queue.configure(downshift::QueueSettings::fromJson(command.value("settings").toObject())).get();

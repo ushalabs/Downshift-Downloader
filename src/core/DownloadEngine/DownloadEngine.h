@@ -97,7 +97,7 @@ struct DownloadResult {
 
 class DownloadEngine final {
 public:
-    struct Inspection { std::string etag, resolvedUrl; std::uint64_t total=0; };
+    struct Inspection { std::string etag, resolvedUrl; std::uint64_t total=0; std::string contentType; };
     // Bounded public-resource preflight, no file creation or authentication context.
     [[nodiscard]] Inspection inspect(const std::string& url, std::stop_token stop={}) const;
     // Blocking worker API. Call off the GUI thread. CurlRuntime must outlive this call.

@@ -1,5 +1,6 @@
 #include "core/Runtime.h"
 #include "gui/MainWindow.h"
+#include "gui/MediaDialog.h"
 #include "browser/PipeServer.h"
 #include "browser/NativeProtocol.h"
 #define NOMINMAX
@@ -42,7 +43,11 @@ int main(int argc, char* argv[]) {
         window.show();
         std::unique_ptr<downshift::browser::PipeServer> browser;
         if(!smokeTest) {
-            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();window.activateWindow();},Qt::QueuedConnection);});
+            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();window.activateWindow();},Qt::QueuedConnection);},[&window,&queue](QString url,QString title){
+                QMetaObject::invokeMethod(&window,[&window,&queue,url=std::move(url),title=std::move(title)]{
+                    window.openVideo(url,title);
+                },Qt::QueuedConnection);
+            },[&window]{QMetaObject::invokeMethod(&window,[&window]{window.captureError();},Qt::QueuedConnection);});
             auto* status=new QTimer(&window);status->setInterval(1000);QObject::connect(status,&QTimer::timeout,&window,[&window,&browser]{window.chromeStatus(browser->active() ? "Ready for the extension":"Unavailable");});status->start();
         }
 

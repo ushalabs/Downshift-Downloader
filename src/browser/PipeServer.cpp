@@ -21,7 +21,7 @@ bool io(HANDLE pipe,void* data,DWORD size,bool write,std::stop_token stop) {
     return count==size;
 }
 }
-PipeServer::PipeServer(QueueManager& queue,std::function<void()> open):queue_(queue),open_(std::move(open)),thread_([this](std::stop_token stop){run(stop);}){}
+PipeServer::PipeServer(QueueManager& queue,std::function<void()> open,std::function<void(QString,QString)> media,std::function<void()> blocked):queue_(queue),open_(std::move(open)),media_(std::move(media)),blocked_(std::move(blocked)),thread_([this](std::stop_token stop){run(stop);}){}
 PipeServer::~PipeServer(){thread_.request_stop();}
 void PipeServer::run(std::stop_token stop) {
     try {
@@ -55,14 +55,21 @@ QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) 
     validate(request);const auto command=request.value("command").toString();
     if(command=="ping"){(void)queue_.snapshot().get();return {{"state","ready"}};}
     if(command=="open"){open_();return {{"state","ready"}};}
+    if(command=="blocked"){open_();if(blocked_)blocked_();return {{"state","blocked"}};}
+    if(command=="media"){
+        if(!media_)throw std::runtime_error("Video downloads are unavailable in this application.");
+        media_(request.value("url").toString(),request.value("title").toString());return {{"state","video-dialog"}};
+    }
     const auto key=request.value("key").toString();
     if(command=="prepare") {
         const auto old=queue_.handoff(key,"status").get();if(old.value("state")!="unknown")return queue_.prepare(key,request.value("url").toString(),request.value("filename").toString(),{}).get();
         const auto url=request.value("url").toString();const auto inspection=DownloadEngine().inspect(url.toStdString(),stop);
         const auto expected=request.value("total").toString().toLongLong();
-        if(inspection.total<256*1024 || (request.contains("total") && expected>=0 && static_cast<std::uint64_t>(expected)!=inspection.total))throw std::runtime_error("This file is too small or differs from Chrome's file. Keep it in Chrome.");
-        return queue_.prepare(key,url,request.value("filename").toString(),inspection).get();
+        if(inspection.total && request.contains("total") && expected>=0 && static_cast<std::uint64_t>(expected)!=inspection.total)throw std::runtime_error("The public file size differs from Chrome's download.");
+        const auto mime=request.value("mime").toString();
+        if((inspection.contentType.starts_with("text/html") || inspection.contentType.starts_with("application/xhtml")) && !mime.startsWith("text/html") && !mime.startsWith("application/xhtml"))throw std::runtime_error("The server returned a webpage instead of this file. Authentication may be required.");
+        return queue_.prepare(key,url,request.value("filename").toString(),inspection,mime).get();
     }
-    return queue_.handoff(key,command).get();
+    return queue_.handoff(key,command,request.value("prompt").toBool()).get();
 }
 }

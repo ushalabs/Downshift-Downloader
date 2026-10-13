@@ -15,11 +15,15 @@ public:
     explicit MainWindow(QueueManager& queue,QWidget* parent=nullptr);
     bool ready() const { return ready_; }
     const QueueSnapshot& current() const { return current_; }
-    void openAdd();
+    void openAdd(QString address={},QString filename={});
+    void confirmDownload(const QueueEntry& entry);
+    void captureError(){message("Chrome is paused: this download could not be handed over. Check the extension, retry, or turn it off to download with Chrome.",true);}
     void openSettings();
+    void openVideo(QString url,QString title,QString folder={});
     void refresh();
     void chromeStatus(QString status){chromeStatus_=std::move(status);}
 private:
+    void resizeEvent(QResizeEvent* event) override;
     template<class T,class F> void watch(std::future<T> future,F success) {
         auto pending=std::make_shared<std::future<T>>(std::move(future)); auto* timer=new QTimer(this); timer->setInterval(30);
         connect(timer,&QTimer::timeout,this,[this,timer,pending,success=std::move(success)]() mutable {

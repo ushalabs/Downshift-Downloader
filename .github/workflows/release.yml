@@ -1,0 +1,76 @@
+name: Publish verified Windows preview
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Windows build run containing verified distribution
+        required: true
+        type: string
+      source_commit:
+        description: Exact clean source commit tested by that Windows run
+        required: true
+        type: string
+      draft_id:
+        description: Existing unpublished draft ID (0 to create a new draft)
+        default: '0'
+        type: string
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: downshift-preview-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Wait for matching Windows verification
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SOURCE: ${{ inputs.source_commit }}
+          VERIFIED_RUN: ${{ inputs.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request
+          run_id = int(os.environ['VERIFIED_RUN'])
+          source = os.environ['RELEASE_SOURCE']
+          url = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}"
+          headers = {'Authorization': 'Bearer '+os.environ['GITHUB_TOKEN'], 'User-Agent': 'Downshift-verification-wait'}
+          for attempt in range(180):
+              with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
+                  run = json.load(response)
+              if run['head_sha'] != source or run['head_branch'] != 'main':
+                  raise RuntimeError('Windows run is for a different source.')
+              if run['status'] == 'completed':
+                  if run['conclusion'] != 'success':
+                      raise RuntimeError('Windows verification failed; nothing will be published.')
+                  print('Matching Windows verification passed.')
+                  break
+              if attempt == 0:
+                  print('Waiting for the matching Windows run; release remains unpublished.', flush=True)
+              time.sleep(30)
+          else:
+              raise RuntimeError('Windows verification did not finish in the waiting window.')
+          PY
+      - name: Download verified Windows artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Downshift-0.3.0-windows-x64
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.run_id }}
+          path: dist
+      - name: Validate source, CI and hashes then publish preview
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SOURCE: ${{ inputs.source_commit }}
+          VERIFIED_RUN: ${{ inputs.run_id }}
+          DRAFT_ID: ${{ inputs.draft_id }}
+        run: python3 scripts/Publish-Release.py --source "$RELEASE_SOURCE" --run "$VERIFIED_RUN" --draft "$DRAFT_ID"
+      - name: Preserve publication evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Downshift-release-evidence
+          path: dist/release-evidence.json
+          if-no-files-found: error

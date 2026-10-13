@@ -1,0 +1,10 @@
+﻿{
+    "sourceCommit":  "eeeb0129cb66a3cb9b7b25c74f0199ef95c171bc",
+    "version":  "0.3.0",
+    "os":  "Microsoft Windows NT 10.0.26200.0",
+    "scope":  "ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership",
+    "packageSha256":  "741531ae80cd03014d027d3077e37d430d572e2d592fccd2047adc7fac495791",
+    "limitations":  "same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests",
+    "runtimePath":  "Windows system directories only",
+    "checks":  13
+}

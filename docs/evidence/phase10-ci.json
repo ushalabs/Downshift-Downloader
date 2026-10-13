@@ -1,0 +1,103 @@
+{
+  "environment": "GitHub-hosted windows-2022 x64, MSVC 19.44",
+  "run": {
+    "completedAt": "2026-10-13T13:54:22Z",
+    "headBranch": "main",
+    "conclusion": "success",
+    "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38402993102",
+    "id": 38402993102
+  },
+  "release": {
+    "mediaToolsInstalled": true,
+    "mediaTestSeconds": 30.72,
+    "testGroups": 14,
+    "failed": 0,
+    "seconds": 125.61
+  },
+  "portableChecks": 13,
+  "artifactId": 11819936791,
+  "sourceCommit": "eeeb0129cb66a3cb9b7b25c74f0199ef95c171bc",
+  "logSha256": "8e7eefc5daddf0e00867e6ee7071dbf572bead0b85117c8884e6c12370afc79a",
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare pinned vcpkg",
+      "conclusion": "success"
+    },
+    {
+      "name": "Inspect build prerequisites",
+      "conclusion": "success"
+    },
+    {
+      "name": "Configure Windows x64",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve completely configured dependency builds",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build Release",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install verified upstream video tools for Release tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Release",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build Debug",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install verified upstream video tools for Debug tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Debug",
+      "conclusion": "success"
+    },
+    {
+      "name": "Package clean Release and corresponding library source",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test extracted portable package with built-in Windows PowerShell",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve verified distribution",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "artifactBytes": 211312307,
+  "debug": {
+    "mediaToolsInstalled": true,
+    "mediaTestSeconds": 31.97,
+    "testGroups": 14,
+    "failed": 0,
+    "seconds": 120.84
+  }
+}

@@ -26,8 +26,17 @@ export class MediaSources {
     if (this.tabs.size > 128) this.tabs.delete(this.tabs.keys().next().value);
   }
   resolve(message, sender) {
-    const page = publicUrl(sender.url) || publicUrl(sender.origin) || publicUrl(sender.tab?.url); if (!page || sender.tab?.incognito) return null;
-    const youtube = youtubePage(page); if (youtube) return youtube;
+    const original = publicUrl(sender.url) || publicUrl(sender.origin) || publicUrl(sender.tab?.url);
+    if (!original || sender.tab?.incognito) return null;
+    // Chrome's sender.url can retain the document's initial URL after pushState.
+    // Accept the content script's current location only within that same origin.
+    const current = publicUrl(message.page);
+    if (current && new URL(current).origin !== new URL(original).origin) return null;
+    const page = current || original;
+    if (/(^|\.)youtube\.com$/.test(new URL(page).hostname) || new URL(page).hostname === "youtu.be") {
+      const player = youtubePage(message.videoPage);
+      return player || youtubePage(page);
+    }
     const direct = publicUrl(message.source); if (direct) return direct;
     const candidates = (this.tabs.get(sender.tab?.id) || []).filter(x => x.frame === sender.frameId && this.now() - x.at < 600000);
     // A single manifest can be resolved safely; multiple players need the site's extractor.

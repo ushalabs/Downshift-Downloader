@@ -1,5 +1,6 @@
 #include "QueueManager.h"
 #include "Categories.h"
+#include "VideoUrl.h"
 #include "database/QueueStore.h"
 #include "core/FileWriter/FileWriter.h"
 #include "core/ResumeManager/ResumeJournal.h"
@@ -106,6 +107,7 @@ void QueueManager::run() {
         for(const auto& row:store_->load()) {
             auto e=QueueEntry::fromJson(object(row));
             if(!e.handoffKey.isEmpty() && (!receipts_.contains(e.handoffKey) || receipts_.at(e.handoffKey).value("downloadId")!=e.id))invalid("Missing or mismatched browser handoff receipt.");
+            if(!e.media && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
             if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to continue in a video window.";save(e);}
             else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
             if(std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.id==e.id;})) invalid("Duplicate database download IDs.");
@@ -137,6 +139,7 @@ void QueueManager::save(QueueEntry& e) {
 }
 std::future<QString> QueueManager::add(QString url,QString dest,int priority,bool start,QString sha256,std::uint64_t speedLimit) {
     return submit([this,url=std::move(url),dest=std::move(dest),priority,start,sha256=std::move(sha256),speedLimit] {
+        if(youtubeHost(QUrl(url).host())) invalid("This is a YouTube page, not a file. Use Download video to resolve its streams and qualities.");
         if(entries_.size()>=10000 || priority < -1 || priority > 1 || speedLimit > 10ULL*1024*1024*1024) invalid("Queue limit or invalid download options.");
         QueueEntry e; e.url=url; e.origin=origin(url); e.destination=destination(dest); e.sha256=sha256.toLower();
         const auto parent=QFileInfo(e.destination).absolutePath();
@@ -150,6 +153,7 @@ std::future<QString> QueueManager::add(QString url,QString dest,int priority,boo
 }
 std::future<void> QueueManager::action(QString id,QueueAction action) { return submit([this,id=std::move(id),action] {
     auto& e=entry(id); const auto worker=workers_.find(id);
+    if(!e.media && !youtubeVideo(e.url).isEmpty() && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("Use Retry video to download the streams, rather than the YouTube webpage.");
     if(e.media && (action!=QueueAction::Remove || e.status==QueueStatus::Running)) invalid("Use the video window to stop this task, or Retry video to retry it.");
     if(e.status==QueueStatus::Prepared) invalid("Chrome still owns this handoff. Leave it in Chrome or cancel the pending handoff.");
     if(!e.handoffKey.isEmpty() && receipts_.at(e.handoffKey).value("state")=="aborted" && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("This browser handoff was aborted. Add a fresh download link instead.");
@@ -233,6 +237,7 @@ void QueueManager::schedule() {
     std::vector<QueueEntry*> pending; for(auto& e:entries_) if(!e.media && e.status==QueueStatus::Queued) pending.push_back(&e);
     std::stable_sort(pending.begin(),pending.end(),[](auto* a,auto* b){return a->priority>b->priority;});
     for(auto* e:pending) {
+        if(!youtubeVideo(e->url).isEmpty()){e->status=QueueStatus::Failed;e->error="This is a YouTube webpage. Choose Retry video to download its streams.";save(*e);continue;}
         if(workers_.size()>=static_cast<std::size_t>(settings_.simultaneous)) break;
         int host=0; for(const auto& [id,w]:workers_) if(entry(id).origin==e->origin) ++host;
         if(host>=std::min(settings_.perHost,settings_.hostConnections)) continue;
@@ -257,6 +262,7 @@ void QueueManager::schedule() {
 }
 std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime) {
     return submit([this,key=std::move(key),url=std::move(url),filename=std::move(filename),inspection=std::move(inspection),mime=std::move(mime)] {
+        if(youtubeHost(QUrl(url).host()))invalid("Use Download video for YouTube rather than saving its watch page.");
         const auto hash=QString::fromLatin1(QCryptographicHash::hash(url.toUtf8(),QCryptographicHash::Sha256).toHex());
         if(const auto i=receipts_.find(key);i!=receipts_.end()) {if(i->second.value("urlHash")!=hash)invalid("This handoff key belongs to another request.");return QJsonObject{{"state",i->second.value("state")},{"downloadId",i->second.value("downloadId")}};}
         if(entries_.size()>=10000 || receipts_.size()>=10000)invalid("The browser handoff/history limit has been reached.");

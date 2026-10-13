@@ -21,7 +21,10 @@
       if (!event.isTrusted) return;
       event.preventDefault(); event.stopPropagation(); button.disabled = true; notice.textContent = "Opening Downshift…";
       try {
-        const answer = await chrome.runtime.sendMessage({type:"media", source:video.currentSrc || video.src || video.querySelector("source")?.src || "", title:document.title.slice(0,200)});
+        const card = video.closest("ytd-rich-item-renderer,ytd-video-renderer,ytd-reel-item-renderer,ytd-compact-video-renderer");
+        const player = video.closest(".html5-video-player");
+        const videoPage = card?.querySelector('a[href*="/watch?v="],a[href^="/shorts/"]')?.href || player?.querySelector("a.ytp-title-link[href]")?.href || "";
+        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, source:video.currentSrc || video.src || video.querySelector("source")?.src || "", title:document.title.slice(0,200)});
         notice.textContent = answer?.ok ? "Choose quality in Downshift." : answer?.error || "Open Downshift and try again.";
       } catch { notice.textContent = "Reload this page after reloading the Downshift extension."; }
       button.disabled = false;

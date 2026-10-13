@@ -1,4 +1,5 @@
 #include "gui/MainWindow.h"
+#include "gui/Brand.h"
 #include "core/Runtime.h"
 #include <QApplication>
 #include <QCheckBox>
@@ -32,6 +33,8 @@ int main(int argc,char** argv) {
     QDir().mkpath(shots);downshift::CurlRuntime curl;const auto database=QDir(root).filePath("queue.sqlite"),file=QDir(root).filePath("Verified download.bin");
     int beats=0;double maximumGap=0;bool measuring=false;auto last=std::chrono::steady_clock::now();QTimer heartbeat;heartbeat.setInterval(20);QObject::connect(&heartbeat,&QTimer::timeout,[&]{const auto now=std::chrono::steady_clock::now();if(measuring){maximumGap=std::max(maximumGap,std::chrono::duration<double>(now-last).count());++beats;}last=now;});heartbeat.start();
     try {
+        check(!downshift::brandIcon().pixmap(32,32).isNull(),"Brand icon decodes with the shipped Qt image features");
+        check(!QPixmap(":/branding/chevron.xpm").isNull(),"Quality selector arrow decodes with shipped Qt");
         {
             downshift::QueueManager queue(database);downshift::MainWindow window(queue);window.show();wait([&]{return window.ready();});check(!window.current().settings.dark,"Light must be default");
             check(window.width()<950 && window.height()<650,"Compact default window");check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact columns adapt");window.resize(1200,750);QApplication::processEvents();

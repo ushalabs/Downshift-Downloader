@@ -1,0 +1,20 @@
+/* XPM */
+static const char *chevron[] = {
+"14 14 2 1",
+"  c None",
+"x c #b94278",
+"              ",
+"              ",
+"              ",
+"              ",
+"              ",
+"   xx    xxx  ",
+"   xxx  xxx   ",
+"    xxxxxx    ",
+"     xxxx     ",
+"      xx      ",
+"              ",
+"              ",
+"              ",
+"              "
+};

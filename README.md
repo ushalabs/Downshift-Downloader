@@ -2,13 +2,13 @@
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
-Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.0 preview adds a compact pink window, content folders, per-download destinations, player download controls and strict browser capture.
+Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.1 repair adds verified YouTube transfers, actual resolution choices, separate quality files and modern pink controls with an original globe/download icon.
 
 ![Downshift pink desktop](assets/screenshots/downloads-pink.png)
 
 ## Get started
 
-Get the Windows x64 portable archive from the [verified v0.3.0 preview](https://github.com/ushalabs/Downshift-Download-Manager/releases/tag/v0.3.0). Extract the **whole ZIP** to a permanent writable folder and run **Setup.cmd**. Open the Desktop Downshift shortcut or Downshift.exe beside its DLLs. Windows 10/11 x64 is required; developer tools are not needed.
+Get the Windows x64 portable archive from [Downshift releases](https://github.com/ushalabs/Downshift-Download-Manager/releases). Extract the **whole ZIP** to a permanent writable folder and run **Setup.cmd**. Open the Desktop Downshift shortcut or Downshift.exe beside its DLLs. Windows 10/11 x64 is required; developer tools are not needed.
 
 For Chrome, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted package's **extension** folder. Reload existing video pages. A previously installed extension needs **Reload** after an update. Capture defaults on for fresh installs; saved off preferences persist. [Full setup](docs/PACKAGING.md) and [Chrome recovery](docs/CHROME.md) explain moving or uninstalling the package.
 

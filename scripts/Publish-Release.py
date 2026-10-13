@@ -150,9 +150,13 @@ Extract the entire **windows-x64 ZIP**, run **Setup.cmd**, and open the Desktop 
 - Downloads/Videos, Audios, Zip and Programs defaults; choose a destination for every download.
 - Chrome opens Downshift and a save window. Enabled handoff failures stay paused until retry or explicit disable.
 - Public streaming/verified segmented transfers, supported player actions, quality selection and video merging.
+- YouTube watch-page routing, current-player URL resolution, checked HLS video/audio selection and separate exact-resolution files.
+- Modern rounded controls and an original pink globe/download icon in Windows and Qt.
 - App-local runtimes, ownership-aware per-user setup/uninstall, complete source/license bundles.
 
 **Verified release producer:** [Windows CI]({run['html_url']}) built Release/Debug, passed all 14 groups in both with video tools installed, verified 13 extracted-package checks and preserved these exact artifacts. Separate local actual Chrome checks passed in both configurations. This publication independently verified archive/per-file hashes and the corresponding library source inventory.
+
+The 0.3.1 repair also completed a real public 713-second YouTube video with video/audio at 144p through the extension and native dialog. Its available quality list included 144p through 1080p. This is separate local Internet acceptance, not a claim that the Windows CI downloaded YouTube or that every advertised quality/site was tested.
 
 Chrome can receive initial bytes or complete files before extension events. Cookies/authentication are not imported. Browser-only, private/protected/DRM, unsafe and unsupported resources are not universally downloadable. Media helper concurrency/rate limits are separate. No Internet-speed or IDM superiority is claimed; the recorded 180-sample benchmark matrix is cached loopback HTTP/1.1. This preview has no signature, store publication, automatic updater or clean-VM claim.
 

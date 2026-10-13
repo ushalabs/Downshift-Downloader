@@ -57,11 +57,14 @@ jobs:
         run: ./scripts/Build-Portable.ps1 -RequireClean
       - name: Test extracted portable package with built-in Windows PowerShell
         shell: powershell
-        run: ./scripts/Test-Portable.ps1 -PackagePath ./build/releases/Downshift-0.3.0-windows-x64.zip -ReportPath ./build/releases/portable-test-report.json
+        run: |
+          $version=[regex]::Match((Get-Content CMakeLists.txt -Raw),'project\(Downshift VERSION (\d+\.\d+\.\d+)').Groups[1].Value
+          if(!$version){throw 'Missing product version.'}
+          ./scripts/Test-Portable.ps1 -PackagePath "./build/releases/Downshift-$version-windows-x64.zip" -ReportPath ./build/releases/portable-test-report.json
       - name: Preserve verified distribution
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Downshift-0.3.0-windows-x64
+          name: Downshift-windows-x64
           path: build/releases/*.*
           if-no-files-found: error
           compression-level: 0

@@ -8,6 +8,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QDialog>
+#include <QComboBox>
+#include <QPixmap>
 #include <QLabel>
 #include <QPushButton>
 #include <iostream>
@@ -21,10 +23,14 @@ int main(int argc,char** argv) {
     while(std::getline(std::cin,line)) {
         if(line=="exit")break;
         if(line=="confirm") {QMetaObject::invokeMethod(&window,[&]{for(auto* button:window.findChildren<QPushButton*>("captureStart"))if(button->isEnabled())button->click();},Qt::BlockingQueuedConnection);std::cout<<"confirmed"<<std::endl;continue;}
-        if(line=="media" || line=="media-download" || line=="media-close") {
+        if(line=="media" || line=="media-download" || line=="media-close" || line.starts_with("media-height ") || line.starts_with("media-shot ")) {
             QJsonArray media;QMetaObject::invokeMethod(&window,[&]{for(auto* dialog:window.findChildren<QDialog*>("mediaDialog")){
-                auto* button=dialog->findChild<QPushButton*>("mediaDownload");if(line=="media-download" && button->isEnabled())button->click();
-                media.append(QJsonObject{{"status",dialog->findChild<QLabel*>("mediaStatus")->text()},{"rate",dialog->findChild<QLabel*>("mediaRate")->text()},{"ready",button->isEnabled()},{"button",button->text()}});
+                auto* button=dialog->findChild<QPushButton*>("mediaDownload");auto* quality=dialog->findChild<QComboBox*>("mediaQuality");
+                if(line.starts_with("media-height "))quality->setCurrentIndex(quality->findData(QString::fromStdString(line.substr(13)).toInt()));
+                if(line.starts_with("media-shot "))dialog->grab().save(QString::fromStdString(line.substr(11)));
+                if(line=="media-download" && button->isEnabled())button->click();
+                QJsonArray qualities;for(int index=0;index<quality->count();++index)qualities.append(quality->itemText(index));
+                media.append(QJsonObject{{"status",dialog->findChild<QLabel*>("mediaStatus")->text()},{"rate",dialog->findChild<QLabel*>("mediaRate")->text()},{"ready",button->isEnabled()},{"button",button->text()},{"qualities",qualities},{"selected",quality->currentText()}});
                 if(line=="media-close")dialog->close();
             }},Qt::BlockingQueuedConnection);std::cout<<QJsonDocument(media).toJson(QJsonDocument::Compact).constData()<<std::endl;continue;
         }

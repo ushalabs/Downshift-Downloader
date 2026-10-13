@@ -1,0 +1,43 @@
+{
+  "url": "https://www.youtube.com/watch?v=HyfC9nZvIJM",
+  "chromeVersion": "155.0.8059.39",
+  "sameDocumentNavigation": true,
+  "qualities": [
+    "Best available",
+    "1080p",
+    "720p",
+    "480p",
+    "360p",
+    "240p",
+    "144p"
+  ],
+  "selected": "144p",
+  "file": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\youtube-031-accepted-live\\run-hBNu9J\\native\\Videos\\The 100 That Changed Pakistan T20 Cricket [HyfC9nZvIJM] [144p].mkv",
+  "bytes": 17905892,
+  "sha256": "8fe5bbc9d5f30362412345871b82daef0aa58a0f3a4a9d685101360aa51f8f6b",
+  "duration": 713.247,
+  "streams": [
+    {
+      "codec_type": "video",
+      "codec_name": "vp9",
+      "width": 256,
+      "height": 144
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac"
+    }
+  ],
+  "historyStatus": "Completed",
+  "nativeDriverSha256": "82d4c91a073238f0e27c45e3bb7b09de5340d01619d93d42cd18cfe950ffcb37",
+  "sources": {
+    "extension/media.js": "9843423b9c70c3ca462704891482c4315a85c7bd31b5581e6e3ea3e721cf0d0a",
+    "extension/video-button.js": "01420b206a4b65904117c35c2db1438ef2b2ed69ec5655bbaa201b857b6c8f9c",
+    "src/gui/MediaDialog.cpp": "df38e04cbf1e3c0f272b349b4556f2848a537ddcf5fca63f21c508feb95f1126",
+    "src/gui/MainWindow.cpp": "38debdff7bb2f528688a802af75af2cd87c58e17a1e1fafb263d6b601b32637d",
+    "src/gui/Dialogs.cpp": "a87393a7955f79d914869f00a707698bbfbe71af11cf2bc3d909788ff246da4d",
+    "src/core/DownloadQueue/QueueManager.cpp": "aa8376bb1deecd7fd4e1a78361651caf4ed8a88ffbf7b8cbb8a944a226acbbeb",
+    "tests/LiveYouTubeCheck.cjs": "e4e8f77ecc47d584fdd08538035d5cd40f0204c4f6eaee9146288ee58c86bc56"
+  },
+  "scope": "Real YouTube page, trusted extension-player click, actual native dialog, full video+audio transfer, merge, verified persisted completion and independent ffprobe/hash"
+}

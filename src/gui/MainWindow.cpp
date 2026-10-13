@@ -1,5 +1,7 @@
 #include "MainWindow.h"
 #include "MediaDialog.h"
+#include "Brand.h"
+#include "core/DownloadQueue/VideoUrl.h"
 #include <QInputDialog>
 #include <QUrl>
 #include <QApplication>
@@ -17,6 +19,7 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QStyle>
+#include <QStyleFactory>
 #include <QSystemTrayIcon>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -29,9 +32,13 @@ QString bytes(std::uint64_t n) {
     while(value>=1024 && unit<4) {value/=1024; ++unit;} return QString("%1 %2").arg(value,0,'f',unit ? 1 : 0).arg(units[unit]);
 }
 QString duration(double seconds) { if(!std::isfinite(seconds) || seconds<0) return "—"; const auto n=static_cast<qint64>(seconds); if(n>=3600) return QString("%1h %2m").arg(n/3600).arg((n/60)%60); if(n>=60) return QString("%1m %2s").arg(n/60).arg(n%60); return QString("%1s").arg(n); }
-QIcon brand() { QPixmap p(40,40); p.fill(Qt::transparent); QPainter painter(&p); painter.setRenderHint(QPainter::Antialiasing); painter.setBrush(QColor("#db2777")); painter.setPen(Qt::NoPen); painter.drawRoundedRect(QRectF(0,0,40,40),11,11); painter.setPen(QPen(Qt::white,3,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin)); painter.drawLine(20,9,20,29); painter.drawLine(12,22,20,30); painter.drawLine(28,22,20,30); return QIcon(p); }
 }
 void MainWindow::openVideo(QString address,QString title,QString folder) {
+    if(youtubeHost(QUrl(address).host())) {
+        const auto canonical=youtubeVideo(address);
+        if(canonical.isEmpty()){message("Open a specific YouTube video and use its Download this video button, or paste its watch/shorts link.",true);return;}
+        address=canonical;
+    }
     const QUrl url(address);
     if(!url.isValid() || (url.scheme()!="https" && url.scheme()!="http") || url.host().isEmpty() || !url.userInfo().isEmpty() || address.size()>32768 || address.contains(QChar(0))){message("Enter an HTTP or HTTPS video address without a username or password.",true);return;}
     int count=0;for(auto* child:findChildren<QDialog*>(QString(),Qt::FindDirectChildrenOnly))if(auto* dialog=dynamic_cast<MediaDialog*>(child)){++count;if(dialog->property("mediaUrl").toString()==address){dialog->showNormal();dialog->raise();dialog->activateWindow();return;}}
@@ -40,12 +47,13 @@ void MainWindow::openVideo(QString address,QString title,QString folder) {
 }
 QPushButton* makeButton(const QString& text,const char* name,QWidget* parent) { auto* b=new QPushButton(text,parent); b->setObjectName(name); b->setCursor(Qt::PointingHandCursor); b->setMinimumHeight(36); return b; }
 MainWindow::MainWindow(QueueManager& queue,QWidget* parent):QMainWindow(parent),queue_(queue) {
-    setObjectName("downshiftMainWindow"); setWindowTitle("Downshift"); setWindowIcon(brand()); resize(860,570); setMinimumSize(700,460);
+    QApplication::setStyle(QStyleFactory::create("Fusion"));QApplication::setFont(QFont("Segoe UI",10));QApplication::setWindowIcon(brandIcon());
+    setObjectName("downshiftMainWindow"); setWindowTitle("Downshift"); setWindowIcon(brandIcon()); resize(860,570); setMinimumSize(700,460);
     auto* central=new QWidget(this); setCentralWidget(central); auto* shell=new QHBoxLayout(central); shell->setContentsMargins(0,0,0,0); shell->setSpacing(0);
     auto* sidebar=new QWidget; sidebar->setObjectName("sidebar"); sidebar->setFixedWidth(150); auto* side=new QVBoxLayout(sidebar); side->setContentsMargins(12,22,12,16); side->setSpacing(8);
-    auto* identity=new QLabel("↓  Downshift"); identity->setObjectName("brand"); side->addWidget(identity); side->addSpacing(30);
+    auto* identity=new QLabel("Downshift"); identity->setObjectName("brand");side->addWidget(identity);side->addSpacing(24);
     const QStringList navigation={"All downloads","In progress","Completed","Needs attention"};
-    for(int i=0;i<navigation.size();++i) { auto* b=makeButton(navigation[i],"navigation"); side->addWidget(b); connect(b,&QPushButton::clicked,this,[this,i]{filter_->setCurrentIndex(i);}); }
+    for(int i=0;i<navigation.size();++i) { auto* b=makeButton(navigation[i],"navigation");b->setCheckable(true);b->setAutoExclusive(true);b->setChecked(i==0); side->addWidget(b); connect(b,&QPushButton::clicked,this,[this,i]{filter_->setCurrentIndex(i);}); }
     side->addStretch(); auto* settings=makeButton("Settings","settingsButton"); side->addWidget(settings); connect(settings,&QPushButton::clicked,this,&MainWindow::openSettings);
     auto* note=new QLabel("Native. Fast. Yours."); note->setObjectName("muted"); side->addWidget(note); shell->addWidget(sidebar);
     auto* content=new QWidget; auto* layout=new QVBoxLayout(content); layout->setContentsMargins(20,18,20,14); layout->setSpacing(12); shell->addWidget(content,1);
@@ -113,6 +121,7 @@ const QueueEntry* MainWindow::selected() const {
     const auto id=table_->item(row,0)->data(Qt::UserRole).toString(); const auto i=std::find_if(current_.entries.begin(),current_.entries.end(),[&](const auto& e){return e.id==id;}); return i==current_.entries.end() ? nullptr : &*i;
 }
 void MainWindow::filter() {
+    int navigationIndex=0;for(auto* button:findChildren<QPushButton*>("navigation"))button->setChecked(navigationIndex++==filter_->currentIndex());
     for(int row=0;row<table_->rowCount();++row) {
         const auto& e=current_.entries[static_cast<std::size_t>(row)]; const int f=filter_->currentIndex();
         const bool status=f==0 || (f==1 && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued || e.status==QueueStatus::Paused)) || (f==2 && e.status==QueueStatus::Completed) || (f==3 && (e.status==QueueStatus::Failed || e.status==QueueStatus::Cancelled));
@@ -120,7 +129,7 @@ void MainWindow::filter() {
     } details();
 }
 void MainWindow::details() {
-    const auto* e=selected();start_->setText(e && e->media ? "Retry video":"Resume"); start_->setEnabled(e && e->status!=QueueStatus::Completed && e->status!=QueueStatus::Running && e->status!=QueueStatus::Prepared); pause_->setEnabled(e && !e->media && (e->status==QueueStatus::Running || e->status==QueueStatus::Queued)); cancel_->setEnabled(e && (e->media ? e->status==QueueStatus::Running:e->status!=QueueStatus::Completed && e->status!=QueueStatus::Cancelled && e->status!=QueueStatus::Prepared)); more_->setEnabled(e!=nullptr);
+    const auto* e=selected();start_->setText(e && (e->media || !youtubeVideo(e->url).isEmpty()) ? "Retry video":"Resume"); start_->setEnabled(e && e->status!=QueueStatus::Completed && e->status!=QueueStatus::Running && e->status!=QueueStatus::Prepared); pause_->setEnabled(e && !e->media && (e->status==QueueStatus::Running || e->status==QueueStatus::Queued)); cancel_->setEnabled(e && (e->media ? e->status==QueueStatus::Running:e->status!=QueueStatus::Completed && e->status!=QueueStatus::Cancelled && e->status!=QueueStatus::Prepared)); more_->setEnabled(e!=nullptr);
     if(!e) {detailTitle_->setText("Select a download");for(auto& [name,label]:detailLabels_)label->setText("—");return;}
     const auto& p=e->progress; detailTitle_->setText((e->media && e->status!=QueueStatus::Completed ? e->mediaTitle:QFileInfo(e->destination).fileName())+"  ·  "+statusText(e->status));
     const QStringList text={e->url,e->destination,p.totalBytes ? bytes(*p.totalBytes):"Unknown",bytes(p.downloadedBytes),e->status==QueueStatus::Running ? bytes(static_cast<std::uint64_t>(p.smoothedBytesPerSecond))+"/s":"—",bytes(static_cast<std::uint64_t>(p.averageBytesPerSecond))+"/s",duration(p.elapsedSeconds),p.etaSeconds ? duration(*p.etaSeconds):"—",QString("%1 active / %2 target").arg(p.activeRanges).arg(p.targetConnections),bytes(p.verifiedBytes),p.resumable ? "Supported; verified before reuse":"Requires server validation; some files need Restart",e->error.isEmpty() ? "None":e->error};
@@ -128,6 +137,7 @@ void MainWindow::details() {
 }
 void MainWindow::message(const QString& text,bool error) {banner_->setText(text);banner_->setProperty("error",error);banner_->show();banner_->style()->unpolish(banner_);banner_->style()->polish(banner_);statusBar()->showMessage(text,10000);}
 void MainWindow::perform(QueueAction action) {if(const auto* e=selected()) {
+    if(!e->media && !youtubeVideo(e->url).isEmpty() && action==QueueAction::Start){openVideo(e->url,"YouTube video");return;}
     if(e->media){if(action==QueueAction::Start)openVideo(e->url,e->mediaTitle,e->mediaFolder);else if(action==QueueAction::Cancel)for(auto* dialog:findChildren<QDialog*>("mediaDialog"))if(dialog->property("mediaUrl").toString()==e->url)if(auto* media=dynamic_cast<MediaDialog*>(dialog))media->stop();return;}
     watch(queue_.action(e->id,action),[this]{banner_->hide();});
 }}
@@ -138,5 +148,20 @@ void MainWindow::theme(bool dark) {
     const QString bg=dark ? "#211522":"#fff6fa",surface=dark ? "#302033":"#ffffff",text=dark ? "#f7e8f0":"#382338",muted=dark ? "#bda1b5":"#80667b",border=dark ? "#50324a":"#f1dce7";
     setStyleSheet(QString("QWidget{font-family:'Segoe UI';font-size:12px;color:%1;background:%2;} QMainWindow,QDialog{background:%2;} QWidget#sidebar{background:%3;border-right:1px solid %5;} QLabel#brand{font-size:20px;font-weight:700;color:#ec4899;background:transparent;} QLabel#heading{font-size:25px;font-weight:700;} QLabel#detailTitle{font-size:15px;font-weight:600;background:transparent;} QLabel#muted{color:%4;background:transparent;} QLabel#aggregateSpeed{font-size:20px;font-weight:600;color:#ec4899;} QPushButton{background:%3;border:1px solid %5;border-radius:7px;padding:7px 12px;} QPushButton:hover{border-color:#ec4899;} QPushButton:disabled{color:%4;background:%2;} QPushButton[primary=true]{background:#db2777;color:white;border-color:#db2777;font-weight:600;} QPushButton[primary=true]:hover{background:#be185d;} QPushButton#navigation{text-align:left;border:0;background:transparent;padding:10px 8px;} QPushButton#navigation:hover{background:%2;} QLineEdit,QComboBox,QSpinBox{background:%3;border:1px solid %5;border-radius:7px;padding:8px;selection-background-color:#db2777;} QLineEdit:focus{border-color:#ec4899;} QTableWidget{background:%3;border:1px solid %5;border-radius:10px;selection-background-color:%6;selection-color:%1;} QTableWidget::item{padding:8px;border-bottom:1px solid %5;background:transparent;} QHeaderView::section{background:%3;color:%4;border:0;border-bottom:1px solid %5;padding:12px 8px;font-weight:600;} QProgressBar{background:%5;border:0;border-radius:5px;text-align:center;color:%1;font-size:10px;} QProgressBar::chunk{background:#f472b6;border-radius:5px;} QWidget#detailsPanel{background:%3;border:1px solid %5;border-radius:10px;} QWidget#detailsPanel QLabel{background:transparent;} QLabel#emptyState{background:%3;border:1px solid %5;border-radius:10px;color:%4;font-size:18px;} QLabel#banner{background:%6;border-radius:7px;padding:10px;} QLabel#banner[error=true]{color:#ef4444;} QStatusBar{color:%4;border-top:1px solid %5;} QMenu{background:%3;border:1px solid %5;padding:6px;} QMenu::item{padding:9px 22px;} QMenu::item:selected{background:%6;} QScrollArea{background:transparent;} QSplitter::handle{background:transparent;} QToolTip{color:%1;background:%3;border:1px solid %5;}")
         .arg(text,bg,surface,muted,border,dark ? "#50253e":"#fce7f3"));
+    setStyleSheet(styleSheet()+QString(
+        "QPushButton{font-family:Segoe UI;font-weight:600;font-size:13px;border-radius:11px;padding:9px 14px;min-height:22px;}"
+        "QPushButton:hover{background:%1;border-color:#f472b6;} QPushButton:pressed{background:%2;}"
+        "QPushButton[primary=true]{background:#db2777;border:0;padding:10px 18px;} QPushButton[primary=true]:hover{background:#ec4899;} QPushButton[primary=true]:pressed{background:#be185d;}"
+        "QPushButton:disabled{border-color:transparent;color:%3;} QPushButton[primary=true]:disabled{background:%2;color:%3;}"
+        "QPushButton#navigation:checked{background:%1;color:#db2777;border:0;border-radius:10px;font-weight:700;}"
+        "QLineEdit,QComboBox,QSpinBox{font-family:Segoe UI;font-size:13px;border-radius:10px;padding:10px;min-height:20px;}"
+        "QComboBox{padding-right:34px;} QComboBox::drop-down{width:30px;border:0;background:transparent;} QComboBox::down-arrow{image:url(:/branding/chevron.xpm);width:14px;height:14px;}"
+        "QComboBox QAbstractItemView{background:%4;border:1px solid %2;padding:6px;selection-background-color:%1;selection-color:%5;outline:0;}"
+        "QHeaderView::section{font-family:Segoe UI;font-size:12px;padding:10px 8px;} QTableWidget{border-radius:14px;}"
+        "QWidget#detailsPanel{border-radius:14px;} QLabel#mediaTitle{font-family:Segoe UI;font-size:20px;font-weight:700;background:transparent;}"
+        "QDialog QLabel{background:transparent;} QDialog#mediaDialog{background:%4;} QProgressBar{border-radius:7px;min-height:8px;} QProgressBar::chunk{border-radius:7px;background:#ec4899;}"
+        "QScrollBar:vertical{background:transparent;width:9px;margin:2px;} QScrollBar::handle:vertical{background:%2;border-radius:4px;min-height:24px;}"
+        "QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0;} QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical{background:transparent;}"
+        ).arg(dark ? "#50253e":"#fce7f3",border,muted,surface,text));
 }
 }

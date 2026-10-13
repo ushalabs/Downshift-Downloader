@@ -1,5 +1,6 @@
 #include "PipeServer.h"
 #include "NativeProtocol.h"
+#include "core/DownloadQueue/VideoUrl.h"
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -62,6 +63,7 @@ QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) 
     }
     const auto key=request.value("key").toString();
     if(command=="prepare") {
+        if(youtubeHost(QUrl(request.value("url").toString()).host()))throw std::runtime_error("Use the YouTube player's Download this video action; a watch page is not a video file.");
         const auto old=queue_.handoff(key,"status").get();if(old.value("state")!="unknown")return queue_.prepare(key,request.value("url").toString(),request.value("filename").toString(),{}).get();
         const auto url=request.value("url").toString();const auto inspection=DownloadEngine().inspect(url.toStdString(),stop);
         const auto expected=request.value("total").toString().toLongLong();

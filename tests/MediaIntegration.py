@@ -22,10 +22,11 @@ def main():
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc=size=320x240:rate=12','-f','lavfi','-i','sine=frequency=440:sample_rate=44100','-t','2','-c:v','mpeg4','-pix_fmt','yuv420p','-c:a','aac',str(source/'fixture.mp4')],check=True,timeout=30,capture_output=True)
         (destination/'Videos').mkdir()
         (source/'broken.mp4').write_bytes((source/'fixture.mp4').read_bytes())
+        (source/'collection.html').write_text('<html><title>Video collection</title><video src="fixture.mp4"></video><video src="broken.mp4"></video></html>',encoding='utf-8')
         (destination/'Videos'/'broken [broken].mp4').write_bytes(b'<html>No video here</html>')
         # FFmpeg's DASH muxer resolves fragment paths relative to the manifest.
         # Use an explicit working directory rather than Windows backslashes in that name.
-        subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-map','0:v','-map','0:a','-c','copy','-f','dash','-remove_at_exit','0','stream.mpd'],cwd=source,check=True,timeout=30,capture_output=True)
+        subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-filter_complex','[0:v]split=2[full][small];[small]scale=160:120[scaled]','-map','[full]','-map','[scaled]','-map','0:a','-c:v','mpeg4','-c:a','copy','-f','dash','-remove_at_exit','0','stream.mpd'],cwd=source,check=True,timeout=30,capture_output=True)
         assert (source/'init-stream0.m4s').exists() and (source/'init-stream1.m4s').exists(),'DASH fixture initialization files missing'
         class Handler(http.server.SimpleHTTPRequestHandler):
             def log_message(self,*args):pass
@@ -47,6 +48,14 @@ def main():
                 assert {'audio','video'}<={stream['codec_type'] for stream in metadata['streams']},metadata
                 assert 1.8<float(metadata['format']['duration'])<2.3,metadata
             assert not list(destination.glob('*.part')),'Completed media left partials'
+            quality_files=list((destination/'quality copies').glob('*.mkv'));assert len(quality_files)==2,quality_files
+            heights=set()
+            for file in quality_files:
+                metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(file)],capture_output=True,text=True,check=True,timeout=20).stdout)
+                assert any(stream['codec_type']=='audio' for stream in metadata['streams'])
+                heights.update(stream['height'] for stream in metadata['streams'] if stream['codec_type']=='video')
+            assert heights=={120,240},heights
+            print('Quality checks: separate 120p and 240p files, each with audio, independently probed.')
             print('Independent checks: direct SHA-256 and both files have audio/video and expected duration.')
         finally:server.shutdown();server.server_close()
     return 0

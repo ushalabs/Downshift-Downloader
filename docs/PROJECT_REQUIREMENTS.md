@@ -4,6 +4,8 @@ Product name: Downshift. The original phase-gated requirements follow.
 
 ## Direct user instructions overriding the original attachment (2026-10-12)
 
+- Follow-up repair request (2026-10-13): prioritize the failed actual YouTube download and absent quality choices; fix their root causes, preserve downloads/history, and modernize controls with an original pink globe/download app icon. Earlier authorization for verified Git operations on main remains in effect.
+
 - Latest authorization (2026-10-13): generalized downloader with Videos/Audios/Zip/Programs defaults below Downloads and user-selected locations per download; strict Chrome capture while enabled; smaller pink desktop UI that expands when maximized. Complete this update, then Phases 9 and 10 autonomously, committing/pushing each verified stage to main. This supersedes the older manual Git and phase-approval restrictions below.
 
 - Develop locally in `C:\Users\HP\Desktop\Projects\Downshift`.

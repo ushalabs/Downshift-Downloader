@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "core/DownloadQueue/Categories.h"
+#include "core/DownloadQueue/VideoUrl.h"
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -35,7 +36,9 @@ void MainWindow::openAdd(QString address,QString filename) {
     auto* note=new QLabel("Existing files are preserved. Some servers require a fresh start instead of resume.");note->setWordWrap(true);note->setObjectName("muted");layout->addWidget(note);
     auto* feedback=new QLabel;feedback->setObjectName("addError");feedback->setTextFormat(Qt::PlainText);feedback->setWordWrap(true);feedback->setStyleSheet("color:#ef4444;");layout->addWidget(feedback);
     auto* buttons=new QDialogButtonBox(QDialogButtonBox::Cancel);auto* accept=buttons->addButton("Add download",QDialogButtonBox::AcceptRole);accept->setObjectName("addSubmit");accept->setProperty("primary",true);layout->addWidget(buttons);connect(buttons,&QDialogButtonBox::rejected,dialog,&QDialog::reject);
-    connect(accept,&QPushButton::clicked,dialog,[this,dialog,url,dest,sha,priority,cap,start,accept,feedback]{accept->setEnabled(false);feedback->clear();const auto index=priority->currentIndex();
+    connect(accept,&QPushButton::clicked,dialog,[this,dialog,url,dest,sha,priority,cap,start,accept,feedback]{
+        if(const auto video=youtubeVideo(url->text().trimmed());!video.isEmpty()){dialog->accept();openVideo(video,"YouTube video");return;}
+        accept->setEnabled(false);feedback->clear();const auto index=priority->currentIndex();
         auto future=queue_.add(url->text(),dest->text(),index==1 ? 1 : index==2 ? -1:0,start->isChecked(),sha->text(),static_cast<std::uint64_t>(cap->value())*1024);
         auto pending=std::make_shared<std::future<QString>>(std::move(future));auto* timer=new QTimer(dialog);timer->setInterval(30);connect(timer,&QTimer::timeout,dialog,[this,dialog,accept,timer,pending,feedback]{if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();try{pending->get();dialog->accept();banner_->hide();refresh();}catch(const std::exception& e){accept->setEnabled(true);feedback->setText(QString::fromUtf8(e.what()));message(QString::fromUtf8(e.what()),true);}});timer->start();
     });dialog->open();url->setFocus();

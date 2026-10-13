@@ -16,7 +16,7 @@ From a verified Release source build:
 
 ```powershell
 ./scripts/Build-Portable.ps1 -RequireClean
-./scripts/Test-Portable.ps1 -PackagePath ./build/releases/Downshift-0.3.0-windows-x64.zip -ReportPath ./build/package-test-report.json
+./scripts/Test-Portable.ps1 -PackagePath ./build/releases/Downshift-0.3.1-windows-x64.zip -ReportPath ./build/package-test-report.json
 ```
 
 The build script bundles only the two product executables and release runtime libraries, not tests/debug/developer tools or video helpers. It generates the extension ZIP, package manifest with SHA-256 per file, separate complete dependency-source kit with vcpkg patches/recipes, and SHA256SUMS.txt. Missing source archives are fetched from their recorded upstream location and must match the exact installed SPDX SHA-512. Release publication requires a clean checkout; development packages explicitly report dirty source.

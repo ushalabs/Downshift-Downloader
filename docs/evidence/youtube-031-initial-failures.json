@@ -1,0 +1,24 @@
+{
+  "scope": "Development diagnostics; excluded from acceptance",
+  "watchHtml": {
+    "path": "C:/Users/HP/Downloads/Programs/watch",
+    "bytes": 1388110,
+    "canonicalVideo": "https://www.youtube.com/watch?v=HyfC9nZvIJM",
+    "preserved": true
+  },
+  "originalPacketCaptured": false,
+  "failures": [
+    {
+      "log": "build/youtube-live-release.log",
+      "cause": "Advertised default direct HTTPS media stream returned HTTP 403; checked HLS subsequently succeeded",
+      "logSha256": "b3f8e1ae9c19380e565ff90e7864b7594874cecffd6f4e2b72af0ddf657ef950"
+    },
+    {
+      "log": "build/youtube-031-release-tests.log",
+      "passed": 13,
+      "total": 14,
+      "cause": "New Qt brand icon decode assertion failed; disabled PNG plugin/resource compression and borrowed buffer fixed with embedded raw RGBA and owned copy",
+      "logSha256": "01c6b781e526a55f80612a2e92fe4865dbf72d923711d89e37157a3134bb559d"
+    }
+  ]
+}

@@ -13,6 +13,12 @@ check(sources.resolve({source:"https://other.example/file.webm"},sender)==="http
 observe("https://cdn.example.com/second.mp4");check(sources.resolve({},sender)===sender.url);
 check(!sources.resolve({}, {...sender,tab:{id:1,incognito:true}}));
 check(sources.resolve({source:"https://cdn.example/file.mp4"},{...sender,url:"https://www.youtube.com/watch?v=EEUVLOzuu8Q"})==="https://www.youtube.com/watch?v=EEUVLOzuu8Q");
+const stale={...sender,url:"https://www.youtube.com/feed/recommended"};
+check(sources.resolve({page:"https://www.youtube.com/watch?v=HyfC9nZvIJM",source:"blob:video"},stale)==="https://www.youtube.com/watch?v=HyfC9nZvIJM");
+check(sources.resolve({page:"https://www.youtube.com/feed/recommended",videoPage:"https://www.youtube.com/watch?v=HyfC9nZvIJM"},stale)==="https://www.youtube.com/watch?v=HyfC9nZvIJM");
+check(!sources.resolve({page:"https://www.youtube.com/feed/recommended",source:"blob:video"},stale));
+check(!sources.resolve({page:"https://evil.test/watch?v=HyfC9nZvIJM"},stale));
+check(sources.resolve({page:"https://www.youtube.com/watch?v=EEUVLOzuu8Q",videoPage:"https://www.youtube.com/watch?v=HyfC9nZvIJM"},stale)==="https://www.youtube.com/watch?v=HyfC9nZvIJM");
 clock=600001;check(sources.resolve({},sender)===sender.url);
 sources.tabs.clear();observe("https://cdn.example.com/foreign.mp4",2);check(sources.resolve({},sender)===sender.url);
 sources.tabs.clear();observe("https://cdn.example.com/segment.ts");observe("https://r1.googlevideo.com/videoplayback");check(sources.tabs.size===0);

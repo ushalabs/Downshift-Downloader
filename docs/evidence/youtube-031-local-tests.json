@@ -1,0 +1,44 @@
+{
+  "scope": "Local Windows 11 development machine; chronology qualified below; remote exact-source CI recorded separately",
+  "fullRelease": {
+    "passed": 14,
+    "total": 14,
+    "seconds": 152.61,
+    "stage": "URL/HLS/icon fixes, before final exact-height filenames"
+  },
+  "fullDebug": {
+    "passed": 14,
+    "total": 14,
+    "seconds": 163.99,
+    "stage": "URL/HLS/icon fixes, before final exact-height filenames"
+  },
+  "finalMediaRelease": {
+    "passed": 1,
+    "total": 1,
+    "seconds": 58.84,
+    "stage": "Final exact-height selection and distinct output filenames"
+  },
+  "finalMediaDebug": {
+    "passed": 1,
+    "total": 1,
+    "seconds": 66.64,
+    "stage": "Final exact-height selection and distinct output filenames"
+  },
+  "chrome": {
+    "releaseChecks": 14,
+    "debugChecks": 14,
+    "stage": "Before final quality filename and clicked-preview priority refinements; reports fingerprint actual tested source"
+  },
+  "finalExtension": {
+    "mediaModelChecks": 23,
+    "captureStateChecks": 38
+  },
+  "live": "youtube-031-live.json covers final source and full real public video; only 144p fully downloaded",
+  "logSha256": {
+    "youtube-acceptance-release-tests.log": "125271805c3380ad8250d199aefe926e38c01cfd2180580a548726edb06b50b8",
+    "youtube-final-all-debug-tests.log": "75b078b446d1a989dd3d3f85983ae1a1853c5a7000d82f1d72ace9fc3e083af7",
+    "youtube-quality-release-tests.log": "26ac68ec307121526dedd3881102fb7f59223b9556072b8a750a4db2229a1dcc",
+    "youtube-quality-debug-tests.log": "1cfe2be4a6081a75d6a9f4ac72b039107328a9aa2a68d8931cf8cdf67b09071d",
+    "youtube-031-accepted-live.log": "a6aaca08574590c9c9cc43a831a8432a664290f7155d0b99cedbf0a62b8c504a"
+  }
+}

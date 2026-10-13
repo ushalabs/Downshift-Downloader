@@ -6,7 +6,7 @@
 - Publish progress during paced callbacks, tune the initial connection pool for small ordinary files, and use fresh HTTP/1.1 on bounded transport retries.
 - Preserve downloads, encrypted history, category folders, per-download destinations and the compact pink desktop.
 
-Development users must reload the extension and refresh existing pages; its popup displays Version 0.3.2. Files remain in C:/Users/HP/Desktop/Projects/Downshift, with the existing Desktop shortcut. Public package/source verification is recorded after actual success in DEVELOPMENT_PROGRESS.md. Historical release tags/assets are immutable.
+Development users must reload the extension and refresh existing pages; its popup displays Version 0.3.2. Files remain in C:/Users/HP/Desktop/Projects/Downshift, with the existing Desktop shortcut. [Exact-source Windows CI](https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38435111840) passed both 14-group suites and 13 portable checks; the [v0.3.2 preview](https://github.com/ushalabs/Downshift-Download-Manager/releases/tag/v0.3.2) has verified public asset hashes and a separately downloaded extension ZIP. DEVELOPMENT_PROGRESS.md records each environment and diagnostic failure. Historical release tags/assets are immutable.
 
 Chrome interception cannot universally precede unknown/script-generated downloads. A displayed notification cannot always be suppressed. Server/network conditions limit throughput: the same slow WinRAR source independently delivered about 20 KB/s. This unsigned preview makes no 3 MB/s, universal YouTube/site or clean-VM guarantee. See CHROME.md, GENERAL_DOWNLOADS.md and TESTING.md for scope and evidence.
 

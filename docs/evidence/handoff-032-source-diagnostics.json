@@ -285,5 +285,20 @@
       "error": "Timeout",
       "scope": "Development Internet attempt; no completed final file claimed"
     }
-  ]
+  ],
+  "secondPublicSource": {
+    "url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/download/v0.3.1/Downshift-0.3.1-windows-x64.zip",
+    "curlFirstMiB": {
+      "bytes": 1048576,
+      "seconds": 25.936144,
+      "bytesPerSecond": 40429
+    },
+    "nativeAttempt": {
+      "completed": false,
+      "harnessDeadlineSeconds": 360,
+      "partialBytes": 12259793,
+      "logSha256": "94347a8986564e05dce91a0fac57dd003ebf40634d5ce840fb170244a857d924"
+    },
+    "scope": "Additional ordinary Internet source diagnostic. Native helper was terminated by the test harness deadline, not a reported engine failure; incomplete streaming partial preserved. Reference range was a later sequential request. Not a controlled head-to-head benchmark or final-file verification."
+  }
 }

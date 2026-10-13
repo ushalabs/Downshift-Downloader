@@ -1,0 +1,58 @@
+{
+  "sourceCommit": "16ac2ac0d254c05c59a275e79ca830650166f98b",
+  "producer": "GitHub Windows CI artifacts",
+  "ci": {
+    "id": 38435111840,
+    "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38435111840",
+    "conclusion": "success"
+  },
+  "portableTest": {
+    "sourceCommit": "16ac2ac0d254c05c59a275e79ca830650166f98b",
+    "version": "0.3.2",
+    "os": "Microsoft Windows NT 10.0.20348.0",
+    "scope": "ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership",
+    "packageSha256": "de162ef11fdf5070256fc2fbb6079bc3c09b05b619ffac972993f80ddbd9e692",
+    "limitations": "same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests",
+    "runtimePath": "Windows system directories only",
+    "checks": 13
+  },
+  "release": {
+    "id": 411921468,
+    "html_url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/tag/v0.3.2",
+    "tag_name": "v0.3.2",
+    "draft": false,
+    "prerelease": true
+  },
+  "assets": [
+    {
+      "name": "Downshift-0.3.2-application-source.zip",
+      "size": 1794970,
+      "digest": "sha256:99a30c1ed8a3e7068017d2a45fc19cdf61e2c2ecbb7430d7ea9387706f5eb6e7",
+      "browser_download_url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/download/v0.3.2/Downshift-0.3.2-application-source.zip"
+    },
+    {
+      "name": "Downshift-0.3.2-chrome-extension.zip",
+      "size": 13137,
+      "digest": "sha256:e6122673df479dbba726f3f417620020647f163823bcca2d492ab778fb75ee3e",
+      "browser_download_url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/download/v0.3.2/Downshift-0.3.2-chrome-extension.zip"
+    },
+    {
+      "name": "Downshift-0.3.2-dependency-sources.zip",
+      "size": 197562972,
+      "digest": "sha256:6873b8941df38d41cad6a35de42946e24f2465789ee70d279fc4a27deb1248fd",
+      "browser_download_url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/download/v0.3.2/Downshift-0.3.2-dependency-sources.zip"
+    },
+    {
+      "name": "Downshift-0.3.2-windows-x64.zip",
+      "size": 12264121,
+      "digest": "sha256:de162ef11fdf5070256fc2fbb6079bc3c09b05b619ffac972993f80ddbd9e692",
+      "browser_download_url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/download/v0.3.2/Downshift-0.3.2-windows-x64.zip"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 415,
+      "digest": "sha256:e6e50f31bceef1540598cbb799d2c145784b682cb834a422858d8e1bbe1774e5",
+      "browser_download_url": "https://github.com/ushalabs/Downshift-Download-Manager/releases/download/v0.3.2/SHA256SUMS.txt"
+    }
+  ]
+}

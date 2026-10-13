@@ -1,0 +1,19 @@
+{
+  "run": {
+    "id": 38396098268,
+    "head_sha": "59df956d33ab7e6098e1dcab8f9aa1075cb5e18e",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38396098268"
+  },
+  "failedSteps": [
+    {
+      "name": "Test Release",
+      "conclusion": "failure"
+    }
+  ],
+  "failure": "gui.integration: Expanded window shows connection details; other 13 Release groups passed",
+  "logs": "build/release-ci-job.log",
+  "publication": "held; unpublished draft only",
+  "causeQualification": "The test assumed a requested 1200-pixel native window is immediately available on every host. Initial failure did not log actual dimensions. Replacement verifies settled native width and both deterministic resize-event policies without skipping assertions."
+}

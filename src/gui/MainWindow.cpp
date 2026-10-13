@@ -132,7 +132,7 @@ void MainWindow::perform(QueueAction action) {if(const auto* e=selected()) {
     watch(queue_.action(e->id,action),[this]{banner_->hide();});
 }}
 void MainWindow::resizeEvent(QResizeEvent* event) {
-    QMainWindow::resizeEvent(event);if(table_)for(int column:{2,5,6,8})table_->setColumnHidden(column,width()<1100);
+    QMainWindow::resizeEvent(event);if(table_)for(int column:{2,5,6,8})table_->setColumnHidden(column,event->size().width()<1100);
 }
 void MainWindow::theme(bool dark) {
     const QString bg=dark ? "#211522":"#fff6fa",surface=dark ? "#302033":"#ffffff",text=dark ? "#f7e8f0":"#382338",muted=dark ? "#bda1b5":"#80667b",border=dark ? "#50324a":"#f1dce7";

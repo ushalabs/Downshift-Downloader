@@ -81,7 +81,7 @@ void MainWindow::more() {
         else {if(row.status!=QueueStatus::Completed)menu.addAction("Retry video",[this,row]{openVideo(row.url,row.mediaTitle,row.mediaFolder);});menu.addAction("Remove from history",[this,row]{watch(queue_.action(row.id,QueueAction::Remove),[this]{message("History removed. Files were preserved.");});});}
         menu.exec(QCursor::pos());return;
     }
-    if(row.status==QueueStatus::Prepared) {menu.addAction("Leave this download in Chrome",[this,row]{watch(queue_.handoff(row.handoffKey,"abort"),[this](const QJsonObject&){message("Browser handoff cancelled. Chrome will resume when its extension reconnects.");});});menu.exec(QCursor::pos());return;}
+    if(row.status==QueueStatus::Prepared) {menu.addAction("Cancel pending browser handoff",[this,row]{watch(queue_.handoff(row.handoffKey,"abort"),[this](const QJsonObject&){message("Handoff cancelled. Turn capture off in the extension to resume in Chrome.");});});menu.exec(QCursor::pos());return;}
     auto* priority=menu.addMenu("Priority");for(const auto& [text,action]:std::vector<std::pair<QString,QueueAction>>{{"High",QueueAction::HighPriority},{"Normal",QueueAction::NormalPriority},{"Low",QueueAction::LowPriority}})priority->addAction(text,[this,row,action]{watch(queue_.action(row.id,action),[this]{banner_->hide();});});
     if(row.status!=QueueStatus::Completed && row.status!=QueueStatus::Running && row.status!=QueueStatus::Prepared) {
         menu.addAction("Restart from beginning…",[this,row]{if(QMessageBox::question(this,"Restart download","Archive the existing partial and download this file again?")==QMessageBox::Yes)watch(queue_.action(row.id,QueueAction::Restart),[this]{banner_->hide();});});

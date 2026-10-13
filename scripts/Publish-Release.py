@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import time
+import urllib.error
 import urllib.request
 import zipfile
 
@@ -121,6 +122,20 @@ def main():
         if steps.get(step) != 'success':
             raise ValueError(f'Required verification did not pass: {step}')
     tag = 'v' + version
+    def tag_reference():
+        try:
+            reference = request(f'{api}/git/ref/tags/{tag}')['object']
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return None
+            raise
+        if reference['type'] == 'tag':
+            reference = request(f"{api}/git/tags/{reference['sha']}")['object']
+        if reference['type'] != 'commit' or reference['sha'] != args.source:
+            raise ValueError('Existing version tag points elsewhere; it will not be replaced.')
+        return reference
+
+    tag_reference()
     release = request(f'{api}/releases/{args.draft}') if args.draft else next(
         (r for r in request(f'{api}/releases?per_page=50') if r['tag_name'] == tag), None)
     if release and release['target_commitish'] != args.source:
@@ -175,6 +190,9 @@ Compare the four ZIPs to SHA256SUMS.txt. Original Downshift source is MIT; share
     release = request(f'{api}/releases/{release_id}')
     if len(release['assets']) != len(names) or any(a.get('digest') != digests.get(a['name']) for a in release['assets']):
         raise ValueError('Draft asset set differs from verified distribution.')
+    if tag_reference() is None:
+        request(api + '/git/refs', 'POST', {'ref': 'refs/tags/' + tag, 'sha': args.source})
+    tag_reference()
     payload.update({'draft': False, 'make_latest': 'false'})
     release = request(f'{api}/releases/{release_id}', 'PATCH', payload)
     reference = request(f'{api}/git/ref/tags/{tag}')['object']

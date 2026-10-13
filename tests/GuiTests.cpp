@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QPixmap>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QThread>
@@ -33,7 +34,14 @@ int main(int argc,char** argv) {
     try {
         {
             downshift::QueueManager queue(database);downshift::MainWindow window(queue);window.show();wait([&]{return window.ready();});check(!window.current().settings.dark,"Light must be default");
-            check(window.width()<950 && window.height()<650,"Compact default window");check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact columns adapt");window.resize(1200,750);QApplication::processEvents();check(!window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Expanded window shows connection details");window.resize(860,570);
+            check(window.width()<950 && window.height()<650,"Compact default window");check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact columns adapt");window.resize(1200,750);QApplication::processEvents();
+            // A small Windows/CI display can clamp the requested native window size.
+            std::cout<<"Responsive initial native size: "<<window.width()<<'x'<<window.height()<<"; connection column hidden="<<window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)<<'\n';
+            wait([&]{return window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)==(window.width()<1100);},3000);
+            std::cout<<"Responsive native size: "<<window.width()<<'x'<<window.height()<<"; connection column hidden="<<window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)<<'\n';
+            check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)==(window.width()<1100),"Columns follow actual native window width");
+            QResizeEvent expanded(QSize(1200,750),window.size());QApplication::sendEvent(&window,&expanded);check(!window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Expanded resize policy shows connection details");
+            QResizeEvent compact(QSize(860,570),QSize(1200,750));QApplication::sendEvent(&window,&compact);check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact resize policy hides connection details");window.resize(860,570);
             last=std::chrono::steady_clock::now();measuring=true;
             widget<QPushButton>(window,"addButton")->click();auto* add=widget<QDialog>(window,"addDialog");
             widget<QLineEdit>(*add,"addUrl")->setText(url);widget<QLineEdit>(*add,"addDestination")->setText(file);widget<QLineEdit>(*add,"addSha256")->setText(sha);widget<QSpinBox>(*add,"addSpeedLimit")->setValue(256);widget<QPushButton>(*add,"addSubmit")->click();

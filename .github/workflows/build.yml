@@ -21,7 +21,7 @@ jobs:
         id: dependencies-cache
         with:
           path: .cache/vcpkg
-          key: windows-2022-x64-msvc-${{ hashFiles('vcpkg.json') }}
+          key: windows-2022-x64-msvc-complete-v2-${{ hashFiles('vcpkg.json') }}
       - name: Prepare pinned vcpkg
         shell: pwsh
         run: |
@@ -32,6 +32,12 @@ jobs:
         run: ./scripts/Test-Environment.ps1
       - name: Configure Windows x64
         run: cmake --preset windows-msvc
+      - name: Preserve completely configured dependency builds
+        if: steps.dependencies-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: .cache/vcpkg
+          key: windows-2022-x64-msvc-complete-v2-${{ hashFiles('vcpkg.json') }}
       - name: Build Release
         run: cmake --build --preset release --parallel 2
       - name: Install verified upstream video tools for Release tests
@@ -60,9 +66,3 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
-      - name: Preserve completed dependency builds
-        if: always() && steps.dependencies-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: .cache/vcpkg
-          key: windows-2022-x64-msvc-${{ hashFiles('vcpkg.json') }}

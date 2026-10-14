@@ -22,6 +22,8 @@ jobs:
         with:
           path: .cache/vcpkg
           key: windows-2022-x64-msvc-complete-v2-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            windows-2022-x64-msvc-complete-v2-
       - name: Prepare pinned vcpkg
         shell: pwsh
         run: |

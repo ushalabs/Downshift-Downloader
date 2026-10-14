@@ -8,6 +8,8 @@ For the 0.4.2 local history repair, see [history recovery](HISTORY_RECOVERY.md).
 
 ## Development prerequisites
 
+T1 also builds native Rasterbar libtorrent 2.1.2, Boost and OpenSSL through pinned vcpkg, adding first-build time/disk use. No Python binding or WebRTC stack is selected. DownshiftTorrent.exe is a developer tool until torrent GUI integration; see TORRENTS.md.
+
 - Windows 10/11 x64.
 - Visual Studio 2022 or Build Tools 2022, MSVC v143, Desktop development with C++, and a Windows SDK.
 - Git.

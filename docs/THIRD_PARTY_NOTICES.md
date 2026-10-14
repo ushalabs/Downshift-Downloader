@@ -9,6 +9,9 @@ Downshift's original application source is licensed under MIT. Dependency licens
 | Qt Core, Gui, Widgets | Open-source LGPLv3 option; link dynamically | [Qt licensing](https://doc.qt.io/qt-6/licensing.html) |
 | libcurl | curl license, with ISC/BSD notices for included components | [curl license](https://curl.se/docs/copyright.html) |
 | SQLite | Public domain; upstream blessing | [SQLite copyright](https://sqlite.org/copyright.html) |
+| Rasterbar libtorrent 2.1.2 (T1) | BSD-3-Clause with embedded notices; preserve pinned port copyright | [Rasterbar source](https://github.com/arvidn/libtorrent) |
+| OpenSSL (torrent engine) | Apache-2.0 | [OpenSSL license](https://openssl-library.org/source/license/) |
+| Boost (torrent engine) | BSL-1.0 | [Boost license](https://www.boost.org/LICENSE_1_0.txt) |
 
 The selected Qt module set permits the LGPL option, so the original application can use MIT while complying with the libraries' terms. No GPL-only optional Qt modules are intentionally selected. See [Qt LGPL obligations](https://www.qt.io/development/open-source-lgpl-obligations).
 

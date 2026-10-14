@@ -1,5 +1,9 @@
 # Downshift architecture
 
+## Torrent foundation (T1)
+
+The independent downshift_torrent target wraps native Rasterbar through its exported CMake/ABI target. An owned worker serializes parsing, commands, alerts and bounded status requests; Qt receives copied queued snapshots. HTTP classes, rate budgets, scheduler and SQLite payloads are not repurposed for peer/piece scheduling. Session failure stays within its adapter. DownshiftTorrent exercises the engine while GUI/database integration remains gated. See TORRENTS.md.
+
 ## Current execution boundaries
 
 The native Windows application uses C++20, MSVC v143, Qt 6 Widgets, libcurl multi with Schannel TLS/HTTP2, and SQLite's C API. Qt and the MSVC runtime are dynamically linked. CMake's x64 Visual Studio generator and a pinned vcpkg baseline build Debug and Release. HTTP/3 is not selected.

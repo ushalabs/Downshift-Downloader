@@ -2,7 +2,9 @@
 
 The 0.4.2 development history repair and storage-binding recovery procedure are documented in [HISTORY_RECOVERY.md](docs/HISTORY_RECOVERY.md). Public release artifacts remain at the separately verified v0.3.3 preview.
 
-The working development version is **0.4.1 — independent range connections and GUI 2.0**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the new pink arrow icon. Startup clearly distinguishes loading/failure from an empty history and retains the existing per-user database, paused tasks and encrypted backups. Segmented HTTP/2 downloads now use independent reusable connections rather than multiplexing the range pool onto one socket. See [performance diagnosis](docs/PERFORMANCE.md) and [GUI 2.0](docs/GUI_2.md). The verified published preview remains v0.3.3; this phase stops for review after commit/push.
+Native BitTorrent Phase T1 provides a tested Rasterbar engine and developer tool: see [torrent scope and usage](docs/TORRENTS.md). Torrent GUI and persistence are later, separately approved phases.
+
+The working HTTP/GUI version is **0.4.2 — history storage repair, independent range connections and GUI 2.0**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the pink arrow icon. Startup distinguishes loading/failure from empty history and checks recovered storage identity. Segmented HTTP/2 downloads use independent reusable connections. See [performance diagnosis](docs/PERFORMANCE.md), [GUI 2.0](docs/GUI_2.md) and [history recovery](docs/HISTORY_RECOVERY.md). The verified published preview remains v0.3.3. The separate T1 torrent foundation is not yet a GUI feature.
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 

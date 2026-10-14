@@ -16,6 +16,20 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets)
 find_package(CURL REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
+find_package(LibtorrentRasterbar 2 CONFIG REQUIRED)
+
+add_library(downshift_torrent STATIC
+    src/torrent/TorrentEngine.cpp src/torrent/TorrentEngine.h)
+set_target_properties(downshift_torrent PROPERTIES AUTOMOC ON)
+target_include_directories(downshift_torrent PUBLIC src)
+target_link_libraries(downshift_torrent PUBLIC Qt6::Core PRIVATE LibtorrentRasterbar::torrent-rasterbar)
+target_compile_options(downshift_torrent PRIVATE /W4 /permissive- /utf-8)
+target_compile_definitions(downshift_torrent PRIVATE _WIN32_WINNT=0x0A00)
+
+add_executable(downshift_torrent_cli src/TorrentCli.cpp)
+set_target_properties(downshift_torrent_cli PROPERTIES OUTPUT_NAME DownshiftTorrent)
+target_link_libraries(downshift_torrent_cli PRIVATE downshift_torrent)
+target_compile_options(downshift_torrent_cli PRIVATE /W4 /permissive- /utf-8)
 
 add_library(downshift_foundation STATIC
     src/core/Runtime.cpp
@@ -99,6 +113,12 @@ add_custom_command(TARGET downshift POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(downshift_torrent_tests tests/TorrentTests.cpp)
+    target_link_libraries(downshift_torrent_tests PRIVATE downshift_torrent LibtorrentRasterbar::torrent-rasterbar)
+    target_compile_options(downshift_torrent_tests PRIVATE /W4 /permissive- /utf-8)
+    target_compile_definitions(downshift_torrent_tests PRIVATE _WIN32_WINNT=0x0A00)
+    add_test(NAME torrent.foundation COMMAND downshift_torrent_tests)
+    set_tests_properties(torrent.foundation PROPERTIES TIMEOUT 150 RUN_SERIAL TRUE)
     find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
     find_program(NODE_EXECUTABLE NAMES node)
     if(NODE_EXECUTABLE)

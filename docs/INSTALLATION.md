@@ -2,7 +2,9 @@
 
 ## End-user installation
 
-No installer, portable package, or verified release binary is available yet. The Windows portable distribution includes its required runtime libraries. End users can follow [portable setup](PACKAGING.md); build tools are required only for source development.
+The separately verified v0.3.3 portable preview is available on GitHub. Development builds may be newer. The Windows portable distribution includes its required runtime libraries. End users can follow [portable setup](PACKAGING.md); build tools are required only for source development.
+
+For the 0.4.2 local history repair, see [history recovery](HISTORY_RECOVERY.md). The existing Desktop shortcut still targets the project Release executable. Its private storage binding and encrypted project data are excluded from distribution.
 
 ## Development prerequisites
 

@@ -93,4 +93,6 @@ The Qt window distinguishes loading, empty, no-match and unavailable history. De
 
 ## Independent range connections (0.4.1)
 
+History follow-up 0.4.2 adds an optional per-executable storage binding, pre-open physical-file identity verification and an authenticated intentional-empty marker. Startup rejects unexplained empty live stores when owned encrypted snapshots retain history. The additive queue_meta table preserves schema-2 HTTP records. See [HISTORY_RECOVERY.md](HISTORY_RECOVERY.md) for the reproduced Desktop/tool storage split and the local recovery procedure.
+
 The range pool disables libcurl multi multiplexing explicitly with CURLPIPE_NOTHING and bounds the idle connection cache to the configured pool size. HTTP/2 remains negotiated normally; each active range uses its own physical connection, and completed connections remain reusable for later ranges. The ordinary single-transfer streaming fallback stays single-connection. Metadata negotiation, hard host/total limits, version/range/TLS validation, encrypted journals, checkpointing and hashes are unchanged. Default multiplexing previously combined eight active easy handles into one physical HTTP/2 connection, despite the UI showing eight ranges. See PERFORMANCE.md and the real TLS transport fixture.

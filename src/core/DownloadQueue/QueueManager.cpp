@@ -103,7 +103,8 @@ void QueueManager::initialize() {
         const auto saved=candidate->settings();if(!saved.isEmpty())settings=QueueSettings::fromJson(object(saved));if(settings.directory.isEmpty())settings.directory=QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
         std::map<QString,QJsonObject> receipts;std::vector<QueueEntry> entries;
         for(const auto& row:candidate->receipts()) {const auto r=object(row);const auto key=r.value("key").toString(),state=r.value("state").toString();if(key.size()!=32 || receipts.contains(key) || (state!="prepared" && state!="committed" && state!="aborted"))invalid("Damaged browser handoff receipt.");receipts.emplace(key,r);}
-        for(const auto& row:candidate->load()) {
+        const auto rows=candidate->load();if(rows.empty())candidate->verifyEmptyHistory();
+        for(const auto& row:rows) {
             auto e=QueueEntry::fromJson(object(row));
             if(!e.handoffKey.isEmpty() && (!receipts.contains(e.handoffKey) || receipts.at(e.handoffKey).value("downloadId")!=e.id))invalid("Missing or mismatched browser handoff receipt.");
             if(std::any_of(entries.begin(),entries.end(),[&](const auto& old){return old.id==e.id;}))invalid("Duplicate database download IDs.");entries.push_back(std::move(e));

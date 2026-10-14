@@ -19,6 +19,7 @@ public:
     std::vector<QByteArray> receipts();
     void handoff(const QString& id,const QByteArray& entry,const QString& key,const QByteArray& receipt);
     void backup();
+    void verifyEmptyHistory();
 private:
     sqlite3* db_ = nullptr;
     QString path_;

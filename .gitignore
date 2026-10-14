@@ -1,4 +1,5 @@
 /build/
+/.downshift-data/
 /vcpkg_installed/
 /.tools/
 /.cache/

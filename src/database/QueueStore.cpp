@@ -59,7 +59,8 @@ QueueStore::QueueStore(const QString& path):path_(QFileInfo(path).absoluteFilePa
         if (sqlite3_step(version.value) != SQLITE_ROW || sqlite3_column_int(version.value, 0) > 2) failure();
         exec(db_, "BEGIN IMMEDIATE; CREATE TABLE IF NOT EXISTS downloads(id TEXT PRIMARY KEY, payload BLOB NOT NULL);"
             "CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1), payload BLOB NOT NULL);"
-            "CREATE TABLE IF NOT EXISTS handoffs(id TEXT PRIMARY KEY, payload BLOB NOT NULL); PRAGMA user_version=2; COMMIT;");
+            "CREATE TABLE IF NOT EXISTS handoffs(id TEXT PRIMARY KEY, payload BLOB NOT NULL);"
+            "CREATE TABLE IF NOT EXISTS queue_meta(key TEXT PRIMARY KEY, payload BLOB NOT NULL); PRAGMA user_version=2; COMMIT;");
     } catch (...) { sqlite3_close(db_); db_ = nullptr; throw; }
 }
 QueueStore::~QueueStore() { sqlite3_close(db_); }
@@ -72,8 +73,33 @@ std::vector<QByteArray> QueueStore::load() {
 void QueueStore::save(const QString& id, const QByteArray& json) {
     Statement s(db_, "INSERT INTO downloads(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload");
     s.text(1, id); s.blob(2, protect(json, true)); s.done();
+    exec(db_,"DELETE FROM queue_meta WHERE key='empty_intent'");
 }
-void QueueStore::erase(const QString& id) { Statement s(db_, "DELETE FROM downloads WHERE id=?1"); s.text(1, id); s.done(); }
+void QueueStore::erase(const QString& id) {
+    exec(db_,"BEGIN IMMEDIATE");
+    try {
+        Statement s(db_,"DELETE FROM downloads WHERE id=?1");s.text(1,id);s.done();
+        Statement count(db_,"SELECT count(*) FROM downloads");if(sqlite3_step(count.value)!=SQLITE_ROW)failure();
+        if(sqlite3_column_int64(count.value,0)==0){Statement marker(db_,"INSERT OR REPLACE INTO queue_meta(key,payload) VALUES('empty_intent',?1)");marker.blob(1,protect("{\"version\":1,\"intentional\":true}",true));marker.done();}
+        exec(db_,"COMMIT");
+    }catch(...){sqlite3_exec(db_,"ROLLBACK",nullptr,nullptr,nullptr);throw;}
+}
+void QueueStore::verifyEmptyHistory() {
+    {Statement marker(db_,"SELECT payload FROM queue_meta WHERE key='empty_intent'");const auto status=sqlite3_step(marker.value);
+    if(status==SQLITE_ROW){const auto value=QJsonDocument::fromJson(column(marker.value)).object();if(value.value("version").toInt()==1 && value.value("intentional").toBool())return;}else if(status!=SQLITE_DONE)failure();}
+    const auto folder=path_+".backups";QFile index(QDir(folder).filePath("owned.json"));if(!index.exists())return;
+    if(!index.open(QIODevice::ReadOnly) || index.size()>8192)throw std::runtime_error("The active history is empty and its recovery index cannot be verified. Existing data was preserved.");
+    const auto document=QJsonDocument::fromJson(index.readAll());const auto files=document.object().value("files").toArray();
+    if(!document.isObject() || document.object().value("version").toInt()!=1 || files.size()>8)failure();
+    const QRegularExpression safe("^snapshot-[0-9a-f]{32}\\.sqlite$");
+    for(const auto& entry:files){
+        if(!safe.match(entry.toString()).hasMatch())failure();const auto file=QDir(folder).filePath(entry.toString());
+        sqlite3* copy=nullptr;if(sqlite3_open_v2(file.toUtf8().constData(),&copy,SQLITE_OPEN_READONLY|SQLITE_OPEN_NOMUTEX,nullptr)!=SQLITE_OK){sqlite3_close(copy);failure();}
+        bool saved=false;
+        try{{Statement row(copy,"SELECT payload FROM downloads LIMIT 1");const auto status=sqlite3_step(row.value);if(status==SQLITE_ROW){(void)column(row.value);saved=true;}else if(status!=SQLITE_DONE)failure();}sqlite3_close(copy);}catch(...){sqlite3_close(copy);throw;}
+        if(saved)throw std::runtime_error("The active history is empty, but encrypted backups contain saved downloads. No empty queue was accepted or rotated over them. Check the data folder and recover the saved history.");
+    }
+}
 QByteArray QueueStore::settings() { Statement s(db_, "SELECT payload FROM settings WHERE id=1"); const int status = sqlite3_step(s.value); if (status == SQLITE_DONE) return {}; if (status != SQLITE_ROW) failure(); return column(s.value); }
 void QueueStore::settings(const QByteArray& json) { Statement s(db_, "INSERT INTO settings VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload"); s.blob(1, protect(json, true)); s.done(); }
 std::vector<QByteArray> QueueStore::receipts() {

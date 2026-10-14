@@ -1,6 +1,7 @@
 #include "PipeServer.h"
 #include "NativeProtocol.h"
 #include "core/DownloadQueue/VideoUrl.h"
+#include "core/DownloadQueue/StorageLocation.h"
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -54,7 +55,7 @@ void PipeServer::run(std::stop_token stop) {
 }
 QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) {
     validate(request);const auto command=request.value("command").toString();
-    if(command=="ping"){const auto snapshot=queue_.snapshot().get();int paused=0,running=0;for(const auto& entry:snapshot.entries){if(entry.status==QueueStatus::Paused)++paused;if(entry.status==QueueStatus::Running || entry.status==QueueStatus::Queued)++running;}return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"historyCount",static_cast<int>(snapshot.entries.size())},{"pausedCount",paused},{"activeCount",running},{"capabilities",QJsonObject{{"serverFilename",true}}}};}
+    if(command=="ping"){const auto snapshot=queue_.snapshot().get();int paused=0,running=0;for(const auto& entry:snapshot.entries){if(entry.status==QueueStatus::Paused)++paused;if(entry.status==QueueStatus::Running || entry.status==QueueStatus::Queued)++running;}return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"historyCount",static_cast<int>(snapshot.entries.size())},{"storageIdentity",storageIdentity(queue_.databasePath())},{"pausedCount",paused},{"activeCount",running},{"capabilities",QJsonObject{{"serverFilename",true}}}};}
     if(command=="open"){open_();return {{"state","ready"}};}
     if(command=="blocked"){open_();if(blocked_)blocked_();return {{"state","blocked"}};}
     if(command=="media"){

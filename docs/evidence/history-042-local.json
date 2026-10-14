@@ -1,0 +1,57 @@
+{
+  "version": "0.4.2",
+  "rootCause": {
+    "sameDisplayedPath": true,
+    "samePhysicalDatabase": false,
+    "desktopBytes": 24576,
+    "developmentBytes": 36864,
+    "deletePending": false,
+    "responsibleRedirectionComponent": "unidentified"
+  },
+  "recoveredRecords": 6,
+  "recordIdsSettingsAndReceiptsUnchanged": true,
+  "oldBranchesArchived": true,
+  "desktopVerification": {
+    "activeCount": 0,
+    "appVersion": "0.4.2",
+    "capabilities": {
+      "serverFilename": true
+    },
+    "historyCount": 6,
+    "ok": true,
+    "pausedCount": 1,
+    "state": "ready",
+    "version": 1,
+    "expectedPhysicalFileMatched": true,
+    "launchParent": "Explorer.exe",
+    "testArguments": false
+  },
+  "interveningProgress": {
+    "changedRecords": 1,
+    "fields": [
+      "averageSpeed",
+      "downloaded",
+      "elapsed",
+      "updated",
+      "verified"
+    ],
+    "destinationAndUrlUnchanged": true,
+    "beforeAndAfterPaused": true,
+    "newerProgressRetained": true,
+    "encryptedPayloadEqualityNotApplicable": true
+  },
+  "localRelease": {
+    "passedGroups": 16,
+    "totalGroups": 16,
+    "seconds": 321.66
+  },
+  "localDebug": {
+    "firstRunPassedGroups": 15,
+    "totalGroups": 16,
+    "seconds": 338.25,
+    "failure": "GUI harness subprocess timeout at 60 seconds",
+    "isolatedGuiRetryPassed": true,
+    "isolatedGuiRetrySeconds": 49.63
+  },
+  "scope": "Private fixture full hashes, pause/restart/resume and crash recovery. Normal Desktop store verified separately. User transfer was not resumed by validation."
+}

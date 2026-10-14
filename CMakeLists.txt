@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Downshift VERSION 0.4.1 LANGUAGES CXX)
+project(Downshift VERSION 0.4.2 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Downshift requires Windows and the MSVC C++ toolchain.")
@@ -44,8 +44,9 @@ target_compile_options(downshift_download PRIVATE /W4 /permissive- /utf-8)
 add_library(downshift_queue STATIC
     src/database/QueueStore.cpp
     src/core/DownloadQueue/QueueManager.cpp
+    src/core/DownloadQueue/StorageLocation.cpp
 )
-target_link_libraries(downshift_queue PUBLIC downshift_engine Qt6::Core PRIVATE crypt32)
+target_link_libraries(downshift_queue PUBLIC downshift_engine Qt6::Core PRIVATE crypt32 shell32 ole32)
 target_compile_options(downshift_queue PRIVATE /W4 /permissive- /utf-8)
 
 add_library(downshift_browser STATIC src/browser/NativeProtocol.cpp src/browser/PipeServer.cpp)
@@ -136,6 +137,11 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_BINARY_DIR}/gui-shots/$<CONFIG>")
     set_tests_properties(gui.integration PROPERTIES TIMEOUT 90)
     add_executable(downshift_queue_tests tests/QueueDriver.cpp)
+    add_executable(downshift_storage_tests tests/StorageTests.cpp)
+    target_link_libraries(downshift_storage_tests PRIVATE downshift_queue)
+    target_compile_options(downshift_storage_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME queue.location COMMAND downshift_storage_tests)
+    set_tests_properties(queue.location PROPERTIES TIMEOUT 30)
     target_link_libraries(downshift_queue_tests PRIVATE downshift_queue)
     target_compile_options(downshift_queue_tests PRIVATE /W4 /permissive- /utf-8)
     add_test(NAME queue.integration COMMAND Python3::Interpreter

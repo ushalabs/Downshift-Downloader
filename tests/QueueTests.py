@@ -132,6 +132,28 @@ def main():
         d=Driver(exe,db);assert not d.send('snapshot')['ok'];d.close();assert not db.exists();checks+=1
         db.write_bytes(b'');d=Driver(exe,db);assert not d.send('snapshot')['ok'];d.close();assert db.stat().st_size==0;checks+=1
         held.replace(db);d=Driver(exe,db);assert len(d.rows())==6;d.close();checks+=1
+        # A valid SQLite file with zero rows must not conceal nonempty backups.
+        import shutil
+        saved=root/'nonempty-history.sqlite';shutil.copy2(db,saved)
+        index=pathlib.Path(str(db)+'.backups')/'owned.json'
+        old_index=index.read_bytes()
+        with sqlite3.connect(db) as sql:sql.execute('DELETE FROM downloads')
+        sql.close()
+        d=Driver(exe,db);answer=d.send('snapshot');assert not answer['ok'],answer;d.close()
+        assert index.read_bytes()==old_index;checks+=1
+        # Deliberate Remove-all remains empty after restart, without deleting data.
+        clean=root/'intentional.sqlite';shutil.copy2(saved,clean)
+        shutil.copytree(pathlib.Path(str(db)+'.backups'),pathlib.Path(str(clean)+'.backups'))
+        d=Driver(exe,clean)
+        for row in d.rows():d.call('action',id=row['id'],action=4)
+        d.close();d=Driver(exe,clean);assert d.rows()==[];checks+=1
+        added=d.call('add',url=url,destination=str(root/'after-clear.bin'),start=False)['id']
+        d.close()
+        with sqlite3.connect(clean) as sql:sql.execute('DELETE FROM downloads')
+        sql.close()
+        d=Driver(exe,clean);assert not d.send('snapshot')['ok'];d.close();checks+=1
+        assert (root/'file0.bin').exists() and (root/'slow.bin.part').exists();checks+=1
+        shutil.copy2(saved,db);d=Driver(exe,db);assert len(d.rows())==6;d.close()
         # Authenticated encrypted record corruption is a visible startup failure.
         import sqlite3
         with sqlite3.connect(db) as sql: sql.execute("UPDATE downloads SET payload=? WHERE id=?",(b"broken",high))

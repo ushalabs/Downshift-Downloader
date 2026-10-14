@@ -2,6 +2,7 @@
 #include "core/Runtime.h"
 #include "browser/PipeServer.h"
 #include "browser/NativeProtocol.h"
+#include "TestWindows.h"
 #include "gui/MainWindow.h"
 #include <QApplication>
 #include <QCoreApplication>
@@ -15,7 +16,6 @@
 #include <QPushButton>
 #include <QEvent>
 #include <iostream>
-class HiddenTestWindows final:public QObject { bool eventFilter(QObject* object,QEvent* event) override {if(event->type()==QEvent::Show)if(auto* widget=qobject_cast<QWidget*>(object);widget && widget->isWindow())widget->setAttribute(Qt::WA_DontShowOnScreen);return false;} };
 int main(int argc,char** argv) {
     QApplication app(argc,argv);if(argc!=2 && argc!=3)return 2;HiddenTestWindows hidden;
     if(argc==3){if(QString::fromLatin1(argv[2])!="--isolated-browser-test")return 2;downshift::browser::useIsolatedTestPipe();app.installEventFilter(&hidden);}
@@ -27,6 +27,8 @@ int main(int argc,char** argv) {
     std::thread commands([&]{std::string line;
     while(std::getline(std::cin,line)) {
         if(line=="exit")break;
+        if(line.starts_with("main-shot ")){QMetaObject::invokeMethod(&window,[&]{window.grab().save(QString::fromStdString(line.substr(10)),"BMP");},Qt::BlockingQueuedConnection);std::cout<<"captured"<<std::endl;continue;}
+        if(line=="summary"){QJsonObject summary;QMetaObject::invokeMethod(&window,[&]{summary={{"ready",window.ready()},{"records",static_cast<int>(window.current().entries.size())},{"summary",window.findChild<QLabel*>("summary")->text()}};},Qt::BlockingQueuedConnection);std::cout<<QJsonDocument(summary).toJson(QJsonDocument::Compact).constData()<<std::endl;continue;}
         if(line=="confirm") {QMetaObject::invokeMethod(&window,[&]{for(auto* button:window.findChildren<QPushButton*>("captureStart"))if(button->isEnabled())button->click();},Qt::BlockingQueuedConnection);std::cout<<"confirmed"<<std::endl;continue;}
         if(line=="media" || line=="media-download" || line=="media-close" || line.starts_with("media-height ") || line.starts_with("media-shot ")) {
             QJsonArray media;QMetaObject::invokeMethod(&window,[&]{for(auto* dialog:window.findChildren<QDialog*>("mediaDialog")){

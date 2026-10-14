@@ -6,6 +6,13 @@
 #include <sqlite3.h>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QSaveFile>
+#include <QUuid>
+#include <QRegularExpression>
 #include <memory>
 #include <stdexcept>
 namespace downshift {
@@ -36,7 +43,10 @@ QByteArray column(sqlite3_stmt* s) {
     return protect(QByteArray(static_cast<const char*>(sqlite3_column_blob(s, 0)), count), false);
 }
 }
-QueueStore::QueueStore(const QString& path) {
+QueueStore::QueueStore(const QString& path):path_(QFileInfo(path).absoluteFilePath()) {
+    const QFileInfo live(path_);
+    if(QFileInfo::exists(QDir(path_+".backups").filePath("owned.json")) && (!live.exists() || live.size()==0))
+        throw std::runtime_error("The saved history file is missing or empty. Its encrypted backups were preserved. Open the data folder in Settings; do not replace it with a new empty queue.");
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) failure();
     // A named Win32 lease in QueueManager prevents competing owners of this database.
     if (sqlite3_open_v2(path.toUtf8().constData(), &db_, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, nullptr) != SQLITE_OK) {
@@ -75,5 +85,39 @@ void QueueStore::handoff(const QString& id,const QByteArray& entry,const QString
     exec(db_,"BEGIN IMMEDIATE");
     try { save(id,entry);Statement s(db_,"INSERT INTO handoffs(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload");s.text(1,key);s.blob(2,protect(receipt,true));s.done();exec(db_,"COMMIT"); }
     catch(...) { sqlite3_exec(db_,"ROLLBACK",nullptr,nullptr,nullptr);throw; }
+}
+void QueueStore::backup() {
+    const auto folder=path_+".backups";
+    if(!QDir().mkpath(folder))throw std::runtime_error("History is saved, but its backup folder is unavailable.");
+    const auto indexPath=QDir(folder).filePath("owned.json");QJsonArray owned;
+    QFile index(indexPath);
+    if(index.exists()) {
+        if(!index.open(QIODevice::ReadOnly) || index.size()>8192)throw std::runtime_error("History is saved, but its backup index is unavailable.");
+        const auto document=QJsonDocument::fromJson(index.readAll());
+        if(!document.isObject() || document.object().value("version").toInt()!=1)throw std::runtime_error("History is saved, but its backup index is invalid.");
+        owned=document.object().value("files").toArray();
+        const QRegularExpression name("^snapshot-[0-9a-f]{32}\\.sqlite$");
+        if(owned.size()>8)throw std::runtime_error("History is saved, but its backup index is invalid.");
+        for(const auto& item:owned)if(!name.match(item.toString()).hasMatch())throw std::runtime_error("History is saved, but its backup index is invalid.");
+        index.close();
+    }
+    const auto name="snapshot-"+QUuid::createUuid().toString(QUuid::Id128)+".sqlite";
+    const auto target=QDir(folder).filePath(name),temporary=target+".pending";
+    sqlite3* copy=nullptr;
+    if(sqlite3_open_v2(temporary.toUtf8().constData(),&copy,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE,nullptr)!=SQLITE_OK){sqlite3_close(copy);throw std::runtime_error("History is saved, but a backup could not be created.");}
+    auto* operation=sqlite3_backup_init(copy,"main",db_,"main");
+    const auto copied=operation ? sqlite3_backup_step(operation,-1):SQLITE_ERROR;
+    const auto finished=operation ? sqlite3_backup_finish(operation):SQLITE_ERROR;
+    const auto flattened=sqlite3_exec(copy,"PRAGMA journal_mode=DELETE;",nullptr,nullptr,nullptr);
+    const auto closed=sqlite3_close(copy);
+    if(copied!=SQLITE_DONE || finished!=SQLITE_OK || flattened!=SQLITE_OK || closed!=SQLITE_OK || !QFile::rename(temporary,target)){
+        QFile::remove(temporary);throw std::runtime_error("History is saved, but its backup could not be verified.");
+    }
+    owned.append(name);QString expired;if(owned.size()>8){expired=owned.first().toString();owned.removeFirst();}
+    QSaveFile save(indexPath);
+    const auto bytes=QJsonDocument(QJsonObject{{"version",1},{"files",owned}}).toJson(QJsonDocument::Compact);
+    if(!save.open(QIODevice::WriteOnly) || save.write(bytes)!=bytes.size() || !save.commit())throw std::runtime_error("History is saved, but its backup index could not be saved.");
+    // Only names recorded in the validated ownership index are ever rotated.
+    if(!expired.isEmpty())QFile::remove(QDir(folder).filePath(expired));
 }
 }

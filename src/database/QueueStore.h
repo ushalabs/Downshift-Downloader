@@ -18,7 +18,9 @@ public:
     void settings(const QByteArray& json);
     std::vector<QByteArray> receipts();
     void handoff(const QString& id,const QByteArray& entry,const QString& key,const QByteArray& receipt);
+    void backup();
 private:
     sqlite3* db_ = nullptr;
+    QString path_;
 };
 }

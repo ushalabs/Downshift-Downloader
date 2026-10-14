@@ -9,6 +9,7 @@ class QLineEdit;
 class QComboBox;
 class QPushButton;
 class QSystemTrayIcon;
+class QScrollArea;
 namespace downshift {
 class MainWindow final:public QMainWindow {
 public:
@@ -21,7 +22,7 @@ public:
     void openSettings();
     void openVideo(QString url,QString title,QString folder={});
     void refresh();
-    void chromeStatus(QString status){chromeStatus_=std::move(status);}
+    void chromeStatus(QString status){chromeStatus_=std::move(status);if(auto* label=findChild<QLabel*>("chromeStatus"))label->setText("Chrome integration: "+chromeStatus_);}
 private:
     void resizeEvent(QResizeEvent* event) override;
     template<class T,class F> void watch(std::future<T> future,F success) {
@@ -52,6 +53,10 @@ private:
     int page_=0;
     std::vector<std::size_t> displayOrder_;
     QLabel *summary_=nullptr,*speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
+    QLabel *totalMetric_=nullptr,*activeMetric_=nullptr,*dataMetric_=nullptr,*emptyHelp_=nullptr,*identity_=nullptr;
+    QWidget *sidebar_=nullptr,*emptyPanel_=nullptr,*detailsContainer_=nullptr;
+    QScrollArea* detailScroll_=nullptr;
+    QPushButton *add_=nullptr,*video_=nullptr,*emptyAdd_=nullptr,*detailToggle_=nullptr,*retryHistory_=nullptr;
     std::vector<std::pair<QString,QLabel*>> detailLabels_;
     QPushButton *start_=nullptr,*pause_=nullptr,*cancel_=nullptr,*more_=nullptr;
     QSystemTrayIcon* tray_=nullptr;

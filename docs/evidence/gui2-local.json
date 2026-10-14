@@ -1,0 +1,57 @@
+{
+  "version": "0.4.0",
+  "scope": "Local Windows native GUI/history phase; no new release publication",
+  "fullSuitesBeforeFinalPopupAndHelpRefinement": {
+    "Release": {
+      "passed": 14,
+      "seconds": 119.58
+    },
+    "Debug": {
+      "passed": 14,
+      "seconds": 134.29
+    }
+  },
+  "finalFocusedSuites": {
+    "Release": {
+      "passed": 4,
+      "seconds": 54.1
+    },
+    "Debug": {
+      "passed": 4,
+      "seconds": 64.82
+    }
+  },
+  "queueChecks": 41,
+  "guiChecks": 113,
+  "controlledMediaChecks": 63,
+  "scaling": {
+    "nativeDpr": 1.25,
+    "additionalEffectiveQtDpr": 1.5,
+    "windowsSystemScalingChanged": false
+  },
+  "originalTriggerCaptured": false,
+  "engineSourceChanged": false,
+  "normalHistory": {
+    "initialRecords": 7,
+    "initialPaused": 1,
+    "differentWorkingDirectoryRestartRetained": true,
+    "userConfirmedFailedEntryRemoval": true,
+    "finalRecords": 6,
+    "finalPaused": 1,
+    "finalActive": 0,
+    "encryptedPayloadUnchangedAfterConfirmedRemoval": true
+  },
+  "testsHidden": true,
+  "publicScreenshots": "Synthetic Qt widget fixtures only",
+  "logSha256": {
+    "gui2-completed-release-tests.log": "21b88b5a8ef87a8b2eace15adb9888794b63373688a892cb600dd13776d9a396",
+    "gui2-completed-debug-tests.log": "8e797f864c7249cb7436511b0d486101a4afb7e0adba5cc071c64f6d5fa3429e",
+    "gui2-popup-release-tests.log": "4fe87f56747672575ff90952c315b4a733ff403a76f6849f930b4bfdd7d1b7ae",
+    "gui2-popup-debug-tests.log": "5a14905e9dde6774eb96d0e9650424bd1adc1caf55a0a5ed4dd879838ba67a7e",
+    "gui2-final-dpi-150.log": "d0cd4c928a666308fd50a3bc72001a060c2f104557b21b7687dba44fd440331a"
+  },
+  "binaries": {
+    "Downshift.exe": "59fc36d3656fe56f6140acea166225fefdb7edfaa54108ab1f90f01d366923d3",
+    "DownshiftNativeHost.exe": "19a3bc5c1de19e0f25ca4e3224f2103d963c8b76d197e1b0d69041aa3a97d621"
+  }
+}

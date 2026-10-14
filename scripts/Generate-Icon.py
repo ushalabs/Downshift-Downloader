@@ -1,7 +1,6 @@
-"""Rebuild Downshift's original globe-and-download icon (Pillow required)."""
+"""Rebuild Downshift's original rounded download icon (Pillow required)."""
 from pathlib import Path
 from PIL import Image, ImageDraw
-import math
 
 root = Path(__file__).resolve().parents[1] / 'assets'
 root.mkdir(exist_ok=True)
@@ -9,24 +8,18 @@ scale=4
 image=Image.new('RGBA',(256*scale,256*scale),(0,0,0,0))
 draw=ImageDraw.Draw(image)
 def box(values): return tuple(round(v*scale) for v in values)
-draw.ellipse(box((25,28,221,224)),fill='#6d1648')
-draw.ellipse(box((23,20,219,216)),fill='#db2777')
-for y in range(23,211):
-    ratio=(y-23)/188
-    color=(int(252-56*ratio),int(116-89*ratio),int(184-67*ratio),255)
-    radius=math.sqrt(max(0,98**2-(y-118)**2))
-    draw.line(box((121-radius,y,121+radius,y)),fill=color,width=scale)
-draw.ellipse(box((61,21,181,215)),outline='#ffd6e9',width=3*scale)
-draw.ellipse(box((94,21,148,215)),outline='#ffd6e9',width=3*scale)
-for y in (65,116,165):
-    radius=math.sqrt(98**2-(y-118)**2)
-    draw.line(box((121-radius,y,121+radius,y)),fill='#ffd6e9',width=3*scale)
-draw.arc(box((7,35,249,191)),185,345,fill='#8c1653',width=13*scale)
-draw.arc(box((7,30,249,186)),185,345,fill='#fbcfe8',width=7*scale)
-points=[(158,98),(194,98),(194,147),(219,147),(176,207),(133,147),(158,147)]
-draw.polygon([box(p) for p in points],fill='#701747')
-points=[(153,91),(189,91),(189,140),(214,140),(171,200),(128,140),(153,140)]
-draw.polygon([box(p) for p in points],fill='white')
+# Original rounded download mark: one clear arrow, no globe detail.
+mask=Image.new('L',image.size,0)
+ImageDraw.Draw(mask).rounded_rectangle(box((14,14,242,242)),radius=52*scale,fill=255)
+for y in range(256*scale):
+    ratio=y/(256*scale-1)
+    draw.line((0,y,256*scale,y),fill=(int(246-57*ratio),int(61-48*ratio),int(152-45*ratio),255))
+image.putalpha(mask);draw=ImageDraw.Draw(image)
+draw.rounded_rectangle(box((19,19,237,237)),radius=47*scale,outline=(255,255,255,65),width=2*scale)
+draw.arc(box((42,47,214,219)),25,320,fill=(255,235,245,255),width=12*scale)
+draw.polygon([box(p) for p in [(185,185),(205,187),(193,206)]],fill=(255,235,245,255))
+arrow=[(105,54),(151,54),(151,129),(177,129),(128,184),(79,129),(105,129)]
+draw.polygon([box(p) for p in arrow],fill='white')
 image=image.resize((256,256),Image.Resampling.LANCZOS)
 image.save(root/'downshift.png')
 (root/'downshift.rgba').write_bytes(image.tobytes())

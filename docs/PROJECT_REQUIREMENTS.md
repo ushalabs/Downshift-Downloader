@@ -1268,3 +1268,7 @@ Fix the extension player action that opens Downshift without a usable YouTube UR
 ## Current follow-up scope
 
 Prioritize shared downloader engineering and general server compatibility after Lightshot failed, rather than URL-specific repairs. The user confirms WinRAR and YouTube downloads succeeded. Remove the duplicate status selector, show new history first, add three sorting views on all four sidebar pages, and use the modern pink styling throughout forms. The unspecified third sort is Oldest; Size means largest first. Existing main/verified publication authorization remains in force. Preserve files and history.
+
+## GUI 2.0 and persistence follow-up (2026-10-14)
+
+The user requests diagnosis of apparently lost history/paused work after the Desktop shortcut restart, followed by the explicitly referred GUI 2.0 brief. Preserve existing data and preferences, keep native C++/Qt Widgets and the engine, verify the responsive design and persistence, commit/push main and stop for review. Initial seven-record inspection and the user's subsequently confirmed removal of one failed record are distinct: current six-record history must be retained. Do not publish 0.4.0 before review. GUI_2.md records implementation and the unobserved original trigger.

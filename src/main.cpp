@@ -6,6 +6,7 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <ShlObj.h>
 
 #include <QApplication>
 #include <QMessageBox>
@@ -37,9 +38,17 @@ int main(int argc, char* argv[]) {
         }
         (void)downshift::checkDependencies();
         QTemporaryDir temporary;
-        const auto directory=smokeTest ? temporary.path() : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        if(smokeTest && !temporary.isValid())throw std::runtime_error("The temporary startup-check folder is unavailable. Saved history was not opened.");
+        QString directory=temporary.path();
+        if(!smokeTest){
+            PWSTR known=nullptr;
+            if(FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData,KF_FLAG_CREATE,nullptr,&known)))throw std::runtime_error("Windows could not locate your saved download history.");
+            directory=QDir(QString::fromWCharArray(known)).filePath("Usha Labs/Downshift");CoTaskMemFree(known);
+            if(directory.isEmpty())throw std::runtime_error("The saved download history location is unavailable.");
+        }
         downshift::QueueManager queue(QDir(directory).filePath("queue.sqlite"));
         downshift::MainWindow window(queue);
+        if(smokeTest)window.setAttribute(Qt::WA_DontShowOnScreen);
         window.show();
         std::unique_ptr<downshift::browser::PipeServer> browser;
         if(!smokeTest) {

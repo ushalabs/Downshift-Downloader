@@ -1,3 +1,14 @@
+# Downshift 0.4.0 GUI 2.0 and history loading (source update)
+
+- Stable Windows per-user storage, validated asynchronous history loading, explicit failure/retry states and encrypted rotating SQLite backups.
+- Missing/truncated history with existing backups cannot silently become a new empty queue. Test windows stay hidden and use private databases.
+- Neutral light and charcoal dark themes with pink accents, an original arrow/ring icon, summary cards, responsive compact navigation and painted progress/status cells.
+- Contextual collapsible details, compact sorting, shared form/popup styling and five organized Settings sections that preserve custom values.
+
+The existing user database was intact. Normal restart checks retained it and its paused task; the exact original empty-window trigger was not captured. The user's deliberate removal of one failed entry is preserved. See GUI_2.md and DEVELOPMENT_PROGRESS.md for evidence and limits. This source phase stops for review; v0.4.0 has not been published as a new release.
+
+---
+
 # Downshift 0.3.3 compatibility and history repair
 
 - Shared capability negotiation, one validated range before parallel fan-out, and safe full-response fallback for unreliable ranges/validators.

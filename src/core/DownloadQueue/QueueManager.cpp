@@ -91,30 +91,39 @@ struct QueueManager::Worker {
     QString error;
     std::jthread thread; // Declared last: joins before control and mailbox destruction.
 };
-QueueManager::QueueManager(QString database):database_(std::move(database)),budget_(std::make_shared<RateBudget>()),service_([this]{run();}) {}
+QueueManager::QueueManager(QString database):database_(QFileInfo(database).absoluteFilePath()),budget_(std::make_shared<RateBudget>()),service_([this]{run();}) {}
 QueueManager::~QueueManager() {
     { std::lock_guard lock(mutex_); closing_=true; } condition_.notify_one(); service_.join();
 }
-void QueueManager::run() {
-    QLockFile lease(database_+".owner"); lease.setStaleLockTime(0);
-    try {
-        if (!QDir().mkpath(QFileInfo(database_).absolutePath()) || !lease.tryLock()) invalid("Another Downshift instance owns this queue.");
-        store_=std::make_unique<QueueStore>(database_);
-        const auto saved=store_->settings(); if(!saved.isEmpty()) settings_=QueueSettings::fromJson(object(saved));
-        if(settings_.directory.isEmpty()) settings_.directory=QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-        budget_->configure(settings_.speedLimit);
-        for(const auto& row:store_->receipts()) {const auto r=object(row);const auto key=r.value("key").toString(),state=r.value("state").toString();if(key.size()!=32 || receipts_.contains(key) || (state!="prepared" && state!="committed" && state!="aborted"))invalid("Damaged browser handoff receipt.");receipts_.emplace(key,r);}
-        for(const auto& row:store_->load()) {
+void QueueManager::initialize() {
+        if(initialized_ || !workers_.empty())invalid("Close Downshift before reloading a queue that was already active.");
+        if(!lease_){lease_=std::make_unique<QLockFile>(database_+".owner");lease_->setStaleLockTime(0);}
+        if (!QDir().mkpath(QFileInfo(database_).absolutePath()) || (!lease_->isLocked() && !lease_->tryLock())) invalid("Another Downshift instance owns this queue. Close it, then choose Retry loading.");
+        auto candidate=std::make_unique<QueueStore>(database_);QueueSettings settings;
+        const auto saved=candidate->settings();if(!saved.isEmpty())settings=QueueSettings::fromJson(object(saved));if(settings.directory.isEmpty())settings.directory=QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        std::map<QString,QJsonObject> receipts;std::vector<QueueEntry> entries;
+        for(const auto& row:candidate->receipts()) {const auto r=object(row);const auto key=r.value("key").toString(),state=r.value("state").toString();if(key.size()!=32 || receipts.contains(key) || (state!="prepared" && state!="committed" && state!="aborted"))invalid("Damaged browser handoff receipt.");receipts.emplace(key,r);}
+        for(const auto& row:candidate->load()) {
             auto e=QueueEntry::fromJson(object(row));
-            if(!e.handoffKey.isEmpty() && (!receipts_.contains(e.handoffKey) || receipts_.at(e.handoffKey).value("downloadId")!=e.id))invalid("Missing or mismatched browser handoff receipt.");
+            if(!e.handoffKey.isEmpty() && (!receipts.contains(e.handoffKey) || receipts.at(e.handoffKey).value("downloadId")!=e.id))invalid("Missing or mismatched browser handoff receipt.");
+            if(std::any_of(entries.begin(),entries.end(),[&](const auto& old){return old.id==e.id;}))invalid("Duplicate database download IDs.");entries.push_back(std::move(e));
+        }
+        // Validate every encrypted record before publishing state or updating recovery statuses.
+        store_=std::move(candidate);settings_=std::move(settings);receipts_=std::move(receipts);entries_=std::move(entries);budget_->configure(settings_.speedLimit);
+        try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());}
+        for(auto& e:entries_){
             if(!e.media && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
             if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to continue in a video window.";save(e);}
             else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
             e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();
-            if(std::any_of(entries_.begin(),entries_.end(),[&](const auto& old){return old.id==e.id;})) invalid("Duplicate database download IDs.");
-            entries_.push_back(std::move(e));
         }
-    } catch (...) { fatal_=std::current_exception(); }
+        initialized_=true;fatal_={};
+}
+std::future<void> QueueManager::retryLoading() {
+    auto task=std::make_shared<std::packaged_task<void()>>([this]{if(initialized_)return;try{initialize();}catch(...){fatal_=std::current_exception();throw;}});auto future=task->get_future();{std::lock_guard lock(mutex_);tasks_.push_back([task]{(*task)();});}condition_.notify_one();return future;
+}
+void QueueManager::run() {
+    try{initialize();}catch(...){fatal_=std::current_exception();}
     for(;;) {
         std::deque<std::function<void()>> tasks; bool closing;
         { std::unique_lock lock(mutex_); condition_.wait_for(lock,std::chrono::milliseconds(50),[this]{return closing_ || !tasks_.empty();}); tasks.swap(tasks_); closing=closing_; }
@@ -124,8 +133,8 @@ void QueueManager::run() {
     }
     for(auto& [id,w]:workers_) w->control.requestPause();
     for(auto& [id,w]:workers_) if(w->thread.joinable()) w->thread.join();
-    if(!fatal_) try { tick(); } catch(...) {}
-    workers_.clear(); store_.reset(); // Release database before releasing process lease.
+    if(!fatal_) try { tick();store_->backup(); } catch(...) {}
+    workers_.clear();store_.reset();lease_.reset(); // Release database before releasing process lease.
 }
 QueueEntry& QueueManager::entry(const QString& id) { const auto i=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.id==id;}); if(i==entries_.end()) invalid("Download no longer exists."); return *i; }
 void QueueManager::save(QueueEntry& e) {
@@ -197,7 +206,7 @@ std::future<void> QueueManager::configure(QueueSettings s) { return submit([this
     s=QueueSettings::fromJson(s.json()); if(s.directory.isEmpty() || !QFileInfo(s.directory).isDir()) invalid("Select an existing download directory.");
     store_->settings(QJsonDocument(s.json()).toJson(QJsonDocument::Compact)); settings_=s; budget_->configure(s.speedLimit);
 }); }
-std::future<QueueSnapshot> QueueManager::snapshot() { return submit([this] { tick(); return QueueSnapshot{entries_,settings_,{}}; }); }
+std::future<QueueSnapshot> QueueManager::snapshot() { return submit([this] { tick(); return QueueSnapshot{entries_,settings_,backupWarning_}; }); }
 std::future<QString> QueueManager::categoryFolder(QString filename,QString mime) {return submit([this,filename=std::move(filename),mime=std::move(mime)]{const auto folder=QDir(settings_.directory).filePath(downloadCategory(filename,mime));if(!QDir().mkpath(folder))invalid("The download category folder could not be created.");return folder;});}
 std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString title) {
     return submit([this,url=std::move(url),folder=std::move(folder),title=std::move(title)] {
@@ -235,7 +244,7 @@ void QueueManager::tick() {
     for(auto i=workers_.begin();i!=workers_.end();) {
         auto& w=*i->second; auto& e=entry(i->first); bool done;
         { std::lock_guard lock(w.mutex); e.progress=w.progress; done=w.done; if(done) { e.status=w.cancel ? QueueStatus::Cancelled : w.status; e.error=w.error; } }
-        if(done) {e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();save(e); i=workers_.erase(i); } else ++i;
+        if(done) {e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();save(e);if(e.status==QueueStatus::Paused)try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());} i=workers_.erase(i); } else ++i;
     }
 }
 void QueueManager::schedule() {

@@ -84,3 +84,9 @@ A small byte-range request discovers metadata. If a server refuses or malforms t
 Zero-recovered-byte failed attempts can use full-response fallback; saved verified ranges cannot silently restart. Resume rehashes saved bytes and requires unchanged strong tags, totals and modification metadata. Rotating query credentials on the same resolved origin/path are permitted under those checks; different resource paths/origins stay rejected. Non-resumable streaming responses do not gain safe byte continuation merely because a download completes.
 
 Browser preparation can use a safe Content-Disposition filename when the link provides no explicit user name. MIME information supplies category routing. The user can override the destination/name before Start. Native readiness reports the actual running app version and filename capability, avoiding opaque requests to an old running app after an extension update. Direct request keys remain URL-free in browser persistence; native history and recovery remain encrypted.
+
+## History lifecycle and GUI 2.0 (0.4.0)
+
+Normal storage uses the Windows Local AppData known folder and a fixed Usha Labs/Downshift path. The queue service owns the lease, transactional startup validation, serialized retry and SQLite backup API snapshots. A missing/zero-byte live database with a backup ownership marker is rejected before CREATE. Only validated owned snapshot names rotate; encrypted rows and resume journals remain unchanged. A failed load cannot publish default settings as saved history.
+
+The Qt window distinguishes loading, empty, no-match and unavailable history. Design centralizes palette, icons and shared form/popup styles; DownloadDelegate paints progress/status without per-row widgets. Responsive navigation/action overflow and contextual details consume asynchronous snapshots. Hidden test-window filters keep fixture queues out of the user's visible desktop. The transfer engine is unchanged from 0.3.3. See GUI_2.md.

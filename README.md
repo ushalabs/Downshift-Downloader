@@ -1,10 +1,14 @@
 # Downshift
 
+The working development version is **0.4.0 — GUI 2.0 and history loading**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the new pink arrow icon. Startup clearly distinguishes loading/failure from an empty history and retains the existing per-user database, paused tasks and encrypted backups. See [GUI 2.0](docs/GUI_2.md). The verified published preview remains v0.3.3; this phase stops for review after commit/push.
+
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
 Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.3 repair negotiates server capabilities, falls back to complete responses when safe ranges are unavailable, and handles supported HTTP content encoding. Browser handoff, verified recovery, quality choices, newest-first history and rounded pink forms share one native application.
 
-![Downshift pink desktop](assets/screenshots/downloads-pink.png)
+![Downshift GUI 2.0 desktop](assets/screenshots/downloads-gui2.png)
+
+GUI 2.0 render with synthetic history fixtures; counts and files shown are test data.
 
 ## Get started
 

@@ -91,6 +91,18 @@ def main():
         d.call("action",id=slow,action=1); paused=wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==2)
         retained=int(next(r for r in paused if r["id"]==slow)["verified"]);assert retained>0;checks+=1
         assert (root/"slow.bin.part").exists(); checks+=1
+        # Explicit Pause survives closing and reopening the real native service.
+        before={r['id']:r for r in paused};d.close();d=Driver(exe,db);reopened=d.call('snapshot')
+        assert set(r['id'] for r in reopened['entries'])==set(before) and reopened['settings']==settings
+        restored=next(r for r in reopened['entries'] if r['id']==slow)
+        assert restored['status']==2 and int(restored['verified'])==retained
+        assert (root/'slow.bin.part.resume').exists();checks+=2
+        backups=list(pathlib.Path(str(db)+'.backups').glob('snapshot-*.sqlite'));assert backups
+        for backup in backups:
+            assert b'QUEUE_SECRET_4729' not in backup.read_bytes()
+            with sqlite3.connect(backup) as copy:assert copy.execute('pragma quick_check').fetchone()[0]=='ok'
+            copy.close()
+        checks+=1
         d.call("action",id=slow,action=0); resumed=wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==1)
         assert int(next(r for r in resumed if r["id"]==slow)["downloaded"])>=retained;checks+=1
         d.call("action",id=slow,action=2); wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==5)
@@ -114,6 +126,12 @@ def main():
         assert b"QUEUE_SECRET_4729" not in pathlib.Path(str(db)+".log").read_bytes()
         d.call("action",id=wake,action=4); checks+=2
         d.close(); d=Driver(exe,db); assert len(d.rows())==6; d.close(); checks+=1
+        # Existing backup ownership makes a missing/truncated live file a visible
+        # failure, rather than silently creating a replacement zero-record database.
+        held=root/'preserved-history.sqlite';db.replace(held)
+        d=Driver(exe,db);assert not d.send('snapshot')['ok'];d.close();assert not db.exists();checks+=1
+        db.write_bytes(b'');d=Driver(exe,db);assert not d.send('snapshot')['ok'];d.close();assert db.stat().st_size==0;checks+=1
+        held.replace(db);d=Driver(exe,db);assert len(d.rows())==6;d.close();checks+=1
         # Authenticated encrypted record corruption is a visible startup failure.
         import sqlite3
         with sqlite3.connect(db) as sql: sql.execute("UPDATE downloads SET payload=? WHERE id=?",(b"broken",high))

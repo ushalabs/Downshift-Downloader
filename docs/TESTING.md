@@ -102,3 +102,11 @@ Native integration checks add weakening after preparation, safe server filename/
 GUI fixtures test latest/oldest/size order on all four sidebar pages, creation-time ties, matching search, and selected download IDs. Shared menu/form styling is rendered. An early screenshot assertion failed because the configured Qt runtime does not encode PNG; its checked rendering uses the supported BMP codec. These are presentation fixtures, not claimed completed Internet downloads.
 
 LiveFileCheck.cjs is an opt-in generic public-file check with a URL and independent reference file argument. It clicks a trusted real Chrome link, operates the native destination/start UI, verifies persisted completion and a separate curl hash, and asserts zero Chrome download creation. It never executes the saved file. LiveYouTubeCheck.cjs remains separate Internet/media acceptance. Both use the isolated test bridge. Failed syntax/startup-harness development attempts are excluded from acceptance.
+
+## GUI 2.0 and persistence acceptance (0.4.0)
+
+Queue tests explicitly pause, restart a separate native process, compare IDs/settings/status/verified bytes, retain partial/journal data, inspect encrypted SQLite snapshots and reject missing/truncated live files with existing backup ownership. GUI tests distinguish startup loading from valid empty history, force a queue ownership error, block unsafe settings saves and verify retry restores the paused record.
+
+GUI rendering covers 1000×650, 900×600, 800×550, maximization, all Settings sections, dark themes and the entire frameless popup container. Assertions cover keyboard sorting, search priority, preserved selection, no per-row progress widgets, exact non-preset/sub-KB preferences, validation and live progress. Qt/media/smoke test windows remain physically hidden. Browser acceptance uses the isolated test host/profile/pipe.
+
+The local screen reports DPR 1.25; an additional QT_SCALE_FACTOR run yields effective DPR 1.5. This does not claim Windows system scaling was changed to 150%. Real user-history checks compare encrypted digests and counts without publishing filenames/URLs. After the user confirmed deliberately removing one failed entry, six records became the preservation baseline. DEVELOPMENT_PROGRESS.md distinguishes final local, Chrome, scaling and remote CI checks from Internet-media evidence.

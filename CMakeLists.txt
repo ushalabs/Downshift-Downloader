@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Downshift VERSION 0.3.3 LANGUAGES CXX)
+project(Downshift VERSION 0.4.0 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Downshift requires Windows and the MSVC C++ toolchain.")
@@ -59,13 +59,15 @@ target_compile_options(downshift_native_host PRIVATE /W4 /permissive- /utf-8)
 
 add_library(downshift_gui STATIC
     src/gui/Brand.cpp
+    src/gui/Design.cpp
+    src/gui/DownloadDelegate.cpp
     src/gui/MainWindow.cpp
     src/gui/MainWindow.h
     src/gui/Dialogs.cpp
     src/gui/MediaDialog.cpp
     src/gui/MediaDialog.h
 )
-target_link_libraries(downshift_gui PUBLIC downshift_queue Qt6::Widgets)
+target_link_libraries(downshift_gui PUBLIC downshift_queue Qt6::Widgets PRIVATE dwmapi)
 qt_add_resources(downshift_gui "branding" PREFIX "/branding" BASE "assets"
     FILES assets/downshift.rgba assets/chevron.xpm)
 target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)
@@ -74,7 +76,7 @@ enable_language(RC)
 configure_file(packaging/Downshift.rc.in Downshift.rc @ONLY)
 target_sources(downshift PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Downshift.rc")
 set_target_properties(downshift PROPERTIES OUTPUT_NAME Downshift)
-target_link_libraries(downshift PRIVATE downshift_gui downshift_browser)
+target_link_libraries(downshift PRIVATE downshift_gui downshift_browser shell32 ole32)
 target_compile_definitions(downshift PRIVATE
     DOWNSHIFT_VERSION="${PROJECT_VERSION}"
 )

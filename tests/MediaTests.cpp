@@ -3,6 +3,7 @@
 #include "gui/MediaDialog.h"
 #include "browser/NativeProtocol.h"
 #include "database/QueueStore.h"
+#include "TestWindows.h"
 #include <QJsonDocument>
 #include <QApplication>
 #include <QComboBox>
@@ -24,7 +25,7 @@ void check(bool value,const char* message){if(!value)throw std::runtime_error(me
 template<class F> void wait(F condition,int timeout=90000){const auto end=std::chrono::steady_clock::now()+std::chrono::milliseconds(timeout);while(std::chrono::steady_clock::now()<end){QApplication::processEvents();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);if(condition())return;QThread::msleep(5);}throw std::runtime_error("Video test timed out");}
 }
 int main(int argc,char** argv) {
-    QApplication app(argc,argv);QApplication::setApplicationName("Downshift");if(argc!=4)return 2;
+    QApplication app(argc,argv);QApplication::setApplicationName("Downshift");HiddenTestWindows hidden;app.installEventFilter(&hidden);if(argc!=4)return 2;
     const QString root=QString::fromLocal8Bit(argv[1]),base=QString::fromLatin1(argv[2]),shots=QString::fromLocal8Bit(argv[3]);
     try {
         downshift::CurlRuntime curl;QString interrupted;

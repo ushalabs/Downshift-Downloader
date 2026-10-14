@@ -9,6 +9,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+class QLockFile;
 namespace downshift {
 class QueueStore;
 enum class QueueStatus { Queued, Running, Paused, Completed, Failed, Cancelled, Prepared };
@@ -50,6 +51,8 @@ public:
     std::future<void> deleteCompleted(QString id);
     std::future<void> configure(QueueSettings settings);
     std::future<QueueSnapshot> snapshot();
+    std::future<void> retryLoading();
+    QString databasePath() const {return database_;}
     std::future<QString> categoryFolder(QString filename,QString mime={});
     std::future<QString> beginMedia(QString url, QString folder, QString title);
     std::future<void> mediaProgress(QString id, DownloadProgress progress);
@@ -69,6 +72,7 @@ private:
         condition_.notify_one(); return future;
     }
     void run();
+    void initialize();
     void tick();
     void schedule();
     QueueEntry& entry(const QString& id);
@@ -79,7 +83,10 @@ private:
     std::deque<std::function<void()>> tasks_;
     bool closing_ = false;
     std::exception_ptr fatal_;
+    QString backupWarning_;
     std::unique_ptr<QueueStore> store_;
+    std::unique_ptr<QLockFile> lease_;
+    bool initialized_=false;
     std::vector<QueueEntry> entries_;
     QueueSettings settings_;
     std::map<QString, std::unique_ptr<Worker>> workers_;

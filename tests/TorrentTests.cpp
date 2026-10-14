@@ -11,6 +11,7 @@
 #include <libtorrent/torrent_status.hpp>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/version.hpp>
+#include <libtorrent/alert_types.hpp>
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -41,12 +42,12 @@ QString metadataOnly(const QString& root,const QString& name,std::vector<lt::cre
     lt::create_torrent torrent(std::move(entries),16384,flags);lt::sha1_hash hash;std::fill(hash.data(),hash.data()+20,'x');for(auto piece:torrent.piece_range())torrent.set_hash(piece,hash);
     const auto bytes=torrent.generate_buf();const auto path=QDir(root).filePath(name+".torrent");QFile file(path);require(file.open(QIODevice::WriteOnly),"Validation metadata opens");require(file.write(bytes.data(),static_cast<qint64>(bytes.size()))==static_cast<qint64>(bytes.size()),"Validation metadata writes");return path;
 }
-lt::settings_pack localSettings(){lt::settings_pack s;s.set_str(lt::settings_pack::listen_interfaces,"127.0.0.1:0");s.set_str(lt::settings_pack::dht_bootstrap_nodes,"");s.set_bool(lt::settings_pack::enable_dht,false);s.set_bool(lt::settings_pack::enable_lsd,false);s.set_bool(lt::settings_pack::enable_upnp,false);s.set_bool(lt::settings_pack::enable_natpmp,false);s.set_bool(lt::settings_pack::enable_outgoing_utp,false);s.set_bool(lt::settings_pack::enable_incoming_utp,false);return s;}
+lt::settings_pack localSettings(){lt::settings_pack s;s.set_int(lt::settings_pack::alert_mask,lt::alert_category::error|lt::alert_category::status|lt::alert_category::storage);s.set_str(lt::settings_pack::listen_interfaces,"127.0.0.1:0");s.set_str(lt::settings_pack::dht_bootstrap_nodes,"");s.set_bool(lt::settings_pack::enable_dht,false);s.set_bool(lt::settings_pack::enable_lsd,false);s.set_bool(lt::settings_pack::enable_upnp,false);s.set_bool(lt::settings_pack::enable_natpmp,false);s.set_bool(lt::settings_pack::enable_outgoing_utp,false);s.set_bool(lt::settings_pack::enable_incoming_utp,false);return s;}
 void transfer(const QString& root,const QString& metadata,bool magnet){
     auto params=lt::load_torrent_file(QDir::toNativeSeparators(metadata).toUtf8().toStdString());const auto name=QString::fromUtf8(params.ti->name().c_str());
     std::cout<<"Local transfer: "<<name.toStdString()<<(magnet?" magnet":" metadata file")<<std::endl;
     lt::session seed{lt::session_params(localSettings())};params.save_path=QDir::toNativeSeparators(QDir(root).filePath("seed")).toUtf8().toStdString();params.flags&=~(lt::torrent_flags::paused|lt::torrent_flags::auto_managed|lt::torrent_flags::seed_mode);lt::error_code error;auto handle=seed.add_torrent(params,error);require(!error,"Local seeder added");
-    wait([&]{return handle.status().is_seeding&&seed.listen_port()!=0;});
+    try{wait([&]{const auto state=handle.status();if(state.errc)throw std::runtime_error(state.errc.message());return state.is_seeding&&seed.listen_port()!=0;});}catch(...){const auto state=handle.status();std::cerr<<"Seeder diagnostic: state="<<static_cast<int>(state.state)<<" error="<<state.errc.message()<<" wanted="<<state.total_wanted<<" verified="<<state.total_wanted_done<<" port="<<seed.listen_port()<<std::endl;std::vector<lt::alert*> alerts;seed.pop_alerts(&alerts);for(auto* alert:alerts)if(lt::alert_cast<lt::listen_failed_alert>(alert)||lt::alert_cast<lt::listen_succeeded_alert>(alert))std::cerr<<"Listen diagnostic: "<<alert->message()<<std::endl;throw;}
     const auto save=QDir(root).filePath(name+(magnet?"-magnet":"-file"));
     TorrentEngine engine({false,true});int events=0;bool correctThread=true;QObject receiver;
     QObject::connect(&engine,&TorrentEngine::updated,&receiver,[&](Snapshot){correctThread=correctThread&&(QThread::currentThread()==receiver.thread());++events;},Qt::QueuedConnection);

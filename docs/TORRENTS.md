@@ -65,6 +65,8 @@ An encrypted acceptance marker changes atomically with Add/Remove. Unexpected di
 
 Add first commits recoverable native metadata/magnet state. Subsequent save_resume_data(flush_disk_cache | save_info_dict) alerts provide native checkpoints, including metadata and counters. Explicit pause/configuration/selection/checkpoint futures settle after encryption and SQLite commit. Overlapping saves are serialized/coalesced; later commands wait for a later native save. Periodic checkpoints run every 15 seconds. Shutdown pauses handles, drains saves/removals with a bounded 20-second alert wait, then joins native workers. Failure reports an error while retaining previous checkpoints.
 
+Selection changes wait for the native file-priority disk operation before checkpointing. Newly selected files are rehashed after part-file migration; their earlier in-memory piece map cannot establish correctness of moved bytes. Both Complete and Seeding transitions wait for the native flush/checkpoint, and an earlier seeding snapshot is invalidated when selection changes. The repeated selection regression fails against the previous backend and passes with this ordering repair.
+
 Restart and process-death recovery always restore paused. Explicit Resume rehashes actual files before reuse/seeding, even after same-size/same-mtime content changes. Libtorrent owns piece validity; SQLite does not invent a completed-piece map. Uncheckpointed written pieces may be rediscovered by rechecking, but recovery of those bytes is not promised. Missing peers/metadata remain waiting states.
 
 Priorities correspond to ordinary Snapshot.files: 0 skips; 1–7 set native priority. At least one file must be selected; internal pad-file indices are handled separately. Selection can change after metadata. Magnet input selections/web seeds/rename overrides remain ignored unless explicit validated options are supplied. Boundary pieces can include skipped-file bytes stored in the native part file. Progress sums verified selected-file bytes rather than whole-piece wanted counters. Selected completion requires every selected file and a completed native flush/checkpoint; skipped files are not reported complete.
@@ -97,7 +99,7 @@ Upstream references: [resume serialization and trust](https://libtorrent.org/ref
 
 ### T2 verification
 
-Final local Release/Debug torrent groups each pass 246 T2 management checks and 142 T1 foundation checks. Full regression coverage and the initial Debug seeder timeout/retry are recorded in DEVELOPMENT_PROGRESS.md and evidence/torrent-t2-*. Exact-source Windows CI delivery is recorded separately after the main push. Fixtures use private stores/destinations and hidden process children. Public swarms, disk-full, multi-peer stress and packaged torrent acceptance remain T4. No new release is published; T3 is not started automatically.
+Final repaired local Release/Debug torrent groups each pass 313 T2 management checks and 142 T1 foundation checks. Full regression coverage, initial local seeder timeouts, the first CI selected-file hash failure and subsequent repair are recorded in DEVELOPMENT_PROGRESS.md and evidence/torrent-t2-*. Exact-source Windows CI delivery is recorded separately after the main push. Fixtures use private stores/destinations and hidden process children. Public swarms, disk-full, multi-peer stress and packaged torrent acceptance remain T4. No new release is published; T3 is not started automatically.
 
 ## T1 historical verification status
 

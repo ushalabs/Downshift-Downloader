@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "a6aebfa2ff61063d72457144d5148f5006a3e3ea",
+  "runId": 38610634490,
+  "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38610634490",
+  "conclusion": "failure",
+  "release": {
+    "passed": 17,
+    "total": 18,
+    "seconds": 195.29
+  },
+  "failure": {
+    "group": "torrent.management",
+    "message": "Newly selected file hash",
+    "stage": "Expanded selected-file transfer exposed Seeding before trustworthy final disk content"
+  },
+  "otherReleaseGroups": "17 passed, including T1 foundation and all existing HTTP/media/GUI/browser/recovery tests",
+  "debugAndPortable": "Not run after failed Release step",
+  "resolution": "Subsequent torrent-only repair waits for native priority IO and disk flush, invalidates prior seeding snapshots and rechecks migrated files. Final CI status is recorded separately."
+}

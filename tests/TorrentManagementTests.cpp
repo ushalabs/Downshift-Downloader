@@ -11,6 +11,7 @@
 #include <libtorrent/torrent_status.hpp>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/version.hpp>
+#include <libtorrent/alert_types.hpp>
 #include <libtorrent/address.hpp>
 #include <QCoreApplication>
 #include <QProcess>
@@ -58,14 +59,14 @@ QString metadataOnly(const QString& root,const QString& name,std::vector<lt::cre
     lt::create_torrent torrent(std::move(entries),16384,flags);lt::sha1_hash hash;std::fill(hash.data(),hash.data()+20,'x');for(auto piece:torrent.piece_range())torrent.set_hash(piece,hash);
     const auto bytes=torrent.generate_buf();const auto path=QDir(root).filePath(name+".torrent");QFile file(path);require(file.open(QIODevice::WriteOnly),"Validation metadata opens");require(file.write(bytes.data(),static_cast<qint64>(bytes.size()))==static_cast<qint64>(bytes.size()),"Validation metadata writes");return path;
 }
-lt::settings_pack localSettings(){lt::settings_pack s;s.set_bool(lt::settings_pack::allow_multiple_connections_per_ip,true);s.set_int(lt::settings_pack::min_reconnect_time,1);s.set_str(lt::settings_pack::listen_interfaces,"127.0.0.1:0");s.set_str(lt::settings_pack::dht_bootstrap_nodes,"");s.set_bool(lt::settings_pack::enable_dht,false);s.set_bool(lt::settings_pack::enable_lsd,false);s.set_bool(lt::settings_pack::enable_upnp,false);s.set_bool(lt::settings_pack::enable_natpmp,false);s.set_bool(lt::settings_pack::enable_outgoing_utp,false);s.set_bool(lt::settings_pack::enable_incoming_utp,false);return s;}
+lt::settings_pack localSettings(){lt::settings_pack s;s.set_int(lt::settings_pack::alert_mask,lt::alert_category::error|lt::alert_category::status|lt::alert_category::storage);s.set_bool(lt::settings_pack::allow_multiple_connections_per_ip,true);s.set_int(lt::settings_pack::min_reconnect_time,1);s.set_str(lt::settings_pack::listen_interfaces,"127.0.0.1:0");s.set_str(lt::settings_pack::dht_bootstrap_nodes,"");s.set_bool(lt::settings_pack::enable_dht,false);s.set_bool(lt::settings_pack::enable_lsd,false);s.set_bool(lt::settings_pack::enable_upnp,false);s.set_bool(lt::settings_pack::enable_natpmp,false);s.set_bool(lt::settings_pack::enable_outgoing_utp,false);s.set_bool(lt::settings_pack::enable_incoming_utp,false);return s;}
 
 Snapshot row(TorrentEngine& engine,const QString& id){for(const auto& item:engine.snapshots().get())if(item.id==id)return item;throw std::runtime_error("Missing managed torrent ID");}
 template<class F>void rejected(F operation,const char* message){bool failed=false;try{operation();}catch(const std::exception&){failed=true;}require(failed,message);}
 struct Seed {
     lt::session session{lt::session_params(localSettings())};
     lt::torrent_handle handle;
-    Seed(const QString& root,const QString& metadata){auto params=lt::load_torrent_file(metadata.toUtf8().toStdString());params.save_path=QDir(root).filePath("seed").toUtf8().toStdString();params.flags&=~(lt::torrent_flags::paused|lt::torrent_flags::auto_managed|lt::torrent_flags::seed_mode);lt::error_code error;handle=session.add_torrent(params,error);require(!error,"Seeder added");wait([&]{return handle.status().is_seeding&&session.listen_port()!=0;});}
+    Seed(const QString& root,const QString& metadata){auto params=lt::load_torrent_file(metadata.toUtf8().toStdString());params.save_path=QDir(root).filePath("seed").toUtf8().toStdString();params.flags&=~(lt::torrent_flags::paused|lt::torrent_flags::auto_managed|lt::torrent_flags::seed_mode);lt::error_code error;handle=session.add_torrent(params,error);require(!error,"Seeder added");try{wait([&]{const auto state=handle.status();if(state.errc)throw std::runtime_error(state.errc.message());return state.is_seeding&&session.listen_port()!=0;});}catch(...){const auto state=handle.status();std::cerr<<"Seeder diagnostic: state="<<static_cast<int>(state.state)<<" error="<<state.errc.message()<<" wanted="<<state.total_wanted<<" verified="<<state.total_wanted_done<<" port="<<session.listen_port()<<std::endl;std::vector<lt::alert*> alerts;session.pop_alerts(&alerts);for(auto* alert:alerts)if(lt::alert_cast<lt::listen_failed_alert>(alert)||lt::alert_cast<lt::listen_succeeded_alert>(alert))std::cerr<<"Listen diagnostic: "<<alert->message()<<std::endl;throw;}}
     quint16 port(){return session.listen_port();}
 };
 void management(const QString& root,const QString& metadata,const QString& name){
@@ -140,6 +141,27 @@ void lifecycle(const QString& root,const QString& metadata,const QString& magnet
         engine.remove(id,true,true).get();engine.remove(magnetId).get();require(engine.snapshots().get().empty(),"Remove-only handles cancelled and pending metadata records");engine.shutdown().get();
     }
 }
+void selectionStress(const QString& root,const QString& metadata){
+    std::cout<<"Selection/write completion ordering"<<std::endl;
+    Seed seed(root,metadata);const auto name=QString::fromStdString(lt::load_torrent_file(metadata.toUtf8().toStdString()).ti->name());
+    for(int n=0;n<6;++n){
+        TorrentEngine engine({false,true});AddOptions config;config.priorities={7,0};config.seeding.mode=SeedMode::Manual;
+        const auto save=QDir(root).filePath(QString("selection-order-%1").arg(n));const auto id=engine.addFile(metadata,save,config).get();engine.connectPeer(id,"127.0.0.1",seed.port()).get();
+        std::cout<<"Ordering iteration "<<n<<" first selection"<<std::endl;
+        wait([&]{return row(engine,id).state==State::Seeding;});
+        require(digest(QDir(save).filePath(name+"/file0.bin"))==digest(QDir(root).filePath("seed/"+name+"/file0.bin")),"Seeding starts after selected-file disk flush");
+        std::cout<<"Ordering iteration "<<n<<" expanded selection"<<std::endl;engine.selectFiles(id,{7,4}).get();const auto changed=row(engine,id);require(changed.state!=State::Seeding||changed.verifiedBytes==changed.selectedBytes,"Changing selection invalidates an earlier seeding snapshot");
+        wait([&]{return row(engine,id).state==State::Seeding;});
+        const auto actualPath=QDir(save).filePath(name+"/file1.bin"),expectedPath=QDir(root).filePath("seed/"+name+"/file1.bin");
+        if(digest(actualPath)!=digest(expectedPath)){
+            QFile actual(actualPath),expected(expectedPath);(void)actual.open(QIODevice::ReadOnly);(void)expected.open(QIODevice::ReadOnly);const auto a=actual.readAll(),b=expected.readAll();qsizetype first=0;while(first<std::min(a.size(),b.size())&&a[first]==b[first])++first;
+            std::cerr<<"Selection disk diagnostic: iteration="<<n<<" actualSize="<<a.size()<<" expectedSize="<<b.size()<<" firstDifference="<<first<<" actualByte="<<(first<a.size()?static_cast<unsigned char>(a[first]):-1)<<" expectedByte="<<(first<b.size()?static_cast<unsigned char>(b[first]):-1)<<std::endl;
+            require(false,"Expanded seeding snapshot waits for migrated/new file bytes on disk");
+        }
+        ++checks;engine.shutdown().get();
+    }
+}
+
 void resolvedMagnet(const QString& root,const QString& metadata){
     std::cout<<"Resolved magnet persistence"<<std::endl;
     Seed seed(root,metadata);const auto params=lt::load_torrent_file(metadata.toUtf8().toStdString());
@@ -231,8 +253,9 @@ int main(int argc,char** argv){
     try{
         require(temp.isValid(),"Private management fixtures");
         const auto v1=create(temp.path(),lt::create_torrent::v1_only,"manage-v1"),v2=create(temp.path(),lt::create_torrent::v2_only,"manage-v2"),hybrid=create(temp.path(),{},"manage-hybrid");
+        if(app.arguments().contains("--selection-race")){selectionStress(temp.path(),v1);std::cout<<"Selection ordering checks: "<<checks<<std::endl;return 0;}
         if(app.arguments().contains("--caps")){capsAndRatio(temp.path(),v1);std::cout<<"Caps/ratio checks: "<<checks<<std::endl;return 0;}
-        management(temp.path(),v1,"manage-v1");management(temp.path(),v2,"manage-v2");management(temp.path(),hybrid,"manage-hybrid");std::cout<<"Storage validation"<<std::endl;storage(temp.path(),v1);std::cout<<"Lifecycle validation"<<std::endl;lifecycle(temp.path(),v1,v2);capsAndRatio(temp.path(),v1);std::cout<<"Process-death validation"<<std::endl;crash(temp.path(),v1);physicalIdentity(temp.path(),v1);resolvedMagnet(temp.path(),hybrid);unexplainedEmpty(temp.path(),v1);
+        management(temp.path(),v1,"manage-v1");management(temp.path(),v2,"manage-v2");management(temp.path(),hybrid,"manage-hybrid");std::cout<<"Storage validation"<<std::endl;storage(temp.path(),v1);std::cout<<"Lifecycle validation"<<std::endl;lifecycle(temp.path(),v1,v2);capsAndRatio(temp.path(),v1);std::cout<<"Process-death validation"<<std::endl;crash(temp.path(),v1);physicalIdentity(temp.path(),v1);resolvedMagnet(temp.path(),hybrid);selectionStress(temp.path(),v1);unexplainedEmpty(temp.path(),v1);
         std::cout<<"Torrent management checks passed: "<<checks<<" (native selected transfers, pause/restart/rehash, policies, encryption, ownership and deletion)\n";return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

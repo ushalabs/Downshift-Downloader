@@ -456,6 +456,12 @@ public:
         try {
             multiCheck(curl_multi_setopt(handle_, CURLMOPT_MAX_TOTAL_CONNECTIONS, static_cast<long>(connections)));
             multiCheck(curl_multi_setopt(handle_, CURLMOPT_MAX_HOST_CONNECTIONS, static_cast<long>(connections)));
+            // A segment slot must own a physical connection. Default HTTP/2
+            // multiplexing otherwise collapses the range pool onto one socket,
+            // losing parallel TCP capacity on per-connection-limited servers.
+            // Keep HTTP/2 and connection reuse, but never share an active socket.
+            multiCheck(curl_multi_setopt(handle_, CURLMOPT_PIPELINING, static_cast<long>(CURLPIPE_NOTHING)));
+            multiCheck(curl_multi_setopt(handle_, CURLMOPT_MAXCONNECTS, static_cast<long>(connections)));
         } catch (...) { curl_multi_cleanup(handle_); throw; }
     }
     ~MultiSession() { clear(); curl_multi_cleanup(handle_); }

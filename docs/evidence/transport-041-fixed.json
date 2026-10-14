@@ -1,0 +1,722 @@
+[
+  {
+    "slots": 1,
+    "backgroundSockets": 0,
+    "wallSeconds": 8.092215800192207,
+    "metrics": {
+      "bytes": 4194304,
+      "segmented": true,
+      "fallback": false,
+      "ranges": 16,
+      "total_seconds": 8.0622961,
+      "transfer_seconds": 8.0541787,
+      "average_bps": 520761.2291989499,
+      "peak_bps": 736290.0580169962,
+      "cpu_seconds": 0.171875,
+      "peak_working_set_bytes": 12828672,
+      "write_bytes": 4194304,
+      "write_seconds": 0.006529799999999999,
+      "allocation_seconds": 0.0001451,
+      "checksum_seconds": 0.015504400000000002,
+      "flush_seconds": 0.04192590000000001,
+      "write_calls": 64,
+      "checksum_read_bytes": 8388608,
+      "checksum_read_calls": 20,
+      "checkpoint_seconds": 0.0672439,
+      "checkpoints": 19,
+      "connection_setup_seconds": 0.024552,
+      "first_byte_seconds": 0.0029732352941176468,
+      "connections_opened": 1,
+      "network_bytes": 4194304,
+      "smallest_range_bytes": 262144,
+      "largest_range_bytes": 262144,
+      "peak_active_ranges": 1,
+      "initial_connections": 1,
+      "final_connections": 1,
+      "tuning_changes": 0,
+      "resource_metrics_available": true,
+      "observer_failed": false,
+      "recovered_bytes": 0,
+      "retries": 0,
+      "cleanup_pending": false
+    },
+    "peakSockets": 1,
+    "peakStreams": 1,
+    "peakTotalSockets": 1,
+    "records": [
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 0,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 262143,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 262144,
+        "last": 524287,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 524288,
+        "last": 786431,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 786432,
+        "last": 1048575,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 1048576,
+        "last": 1310719,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 1310720,
+        "last": 1572863,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 1572864,
+        "last": 1835007,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 1835008,
+        "last": 2097151,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 2097152,
+        "last": 2359295,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 2359296,
+        "last": 2621439,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 2621440,
+        "last": 2883583,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 2883584,
+        "last": 3145727,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 3145728,
+        "last": 3407871,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 3407872,
+        "last": 3670015,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 3670016,
+        "last": 3932159,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 3932160,
+        "last": 4194303,
+        "background": false
+      }
+    ]
+  },
+  {
+    "slots": 8,
+    "backgroundSockets": 0,
+    "wallSeconds": 1.137635299935937,
+    "metrics": {
+      "bytes": 4194304,
+      "segmented": true,
+      "fallback": false,
+      "ranges": 16,
+      "total_seconds": 1.1081851,
+      "transfer_seconds": 1.1022541,
+      "average_bps": 3805206.0772556895,
+      "peak_bps": 4160061.700133859,
+      "cpu_seconds": 0.1875,
+      "peak_working_set_bytes": 14290944,
+      "write_bytes": 4194304,
+      "write_seconds": 0.005342400000000002,
+      "allocation_seconds": 0.0001268,
+      "checksum_seconds": 0.009593599999999999,
+      "flush_seconds": 0.0241056,
+      "write_calls": 64,
+      "checksum_read_bytes": 8388608,
+      "checksum_read_calls": 20,
+      "checkpoint_seconds": 0.0336212,
+      "checkpoints": 15,
+      "connection_setup_seconds": 0.26399,
+      "first_byte_seconds": 0.030667882352941184,
+      "connections_opened": 8,
+      "network_bytes": 4194304,
+      "smallest_range_bytes": 262144,
+      "largest_range_bytes": 262144,
+      "peak_active_ranges": 8,
+      "initial_connections": 8,
+      "final_connections": 8,
+      "tuning_changes": 0,
+      "resource_metrics_available": true,
+      "observer_failed": false,
+      "recovered_bytes": 0,
+      "retries": 0,
+      "cleanup_pending": false
+    },
+    "peakSockets": 8,
+    "peakStreams": 8,
+    "peakTotalSockets": 8,
+    "records": [
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 0,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 262143,
+        "background": false
+      },
+      {
+        "socket": 2,
+        "protocol": "2.0",
+        "first": 262144,
+        "last": 524287,
+        "background": false
+      },
+      {
+        "socket": 3,
+        "protocol": "2.0",
+        "first": 524288,
+        "last": 786431,
+        "background": false
+      },
+      {
+        "socket": 4,
+        "protocol": "2.0",
+        "first": 786432,
+        "last": 1048575,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 1048576,
+        "last": 1310719,
+        "background": false
+      },
+      {
+        "socket": 6,
+        "protocol": "2.0",
+        "first": 1310720,
+        "last": 1572863,
+        "background": false
+      },
+      {
+        "socket": 7,
+        "protocol": "2.0",
+        "first": 1572864,
+        "last": 1835007,
+        "background": false
+      },
+      {
+        "socket": 8,
+        "protocol": "2.0",
+        "first": 1835008,
+        "last": 2097151,
+        "background": false
+      },
+      {
+        "socket": 1,
+        "protocol": "2.0",
+        "first": 2097152,
+        "last": 2359295,
+        "background": false
+      },
+      {
+        "socket": 2,
+        "protocol": "2.0",
+        "first": 2359296,
+        "last": 2621439,
+        "background": false
+      },
+      {
+        "socket": 3,
+        "protocol": "2.0",
+        "first": 2621440,
+        "last": 2883583,
+        "background": false
+      },
+      {
+        "socket": 4,
+        "protocol": "2.0",
+        "first": 2883584,
+        "last": 3145727,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 3145728,
+        "last": 3407871,
+        "background": false
+      },
+      {
+        "socket": 6,
+        "protocol": "2.0",
+        "first": 3407872,
+        "last": 3670015,
+        "background": false
+      },
+      {
+        "socket": 7,
+        "protocol": "2.0",
+        "first": 3670016,
+        "last": 3932159,
+        "background": false
+      },
+      {
+        "socket": 8,
+        "protocol": "2.0",
+        "first": 3932160,
+        "last": 4194303,
+        "background": false
+      }
+    ]
+  },
+  {
+    "slots": 1,
+    "backgroundSockets": 4,
+    "wallSeconds": 10.100115099921823,
+    "metrics": {
+      "bytes": 4194304,
+      "segmented": true,
+      "fallback": false,
+      "ranges": 16,
+      "total_seconds": 10.0706445,
+      "transfer_seconds": 10.0642983,
+      "average_bps": 416750.7634387188,
+      "peak_bps": 523639.9432062881,
+      "cpu_seconds": 0.296875,
+      "peak_working_set_bytes": 12787712,
+      "write_bytes": 4194304,
+      "write_seconds": 0.006752800000000001,
+      "allocation_seconds": 0.0001462,
+      "checksum_seconds": 0.0143327,
+      "flush_seconds": 0.037542400000000004,
+      "write_calls": 64,
+      "checksum_read_bytes": 8388608,
+      "checksum_read_calls": 20,
+      "checkpoint_seconds": 0.06098380000000001,
+      "checkpoints": 19,
+      "connection_setup_seconds": 0.023016,
+      "first_byte_seconds": 0.0027370000000000003,
+      "connections_opened": 1,
+      "network_bytes": 4194304,
+      "smallest_range_bytes": 262144,
+      "largest_range_bytes": 262144,
+      "peak_active_ranges": 1,
+      "initial_connections": 1,
+      "final_connections": 1,
+      "tuning_changes": 0,
+      "resource_metrics_available": true,
+      "observer_failed": false,
+      "recovered_bytes": 0,
+      "retries": 0,
+      "cleanup_pending": false
+    },
+    "peakSockets": 1,
+    "peakStreams": 1,
+    "peakTotalSockets": 5,
+    "records": [
+      {
+        "socket": 1,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 2,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 3,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 4,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 0,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 262143,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 262144,
+        "last": 524287,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 524288,
+        "last": 786431,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 786432,
+        "last": 1048575,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 1048576,
+        "last": 1310719,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 1310720,
+        "last": 1572863,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 1572864,
+        "last": 1835007,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 1835008,
+        "last": 2097151,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 2097152,
+        "last": 2359295,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 2359296,
+        "last": 2621439,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 2621440,
+        "last": 2883583,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 2883584,
+        "last": 3145727,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 3145728,
+        "last": 3407871,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 3407872,
+        "last": 3670015,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 3670016,
+        "last": 3932159,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 3932160,
+        "last": 4194303,
+        "background": false
+      }
+    ]
+  },
+  {
+    "slots": 8,
+    "backgroundSockets": 4,
+    "wallSeconds": 3.115782600361854,
+    "metrics": {
+      "bytes": 4194304,
+      "segmented": true,
+      "fallback": false,
+      "ranges": 16,
+      "total_seconds": 3.0872405,
+      "transfer_seconds": 3.081249,
+      "average_bps": 1361235.0056746467,
+      "peak_bps": 2096966.6281500717,
+      "cpu_seconds": 0.140625,
+      "peak_working_set_bytes": 14123008,
+      "write_bytes": 4194304,
+      "write_seconds": 0.006083,
+      "allocation_seconds": 0.0001304,
+      "checksum_seconds": 0.009253099999999998,
+      "flush_seconds": 0.0157456,
+      "write_calls": 64,
+      "checksum_read_bytes": 8388608,
+      "checksum_read_calls": 20,
+      "checkpoint_seconds": 0.0299928,
+      "checkpoints": 14,
+      "connection_setup_seconds": 0.23841500000000002,
+      "first_byte_seconds": 0.027849000000000002,
+      "connections_opened": 8,
+      "network_bytes": 4194304,
+      "smallest_range_bytes": 262144,
+      "largest_range_bytes": 262144,
+      "peak_active_ranges": 8,
+      "initial_connections": 8,
+      "final_connections": 8,
+      "tuning_changes": 0,
+      "resource_metrics_available": true,
+      "observer_failed": false,
+      "recovered_bytes": 0,
+      "retries": 0,
+      "cleanup_pending": false
+    },
+    "peakSockets": 8,
+    "peakStreams": 8,
+    "peakTotalSockets": 12,
+    "records": [
+      {
+        "socket": 1,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 2,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 3,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 4,
+        "protocol": "1.1",
+        "first": 0,
+        "last": 1073741823,
+        "background": true
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 0,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 0,
+        "last": 262143,
+        "background": false
+      },
+      {
+        "socket": 6,
+        "protocol": "2.0",
+        "first": 262144,
+        "last": 524287,
+        "background": false
+      },
+      {
+        "socket": 7,
+        "protocol": "2.0",
+        "first": 524288,
+        "last": 786431,
+        "background": false
+      },
+      {
+        "socket": 8,
+        "protocol": "2.0",
+        "first": 786432,
+        "last": 1048575,
+        "background": false
+      },
+      {
+        "socket": 9,
+        "protocol": "2.0",
+        "first": 1048576,
+        "last": 1310719,
+        "background": false
+      },
+      {
+        "socket": 10,
+        "protocol": "2.0",
+        "first": 1310720,
+        "last": 1572863,
+        "background": false
+      },
+      {
+        "socket": 11,
+        "protocol": "2.0",
+        "first": 1572864,
+        "last": 1835007,
+        "background": false
+      },
+      {
+        "socket": 12,
+        "protocol": "2.0",
+        "first": 1835008,
+        "last": 2097151,
+        "background": false
+      },
+      {
+        "socket": 5,
+        "protocol": "2.0",
+        "first": 2097152,
+        "last": 2359295,
+        "background": false
+      },
+      {
+        "socket": 6,
+        "protocol": "2.0",
+        "first": 2359296,
+        "last": 2621439,
+        "background": false
+      },
+      {
+        "socket": 7,
+        "protocol": "2.0",
+        "first": 2621440,
+        "last": 2883583,
+        "background": false
+      },
+      {
+        "socket": 8,
+        "protocol": "2.0",
+        "first": 2883584,
+        "last": 3145727,
+        "background": false
+      },
+      {
+        "socket": 9,
+        "protocol": "2.0",
+        "first": 3145728,
+        "last": 3407871,
+        "background": false
+      },
+      {
+        "socket": 10,
+        "protocol": "2.0",
+        "first": 3407872,
+        "last": 3670015,
+        "background": false
+      },
+      {
+        "socket": 11,
+        "protocol": "2.0",
+        "first": 3670016,
+        "last": 3932159,
+        "background": false
+      },
+      {
+        "socket": 12,
+        "protocol": "2.0",
+        "first": 3932160,
+        "last": 4194303,
+        "background": false
+      }
+    ]
+  }
+]

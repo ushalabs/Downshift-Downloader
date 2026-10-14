@@ -36,7 +36,7 @@ template<class F> void wait(F condition,int timeout=15000) {
 }
 }
 int main(int argc,char** argv) {
-    QApplication app(argc,argv); QApplication::setApplicationName("Downshift");QApplication::setOrganizationName("Usha Labs");QApplication::setApplicationVersion("0.4.0");
+    QApplication app(argc,argv); QApplication::setApplicationName("Downshift");QApplication::setOrganizationName("Usha Labs");QApplication::setApplicationVersion("0.4.1");
     HiddenTestWindows hidden;app.installEventFilter(&hidden);std::cout<<"GUI device pixel ratio: "<<app.primaryScreen()->devicePixelRatio()<<'\n';
     if(argc!=5)return 2;const auto root=QString::fromLocal8Bit(argv[1]),url=QString::fromLatin1(argv[2]),sha=QString::fromLatin1(argv[3]),shots=QString::fromLocal8Bit(argv[4]);
     QDir().mkpath(shots);downshift::CurlRuntime curl;const auto database=QDir(root).filePath("queue.sqlite"),file=QDir(root).filePath("Verified download.bin");

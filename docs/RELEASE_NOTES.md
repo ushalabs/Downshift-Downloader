@@ -1,3 +1,13 @@
+# Downshift 0.4.1 independent range connections (source update)
+
+- Fix eight active HTTP/2 ranges sharing one TCP connection: each active range now uses an independent, reusable connection within the existing hard limits.
+- Bound the idle connection cache; retain HTTP/2, TLS verification, metadata negotiation, safe fallback, resume validation, checkpoints and hashing.
+- Add real TLS/HTTP/2 socket-count, keep-alive, full-file checksum and background-contention regressions.
+
+Saved user speed caps were already disabled. Same-source bounded live samples improved, with original history/partials untouched; PERFORMANCE.md and DEVELOPMENT_PROGRESS.md record actual scope/results. No router/Windows traffic-priority settings were changed. This source update does not publish a new release or establish universal Internet/IDM throughput parity.
+
+---
+
 # Downshift 0.4.0 GUI 2.0 and history loading (source update)
 
 - Stable Windows per-user storage, validated asynchronous history loading, explicit failure/retry states and encrypted rotating SQLite backups.

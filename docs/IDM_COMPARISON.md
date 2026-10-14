@@ -13,3 +13,9 @@ python scripts/ProbeIdm.py --output build/idm-new-availability.json
 ```
 
 If that record reports `available_for_benchmark: true`, a later fair throughput comparison can use the same sizes/shaping, sequential alternating runs, at least three repetitions, full completed-file SHA-256 verification, actual observed connection counts, and explicit IDM configuration/startup/verification differences. A 4 MiB availability probe is not a throughput benchmark. Downshift's current paired measurements compare its Phase 7 and Phase 8 builds only.
+
+## User observation and 0.4.1 follow-up (2026-10-14)
+
+The user supplied screenshots reporting IDM around 3 MB/s and Downshift around 447 KB/s and confirmed that the file is the same. The displayed server addresses differ, so these images are an observation rather than an identical-URL controlled benchmark. IDM was not operated or modified in this follow-up.
+
+A real HTTP/2 fixture reproduced Downshift's eight active ranges sharing one physical socket. The correction retains HTTP/2 and keep-alive while using independent range connections. Bounded before/after samples used the same saved Downshift URL, independently of the two screenshot addresses; PERFORMANCE.md records their scope. This establishes a Downshift defect and its measured improvement, without claiming measured IDM parity, proprietary IDM internals, or control over router/other-device bandwidth.

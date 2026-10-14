@@ -1272,3 +1272,7 @@ Prioritize shared downloader engineering and general server compatibility after 
 ## GUI 2.0 and persistence follow-up (2026-10-14)
 
 The user requests diagnosis of apparently lost history/paused work after the Desktop shortcut restart, followed by the explicitly referred GUI 2.0 brief. Preserve existing data and preferences, keep native C++/Qt Widgets and the engine, verify the responsive design and persistence, commit/push main and stop for review. Initial seven-record inspection and the user's subsequently confirmed removal of one failed record are distinct: current six-record history must be retained. Do not publish 0.4.0 before review. GUI_2.md records implementation and the unobserved original trigger.
+
+## Transport throughput follow-up (2026-10-14)
+
+After reviewing GUI 2.0, the user requests faster general downloading under background traffic, citing IDM around 3 MB/s versus Downshift around 447 KB/s for the same file. Screenshots show different host addresses and the user confirms the same file. Investigate actual settings, sockets and scheduling, implement a general correction and preserve history/partials. Compare bounded samples against the same saved source rather than treating screenshots as a controlled benchmark. Existing authorized main commit/push remains applicable; no automatic new release is requested.

@@ -1,0 +1,46 @@
+{
+  "version": "0.4.1",
+  "scope": "Windows local native transport correction; full suites plus bounded same-source partial sample",
+  "baselineSource": "0fe5d3e23dece02038a1c572d4d1d765eb6c092e",
+  "settingsObserved": {
+    "aggregateSpeedCap": 0,
+    "perTaskSpeedCaps": 0,
+    "automatic": false,
+    "effectivePool": 8,
+    "preferencesChanged": false
+  },
+  "sourceTlsProbe": {
+    "alpn": "h2",
+    "tls": "TLSv1.2",
+    "verified": true
+  },
+  "normalHistory": {
+    "records": 6,
+    "paused": 1,
+    "active": 0,
+    "encryptedHistorySettingsReceiptsUnchanged": true,
+    "originalPartialJournalMetadataUnchanged": true
+  },
+  "suites": {
+    "release": {
+      "passed": 15,
+      "seconds": 143.67
+    },
+    "debug": {
+      "passed": 15,
+      "seconds": 155.93
+    }
+  },
+  "logSha256": {
+    "release": "71fae912f4665e3e316c4e0cdf90bc2c3daaaedb04e472ebe62ddb0e6b06d588",
+    "debug": "3d1e72d1f969c40f86d7e0808507a6ab54f8f48a432184e1d108a608eced54fb"
+  },
+  "productionBinaries": {
+    "Downshift.exe": "ebb946cbfe84a62ee72d0c4a7af6614292c2e425dde0e2cfd999199897e3cf1f",
+    "DownshiftNativeHost.exe": "9b0f722b96c4f06d749797bcd05a34ee76bab47113b0408bb3fcccaf73172639",
+    "DownshiftDownload.exe": "be6103af7d3a4095f52c59f314075e45e3227d044cb4fd2ec58764c13d84697a"
+  },
+  "routerOrWindowsTrafficPolicyChanged": false,
+  "idmOperated": false,
+  "newReleasePublished": false
+}

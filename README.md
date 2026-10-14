@@ -1,6 +1,6 @@
 # Downshift
 
-The working development version is **0.4.0 — GUI 2.0 and history loading**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the new pink arrow icon. Startup clearly distinguishes loading/failure from an empty history and retains the existing per-user database, paused tasks and encrypted backups. See [GUI 2.0](docs/GUI_2.md). The verified published preview remains v0.3.3; this phase stops for review after commit/push.
+The working development version is **0.4.1 — independent range connections and GUI 2.0**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the new pink arrow icon. Startup clearly distinguishes loading/failure from an empty history and retains the existing per-user database, paused tasks and encrypted backups. Segmented HTTP/2 downloads now use independent reusable connections rather than multiplexing the range pool onto one socket. See [performance diagnosis](docs/PERFORMANCE.md) and [GUI 2.0](docs/GUI_2.md). The verified published preview remains v0.3.3; this phase stops for review after commit/push.
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Downshift VERSION 0.4.0 LANGUAGES CXX)
+project(Downshift VERSION 0.4.1 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Downshift requires Windows and the MSVC C++ toolchain.")
@@ -103,6 +103,9 @@ if(BUILD_TESTING)
     if(NODE_EXECUTABLE)
         add_test(NAME browser.extension COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/ExtensionTests.mjs")
         add_test(NAME browser.media COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaExtensionTests.mjs")
+        add_test(NAME engine.transport COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/TransportTests.py" "$<TARGET_FILE:downshift_download>" "${NODE_EXECUTABLE}")
+        set_tests_properties(engine.transport PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
         set_tests_properties(browser.extension PROPERTIES TIMEOUT 30)
     else()
         message(STATUS "Node.js unavailable: extension state checks require a separate Node test run.")

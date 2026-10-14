@@ -95,3 +95,24 @@ Process wall time includes native startup, transfer, hashes, flushes, and shutdo
 ## IDM availability
 
 Installed IDM did not request the fixture or produce a file within either final documented-CLI 30-second availability probe. No cause or comparative speed is inferred. [IDM status](IDM_COMPARISON.md) contains evidence and reproduction instructions.
+
+## HTTP/2 connection diagnosis and repair (0.4.1, 2026-10-14)
+
+The user observed roughly 3 MB/s in IDM versus 447 KB/s in Downshift for the same file. The images show different source hosts; the user confirmed the same file. Read-only saved settings showed no aggregate or per-task speed caps, manual mode and eight effective slots (16 configured connections divided across the existing two-per-host admission policy). No preferences, Windows/router priorities or IDM settings were changed.
+
+The confirmed defect is physical connection sharing. Downshift preferred HTTP/2 and left libcurl's default multi multiplexing enabled. Eight active byte-range handles could therefore use one TCP connection, while the table displayed eight ranges as Connections. This loses the expected independent TCP/per-socket capacity. See libcurl's [multiplexing contract](https://curl.se/libcurl/c/CURLMOPT_PIPELINING.html). The correction explicitly disables active multiplexing and bounds the idle connection cache to the hard pool size. HTTP/2 and reusable keep-alive connections remain enabled; no forced HTTP/1.1 downgrade or fresh socket per healthy range is introduced. Streaming remains one connection. TLS/ETag/range validation, safe fallback, pacing limits, checkpoints and independent file verification are unchanged.
+
+The actual TLS HTTP/2 fixture serves 4 MiB pattern files with sixteen ranges, counts sockets and independently verifies complete size/SHA-256 and contiguous coverage. Each observation below is one sequential sample, not a repeated statistical Internet benchmark. Four genuine background HTTP/1.1 transfers in the contention cases share a modeled 2 MiB/s fair physical-socket budget. Rates include startup and finalization.
+
+| Controlled profile | Old slots / physical sockets | Old MiB/s | Fixed slots / physical sockets | Fixed MiB/s |
+|---|---|---:|---|---:|
+| Per-socket 512 KiB/s | 1 / 1 | 0.50 | 1 / 1 | 0.50 |
+| Per-socket 512 KiB/s | 8 / 1 | 0.50 | 8 / 8 | 3.63 |
+| Four background sockets, shared link | 1 / 1 | 0.40 | 1 / 1 | 0.40 |
+| Four background sockets, shared link | 8 / 1 | 0.40 | 8 / 8 | 1.30 |
+
+Exact bytes, times, physical socket IDs/protocols and engine metrics are in evidence/transport-041-{baseline,fixed}.json. The baseline binary is the saved GUI 2.0 CLI; its fingerprint is retained. The final regression also asserts keep-alive reuse across sixteen ranges and socket limits. Existing HTTP/1.1 and malformed HTTP/2 retry tests remain separately required.
+
+The user's saved large-file source negotiated verified TLS 1.2 with ALPN h2. Bounded old/fixed live samples used the same saved URL kept in memory, separate UUID destinations and eight slots. Both paused normally after about 8 MiB. Windows owning-process socket sampling observed one established TCP connection before and eight after. The last sampled smoothed rates were 472,130 B/s and 2,446,178 B/s; sample endpoints were 8,454,144 bytes at 19.90 s and 8,388,608 bytes at 4.40 s respectively. These are short partial samples with ramp-up, not whole-file checksums, a measured IDM comparison or a stable ISP line-rate claim. See evidence/transport-041-live-partial.json. Original user partial/journal sizes and modification times remained unchanged; signed URLs and filenames are excluded from public evidence.
+
+Independent connections can use more available capacity under contention, but an application cannot guarantee priority over other devices without network-level policy. Source limits, latency, congestion, shared link capacity, disk pressure and explicit speed caps still apply. The fixture models a mechanism rather than every router's scheduling. This phase does not install global QoS settings or publish a new release.

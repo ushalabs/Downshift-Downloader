@@ -1,0 +1,32 @@
+{
+  "scope": "Same saved source URL kept in memory; no user files changed",
+  "originalPartialMetadataUnchanged": true,
+  "samples": [
+    {
+      "label": "baseline",
+      "binarySha256": "6b897e64832ecd7ffc26dc7837ed7c4da3b4aa89856e32c5fab7ffde154a778b",
+      "exitCode": 3,
+      "timedOut": false,
+      "peakObservedTcpConnections": 1,
+      "samples": 60,
+      "lastSampleBytes": 8454144,
+      "lastElapsedSeconds": 19.8958465,
+      "lastSmoothedBps": 472130.48986713955,
+      "peakActiveRanges": 8,
+      "scope": "Bounded partial live transfer, not full-file verification or IDM measurement"
+    },
+    {
+      "label": "fixed",
+      "binarySha256": "be6103af7d3a4095f52c59f314075e45e3227d044cb4fd2ec58764c13d84697a",
+      "exitCode": 3,
+      "timedOut": false,
+      "peakObservedTcpConnections": 8,
+      "samples": 12,
+      "lastSampleBytes": 8388608,
+      "lastElapsedSeconds": 4.4021169,
+      "lastSmoothedBps": 2446178.030520943,
+      "peakActiveRanges": 8,
+      "scope": "Bounded partial live transfer, not full-file verification or IDM measurement"
+    }
+  ]
+}

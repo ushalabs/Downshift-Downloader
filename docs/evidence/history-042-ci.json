@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "abac103bb4f2fc0b597956b7af9a190460979335",
+  "runId": 38554413240,
+  "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38554413240",
+  "conclusion": "success",
+  "release": {
+    "passed": 16,
+    "total": 16,
+    "seconds": 165.51
+  },
+  "debug": {
+    "passed": 16,
+    "total": 16,
+    "seconds": 167.8
+  },
+  "portableChecks": 13,
+  "scope": "Controlled fixtures and extracted portable checks. Actual Desktop history and isolated Chrome observations are recorded separately. No release publication."
+}

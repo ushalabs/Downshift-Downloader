@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "69c0310a6edfbf9d479831ecc5a7e0db0a2a2f31",
+  "branch": "main",
+  "remoteHashMatched": true,
+  "ciRunId": 38570946997,
+  "ciUrl": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38570946997",
+  "ciStatusAtReport": "in_progress",
+  "ciConclusion": null,
+  "localAcceptance": "completed",
+  "nextPhase": "T2 requires explicit approval",
+  "publishedReleaseUnchanged": "v0.3.3"
+}

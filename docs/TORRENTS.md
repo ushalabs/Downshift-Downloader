@@ -47,4 +47,6 @@ Rasterbar uses BSD-3-Clause with embedded component notices; the pinned port als
 
 ## Verification status
 
+Exact-source Windows CI run 38570946997 passed 17/17 Release groups, 17/17 Debug groups and 13 existing HTTP/GUI portable checks, without skipped test groups. See evidence/torrent-t1-ci.json. This does not constitute a public torrent release or future torrent GUI/persistence acceptance.
+
 The normal MSVC Release and Debug builds passed all 17 local test groups. Each torrent group passed 142 assertions, including six complete local-peer transfers across piece boundaries, all twelve final-file SHA-256 comparisons, runtime/header version match (2.1.2.0, ABI 100), invalid/oversized input, symlink/file-count rejection, duplicates, unavailable metadata/cancellation, destination errors, queued Qt delivery and startup/shutdown races. Release CLI help and invalid invocation exit behavior also passed. Complete HTTP, encrypted queue/recovery, browser and GUI regressions remain included. See DEVELOPMENT_PROGRESS.md and evidence/torrent-t1-local.json for final results and scopes. Public swarm/DHT/tracker reachability, multi-peer load, disk-full and full torrent recovery/seeding policy acceptance remain unverified/deferred; this is T1, not T4.

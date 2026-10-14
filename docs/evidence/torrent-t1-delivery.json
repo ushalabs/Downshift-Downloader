@@ -4,8 +4,8 @@
   "remoteHashMatched": true,
   "ciRunId": 38570946997,
   "ciUrl": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38570946997",
-  "ciStatusAtReport": "in_progress",
-  "ciConclusion": null,
+  "ciStatusAtReport": "completed",
+  "ciConclusion": "success",
   "localAcceptance": "completed",
   "nextPhase": "T2 requires explicit approval",
   "publishedReleaseUnchanged": "v0.3.3"

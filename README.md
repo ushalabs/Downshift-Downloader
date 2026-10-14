@@ -45,7 +45,7 @@ Enabled capture promptly pauses Chrome and does not silently fall back when a ha
 
 ## Verification and performance
 
-Local Release and Debug each pass 14 full test groups, including actual video fixture downloads with helpers installed, 12,241 engine unit checks and controlled HTTP/HTTPS/recovery/GUI/queue/protocol scenarios. Separate actual isolated Chrome checks pass in both configurations. Portable tests verify app-local libraries, startup without developer PATH, per-user setup and ownership-safe uninstall. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes local results, Windows CI and release verification; no fresh-VM or universal compatibility claim is made.
+Current Release and Debug each pass 17 full test groups, including video fixture downloads with helpers installed and controlled HTTP/HTTPS/recovery/GUI/queue/protocol/storage/torrent scenarios. Separate actual isolated Chrome runs pass 15 checks each. Exact-source T1 Windows CI also passed 17 Release groups, 17 Debug groups and 13 existing HTTP/GUI portable checks. Portable tests verify app-local libraries, startup without developer PATH, per-user setup and ownership-safe uninstall. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes local results, Windows CI and release verification; no fresh-VM or universal compatibility claim is made.
 
 Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
 

@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "69c0310a6edfbf9d479831ecc5a7e0db0a2a2f31",
+  "runId": 38570946997,
+  "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38570946997",
+  "conclusion": "success",
+  "release": { "passed": 17, "total": 17, "seconds": 210.77 },
+  "debug": { "passed": 17, "total": 17, "seconds": 216.86 },
+  "skippedTestGroups": 0,
+  "portableChecks": 13,
+  "scope": "Exact-source Windows build, controlled native HTTP/media/queue/browser/GUI/torrent fixtures and existing HTTP/GUI portable checks. No torrent GUI, persistent recovery, public swarm or release publication claim. Actual Desktop history and isolated Chrome checks are recorded separately."
+}

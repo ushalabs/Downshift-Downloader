@@ -1,0 +1,10 @@
+{
+  "checks": 13,
+  "scope": "ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership",
+  "packageSha256": "47982b1b3c7720f285e507082a72d2e0a6985562684c7660535cdbd721f1280e",
+  "runtimePath": "Windows system directories only",
+  "limitations": "same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "version": "0.3.3",
+  "sourceCommit": "41a71a3bfcbd2ec73d0c14cf7057a8e82d62a4c3"
+}

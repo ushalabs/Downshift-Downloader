@@ -6,7 +6,7 @@
 - Newest-first history, Latest/Oldest/Size views on every sidebar page, preserved selected IDs and shared rounded pink forms/menus/dropdowns.
 - Browser checks use a separate test bridge, leaving the user's normal connection and history alone.
 
-Validation/publication results are recorded after success in DEVELOPMENT_PROGRESS.md. This is an unsigned preview; supported public HTTP/HTTPS transfer does not imply universal authenticated, browser-only or DRM support. No proprietary IDM implementation or general Internet-speed advantage is claimed.
+[Exact-source Windows CI](https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38458456028) passed both 14-group suites and 13 portable checks. The [v0.3.3 preview](https://github.com/ushalabs/Downshift-Download-Manager/releases/tag/v0.3.3) has verified asset hashes and a separately downloaded public extension ZIP. DEVELOPMENT_PROGRESS.md distinguishes successful local/CI checks from the current YouTube 429 refusal. This is an unsigned preview; supported public HTTP/HTTPS transfer does not imply universal authenticated, browser-only or DRM support. No proprietary IDM implementation or general Internet-speed advantage is claimed.
 
 ---
 

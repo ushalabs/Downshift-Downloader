@@ -1,12 +1,12 @@
-# Torrent engine: Phase T1
+# Torrent engine and management: Phases T1–T2
 
-T1 is the native engine foundation. Torrent management/persistence (T2), Qt torrent pages/dialogs (T3), and full torrent packaging acceptance (T4) require separate approval. The existing HTTP GUI/browser remain on libcurl and SQLite. T1 registers no torrent file association or magnet browser takeover.
+T1 is the native engine foundation. The current direct request authorizes T2 management/persistence. Qt torrent pages/dialogs (T3) and full torrent packaging acceptance (T4) still require separate approval. The existing HTTP GUI/browser remain on libcurl and SQLite. No torrent file association or magnet browser takeover is registered.
 
 ## Dependency and architecture
 
 The immutable vcpkg baseline resolves Rasterbar libtorrent 2.1.2. Default features are disabled: native C++, OpenSSL, no Python binding, deprecated-function ABI or WebTorrent/WebRTC. The port exports ABI 100 and OpenSSL/libcrypto definitions through LibtorrentRasterbar::torrent-rasterbar; Downshift consumes that imported target rather than defining ABI macros. Existing dependencies remain on the same baseline. This is Rasterbar, not the unrelated rTorrent library.
 
-The independent downshift_torrent QObject adapter owns a command worker and native session. Parsing, filesystem work and alerts run off the Qt thread. set_alert_notify only wakes the worker; pop_alerts pointers never survive the next pop or enter Qt signals. Status is requested at most twice per second; queued Qt connections receive copied snapshots. Shutdown disables notification, aborts the session and joins network/disk workers before releasing synchronization objects. Await asynchronous shutdown outside the GUI thread before destruction; the destructor joins as a lifetime safeguard.
+The independent downshift_torrent QObject adapter owns a command worker and native session. Parsing, filesystem work and alerts run off the Qt thread. set_alert_notify only wakes the worker; pop_alerts pointers never survive the next pop or enter Qt signals. Worker status polling runs at most twice per second, including idle seeds so time policies advance without peers; queued Qt connections receive copied snapshots. Shutdown disables notification, aborts the session and joins network/disk workers before releasing synchronization objects. Await asynchronous shutdown outside the GUI thread before destruction; the destructor joins as a lifetime safeguard.
 
 Upstream references: [session/alert lifetime](https://libtorrent.org/reference-Session.html), [native metadata loading](https://libtorrent.org/reference-Core.html), [loading limits](https://libtorrent.org/reference-Torrent_Info.html).
 
@@ -16,11 +16,11 @@ Upstream references: [session/alert lifetime](https://libtorrent.org/reference-S
 - Separate metadata-loading state and cancellation. Unavailable peers do not make a valid magnet invalid.
 - Native tracker/DHT/PEX discovery, piece selection/verification and peer transfers, with no HTTP segment scheduler.
 - File-list and byte/rate/status snapshots for later Qt integration.
-- Automatic pause at verified completion. Uploads can occur during downloading; no indefinite post-download seeding policy is implemented in T1.
+- T1 automatically paused at verified completion. T2 adds explicit completion seeding policies below; uploads can also occur while downloading.
 
-Production enables DHT/LSD and the default metadata/PEX extensions. Automatic UPnP/NAT-PMP mapping is disabled. Listening uses available ports; outgoing transfers can work without port forwarding. Tests disable discovery and use loopback peers; they do not establish public tracker/DHT reachability.
+Production enables DHT/LSD and the default metadata/PEX extensions. Automatic UPnP/NAT-PMP mapping is disabled. Listening uses available ports; outgoing transfers can work without port forwarding. Tests disable discovery, use TCP loopback peers, allow multiple fixture peers on the same IP and lower only fixture reconnect backoff; they do not establish public tracker/DHT reachability.
 
-## Developer usage
+## Developer usage (T1-compatible ephemeral mode)
 
 The new DownshiftTorrent.exe console target is beside the development binaries:
 
@@ -37,15 +37,69 @@ Local metadata is bounded to 10,000,000 bytes before read/parse; magnets to 32,7
 
 After libtorrent sanitization, Windows paths reject relative destinations, traversal, device names, unsafe characters, collisions, symlinks and existing junctions. Magnet payloads remain in upload mode until metadata passes validation. Embedded web seeds, rename overrides and file selections are ignored in T1; all ordinary files download from peers. Nothing executes automatically. Cancel/shutdown never delete data. These checks are not an OS sandbox against another process changing destinations concurrently.
 
-## Recovery, privacy and licensing
+## T1 historical scope, privacy and licensing
 
-T1 does not save resume data or torrent SQLite rows. Exit retains files but cannot automatically restore sessions. Re-adding metadata invokes native verification; unverified pieces are never complete. File priorities, persisted pause/resume, crash recovery, speed settings, seeding policies and detailed tracker/peer management are T2; sidebar/history/dialogs are T3.
+The original T1 foundation did not save resume data or torrent SQLite rows. Its ephemeral mode retains files but cannot automatically restore sessions. Persistent T2 usage below supersedes that limitation. Re-adding metadata invokes native verification; unverified pieces are never complete. Sidebar/shared-history/dialogs remain T3.
 
 Ordinary BitTorrent exposes your IP to peers and trackers. Downshift promises no anonymity and adds no telemetry. Avoid publishing private tracker tokens. Tests generate deterministic bytes, without copyrighted media or unauthorized sources.
 
 Rasterbar uses BSD-3-Clause with embedded component notices; the pinned port also records Zlib/BSL/APSL/BSD notices. OpenSSL uses Apache-2.0 and Boost BSL-1.0. Preserve exact installed-port notices and sources when packaging; see THIRD_PARTY_NOTICES.md. No T1 release publication is authorized.
 
-## Verification status
+## T2 management and persistence
+
+T2 extends the independent native torrent target and developer console. HTTP transfer, queue, GUI, media and extension source remain unchanged. Torrent widgets, shared-history rows, associations and magnet browser takeover are T3.
+
+TorrentEngine supports add-paused, pause/resume, checkpoints, file selection/priorities, per-torrent and session limits, seeding policies, copied tracker/peer/availability details, cancellation, remove-only and confirmed delete-data. Commands, SQLite and native queries run on its worker; await futures outside the GUI thread. Up to eight retained torrents use resolved, nonoverlapping destination folders below filesystem roots. Remove retained records before re-adding their info hash. Failed disk transfers can be explicitly resumed after fixing the cause; unsafe metadata stays blocked.
+
+### Storage boundary
+
+An absolute Options.databasePath or console --database enables persistence; empty means an ephemeral session. The intended T3 integration is a companion torrents.sqlite under the verified user data directory, beside queue.sqlite. The normal application does not open it during T2. The torrent subsystem rejects queue.sqlite, renamed unrelated SQLite files and stores inside payload destinations. It never migrates the HTTP schema or opens its queue connection.
+
+Schema version 1 (user_version=1, application ID DSTR) uses torrents, torrent_settings and torrent_meta tables. User-scoped Windows DPAPI authenticates/encrypts complete versioned records, metadata/native resume data, destinations, tracker tokens, priorities, counters, seeding rules and settings. In SQLite, only opaque IDs and schema remain plaintext. This does not protect against software running as the same Windows user. Prepared statements, WAL, FULL synchronization and secure deletion apply; record/input bounds remain enforced.
+
+A path lease and Windows volume/FileID mutex prevent competing owners, including hard-link aliases. The managed .owned marker binds the physical database identity and rejects a replacement behind the same displayed path. Missing/truncated owned live storage, future versions, invalid records, wrong hashes and DPAPI tampering fail visibly without accepting empty history. SQLite backup and QSaveFile provide an encrypted .backup.sqlite after complete validation and clean shutdown. The live database is never automatically overwritten from a backup. Deliberate restoration requires verified content and rebinding the new physical identity; no automatic repair command is provided.
+
+An encrypted acceptance marker changes atomically with Add/Remove. Unexpected disappearance of every torrent row fails even when the database remains structurally valid; it cannot rotate over a valid backup. Explicit removal of the last torrent records an intentional empty state that is allowed after restart. Missing/tampered acceptance metadata also fails visibly.
+
+### Recovery and selected-file correctness
+
+Add first commits recoverable native metadata/magnet state. Subsequent save_resume_data(flush_disk_cache | save_info_dict) alerts provide native checkpoints, including metadata and counters. Explicit pause/configuration/selection/checkpoint futures settle after encryption and SQLite commit. Overlapping saves are serialized/coalesced; later commands wait for a later native save. Periodic checkpoints run every 15 seconds. Shutdown pauses handles, drains saves/removals with a bounded 20-second alert wait, then joins native workers. Failure reports an error while retaining previous checkpoints.
+
+Restart and process-death recovery always restore paused. Explicit Resume rehashes actual files before reuse/seeding, even after same-size/same-mtime content changes. Libtorrent owns piece validity; SQLite does not invent a completed-piece map. Uncheckpointed written pieces may be rediscovered by rechecking, but recovery of those bytes is not promised. Missing peers/metadata remain waiting states.
+
+Priorities correspond to ordinary Snapshot.files: 0 skips; 1–7 set native priority. At least one file must be selected; internal pad-file indices are handled separately. Selection can change after metadata. Magnet input selections/web seeds/rename overrides remain ignored unless explicit validated options are supplied. Boundary pieces can include skipped-file bytes stored in the native part file. Progress sums verified selected-file bytes rather than whole-piece wanted counters. Selected completion requires every selected file and a completed native flush/checkpoint; skipped files are not reported complete.
+
+### Limits, statistics and seeding
+
+Download/upload limits use bytes/second (0 unlimited); connection limits are 1–512. Session budgets affect torrents only. Defaults remain 64 session peers, eight retained torrents and 256 KiB/s per-torrent upload. IP peer classes include LAN/loopback in the global budget. Native pacing can briefly burst; controlled sustained loopback checks are separate from Internet throughput guarantees. Only loopback test mode reduces reconnect backoff to one second; production retains native reconnect behavior.
+
+Copied snapshots include selected/total/verified bytes, rates, seeds/peers, lifetime payload counters, availability and upload/download ratio. Explicit details queries copy file progress, tracker verification/failure summaries, peer addresses/clients/rates and piece availability. Default console progress omits addresses/source URLs. --details explicitly prints them and may reveal private tracker tokens; do not publish that output.
+
+Seeding modes are stop (default), ratio, time and manual. Ratio uses native lifetime payload uploaded/downloaded; with zero downloaded bytes it remains zero. Time counts active post-selected-completion seeding, persists milliseconds and excludes pauses. Half-second policy polling continues for idle seeds and can slightly overshoot thresholds. Manual runs until pause/cancel/shutdown. Uploads during downloading remain possible in every mode. Restored sessions never upload automatically.
+
+Cancel retains history and files. Remove-only erases the record and keeps payload. Delete-data requires explicit confirmation, validated metadata and fresh link/path checks; its future settles after native deletion acknowledgement and SQLite removal. Unrelated files remain. Cancelled known-metadata records attach a paused native storage handle for confirmed deletion. Interrupted removal stays cancelled with a visible message and never silently repeats deletion. This is not a sandbox against concurrent filesystem changes by another process.
+
+### Persistent developer console
+
+Use actual valid inputs and keep the store outside payload destinations:
+
+```powershell
+./build/windows-msvc/Release/DownshiftTorrent.exe --database 'D:/DownshiftData/torrents.sqlite' --torrent 'D:/metadata/example.torrent' --save 'D:/Downloads/Torrents/example' --paused --priorities '7,0'
+./build/windows-msvc/Release/DownshiftTorrent.exe --database 'D:/DownshiftData/torrents.sqlite' --list
+./build/windows-msvc/Release/DownshiftTorrent.exe --database 'D:/DownshiftData/torrents.sqlite' --id 'SAVED_ID' --resume --timeout 600
+./build/windows-msvc/Release/DownshiftTorrent.exe --database 'D:/DownshiftData/torrents.sqlite' --id 'SAVED_ID' --configure --download-limit 1048576 --upload-limit 262144 --connections 32 --seed time --seed-seconds 3600
+./build/windows-msvc/Release/DownshiftTorrent.exe --database 'D:/DownshiftData/torrents.sqlite' --id 'SAVED_ID' --remove
+```
+
+Additional ID actions are --pause, --cancel, --details and --delete-data --confirm-delete. --global-limits applies the rate/connection options session-wide. Each invocation restores entries paused; only explicit Resume/add-start transfers. Seeding runs continue until policy completion or bounded timeout. Clean timeout preserves checkpoints. Exit codes remain 0 success/verified selected completion, 1 error, 2 invalid action combination, 3 timeout.
+
+Upstream references: [resume serialization and trust](https://libtorrent.org/reference-Resume_Data.html), [pause, save alerts, priorities and native limits](https://libtorrent.org/reference-Torrent_Handle.html), [session peer classes](https://libtorrent.org/reference-Session.html).
+
+### T2 verification
+
+Final local Release/Debug torrent groups each pass 246 T2 management checks and 142 T1 foundation checks. Full regression coverage and the initial Debug seeder timeout/retry are recorded in DEVELOPMENT_PROGRESS.md and evidence/torrent-t2-*. Exact-source Windows CI delivery is recorded separately after the main push. Fixtures use private stores/destinations and hidden process children. Public swarms, disk-full, multi-peer stress and packaged torrent acceptance remain T4. No new release is published; T3 is not started automatically.
+
+## T1 historical verification status
 
 Exact-source Windows CI run 38570946997 passed 17/17 Release groups, 17/17 Debug groups and 13 existing HTTP/GUI portable checks, without skipped test groups. See evidence/torrent-t1-ci.json. This does not constitute a public torrent release or future torrent GUI/persistence acceptance.
 

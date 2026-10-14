@@ -2,9 +2,9 @@
 
 The 0.4.2 development history repair and storage-binding recovery procedure are documented in [HISTORY_RECOVERY.md](docs/HISTORY_RECOVERY.md). Public release artifacts remain at the separately verified v0.3.3 preview.
 
-Native BitTorrent Phase T1 provides a tested Rasterbar engine and developer tool: see [torrent scope and usage](docs/TORRENTS.md). Torrent GUI and persistence are later, separately approved phases.
+Native BitTorrent Phases T1–T2 provide a Rasterbar engine, encrypted torrent recovery, selection/limits/seeding controls and a developer console: see [torrent scope and usage](docs/TORRENTS.md). Torrent GUI is the separately approved T3 phase.
 
-The working HTTP/GUI version is **0.4.2 — history storage repair, independent range connections and GUI 2.0**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the pink arrow icon. Startup distinguishes loading/failure from empty history and checks recovered storage identity. Segmented HTTP/2 downloads use independent reusable connections. See [performance diagnosis](docs/PERFORMANCE.md), [GUI 2.0](docs/GUI_2.md) and [history recovery](docs/HISTORY_RECOVERY.md). The verified published preview remains v0.3.3. The separate T1 torrent foundation is not yet a GUI feature.
+The working HTTP/GUI version is **0.4.2 — history storage repair, independent range connections and GUI 2.0**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the pink arrow icon. Startup distinguishes loading/failure from empty history and checks recovered storage identity. Segmented HTTP/2 downloads use independent reusable connections. See [performance diagnosis](docs/PERFORMANCE.md), [GUI 2.0](docs/GUI_2.md) and [history recovery](docs/HISTORY_RECOVERY.md). The verified published preview remains v0.3.3. The separate torrent subsystem is not yet a GUI feature.
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
@@ -45,7 +45,7 @@ Enabled capture promptly pauses Chrome and does not silently fall back when a ha
 
 ## Verification and performance
 
-Current Release and Debug each pass 17 full test groups, including video fixture downloads with helpers installed and controlled HTTP/HTTPS/recovery/GUI/queue/protocol/storage/torrent scenarios. Separate actual isolated Chrome runs pass 15 checks each. Exact-source T1 Windows CI also passed 17 Release groups, 17 Debug groups and 13 existing HTTP/GUI portable checks. Portable tests verify app-local libraries, startup without developer PATH, per-user setup and ownership-safe uninstall. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes local results, Windows CI and release verification; no fresh-VM or universal compatibility claim is made.
+T2 regression coverage includes 18 groups for HTTP/HTTPS, transport, recovery, queue, GUI, media, browser/protocol, storage and torrents. Release passed its full run; Debug required an isolated retry of the T1 local-seeder fixture. Both final torrent suites passed 246 management checks and 142 foundation checks. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes complete runs, final affected-group reruns, Windows CI and release verification. Earlier exact-source T1 CI passed 17 Release/17 Debug groups and 13 existing HTTP/GUI portable checks; actual isolated Chrome runs belong to that earlier verification. No fresh-VM, public-swarm or packaged torrent acceptance is claimed.
 
 Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
 

@@ -1,8 +1,8 @@
 # Downshift architecture
 
-## Torrent foundation (T1)
+## Torrent foundation and management (T1–T2)
 
-The independent downshift_torrent target wraps native Rasterbar through its exported CMake/ABI target. An owned worker serializes parsing, commands, alerts and bounded status requests; Qt receives copied queued snapshots. HTTP classes, rate budgets, scheduler and SQLite payloads are not repurposed for peer/piece scheduling. Session failure stays within its adapter. DownshiftTorrent exercises the engine while GUI/database integration remains gated. See TORRENTS.md.
+The independent downshift_torrent target wraps native Rasterbar through its exported CMake/ABI target. An owned worker serializes parsing, commands, alerts and bounded status requests; Qt receives copied queued snapshots. HTTP classes, rate budgets, scheduler and SQLite payloads are not repurposed for peer/piece scheduling. T2 adds a worker-owned DPAPI-encrypted companion TorrentStore, native resume checkpoints, paused recovery with rehash, selection, limits and seeding policies. Its versioned SQLite tables, path/physical-store leases and backups never alter the HTTP queue. DownshiftTorrent exercises management while Qt torrent pages and shared-history integration remain T3. See TORRENTS.md.
 
 ## Current execution boundaries
 

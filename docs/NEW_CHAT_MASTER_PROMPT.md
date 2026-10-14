@@ -1,5 +1,9 @@
 # Downshift — complete new-chat handoff
 
+## Current continuation update: Torrent T2 (2026-10-14)
+
+The user directly authorized Torrent T2 in the subsequent chat and explicitly excluded changes to the existing HTTP direct downloader. T2 management/persistence now extends the separate native torrent target and developer console: DPAPI-encrypted companion SQLite storage, native checkpoints, paused recovery with rehash, selection/priorities, independent limits, seeding policies, statistics and confirmed removal/deletion. HTTP/media/GUI/browser source remains unchanged; the normal application does not yet expose torrent controls. Consult the newest DEVELOPMENT_PROGRESS.md entry and torrent-t2 evidence for actual validation/commit/push status. T3 Qt torrent integration requires explicit approval; do not automatically start it or publish a release. The older T1 handoff below is historical context.
+
 Copy this document into the new chat. This is a factual project handoff as of 14 October 2026, followed by instructions for continuing. Inspect the actual checkout before relying on any recorded status. Do not restart the project or automatically begin an unapproved phase.
 
 ## Role and objective

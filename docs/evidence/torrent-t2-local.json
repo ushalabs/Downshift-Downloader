@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 1,
+  "phase": "Torrent T2 management and persistence",
+  "date": "2026-10-14",
+  "environment": "Local Windows x64, MSVC v143, C++20, Qt 6, pinned Rasterbar 2.1.2.0 ABI 100",
+  "scope": "Independent torrent worker/console/store. HTTP/media/GUI/browser source unchanged. No T3 or release publication.",
+  "fullReleaseBeforeFinalTorrentGuards": {
+    "tests": 18,
+    "failures": 0,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.management",
+        "seconds": 97.3675,
+        "passed": true,
+        "assertions": 216,
+        "capObservations": {
+          "download": [
+            {
+              "mode": "global",
+              "selectedBytes": 524389,
+              "seconds": 10.6565,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "selectedBytes": 524389,
+              "seconds": 10.6614,
+              "configuredBytesPerSecond": 65536
+            }
+          ],
+          "upload": [
+            {
+              "mode": "global",
+              "measuredBytes": 338882,
+              "seconds": 5.11076,
+              "ratioAtStop": 0.860979,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "measuredBytes": 311296,
+              "seconds": 5.06665,
+              "ratioAtStop": 0.818182,
+              "configuredBytesPerSecond": 65536
+            }
+          ]
+        }
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 16.8404,
+        "passed": true,
+        "assertions": 142
+      },
+      {
+        "name": "browser.extension",
+        "seconds": 1.06045,
+        "passed": true,
+        "assertions": 48
+      },
+      {
+        "name": "browser.media",
+        "seconds": 0.0905397,
+        "passed": true,
+        "assertions": 27
+      },
+      {
+        "name": "engine.transport",
+        "seconds": 23.4762,
+        "passed": true
+      },
+      {
+        "name": "browser.native",
+        "seconds": 6.94087,
+        "passed": true,
+        "assertions": 36
+      },
+      {
+        "name": "gui.media",
+        "seconds": 35.5621,
+        "passed": true,
+        "assertions": 63
+      },
+      {
+        "name": "gui.integration",
+        "seconds": 12.8466,
+        "passed": true,
+        "assertions": 113
+      },
+      {
+        "name": "queue.location",
+        "seconds": 0.0996024,
+        "passed": true,
+        "assertions": 29
+      },
+      {
+        "name": "queue.integration",
+        "seconds": 20.8351,
+        "passed": true,
+        "assertions": 45
+      },
+      {
+        "name": "engine.unit",
+        "seconds": 0.494978,
+        "passed": true
+      },
+      {
+        "name": "engine.integration",
+        "seconds": 6.61592,
+        "passed": true
+      },
+      {
+        "name": "engine.adaptive",
+        "seconds": 17.6754,
+        "passed": true
+      },
+      {
+        "name": "engine.buffered",
+        "seconds": 2.44058,
+        "passed": true
+      },
+      {
+        "name": "engine.recovery",
+        "seconds": 20.735,
+        "passed": true
+      },
+      {
+        "name": "foundation.dependencies",
+        "seconds": 0.183877,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.minimal",
+        "seconds": 1.32076,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.windows",
+        "seconds": 1.37639,
+        "passed": true
+      }
+    ]
+  },
+  "fullDebugBeforeFinalMagnetAndRootChecks": {
+    "tests": 18,
+    "failures": 1,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.management",
+        "seconds": 97.3158,
+        "passed": true,
+        "assertions": 234,
+        "capObservations": {
+          "download": [
+            {
+              "mode": "global",
+              "selectedBytes": 524389,
+              "seconds": 11.1437,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "selectedBytes": 524389,
+              "seconds": 10.1213,
+              "configuredBytesPerSecond": 65536
+            }
+          ],
+          "upload": [
+            {
+              "mode": "global",
+              "measuredBytes": 321214,
+              "seconds": 5.04809,
+              "ratioAtStop": 0.904539,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "measuredBytes": 212992,
+              "seconds": 3.04816,
+              "ratioAtStop": 0.846301,
+              "configuredBytesPerSecond": 65536
+            }
+          ]
+        }
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 25.2244,
+        "passed": false
+      },
+      {
+        "name": "browser.extension",
+        "seconds": 0.986979,
+        "passed": true,
+        "assertions": 48
+      },
+      {
+        "name": "browser.media",
+        "seconds": 0.105457,
+        "passed": true,
+        "assertions": 27
+      },
+      {
+        "name": "engine.transport",
+        "seconds": 23.1014,
+        "passed": true
+      },
+      {
+        "name": "browser.native",
+        "seconds": 7.08787,
+        "passed": true,
+        "assertions": 36
+      },
+      {
+        "name": "gui.media",
+        "seconds": 34.7787,
+        "passed": true,
+        "assertions": 63
+      },
+      {
+        "name": "gui.integration",
+        "seconds": 21.035,
+        "passed": true,
+        "assertions": 113
+      },
+      {
+        "name": "queue.location",
+        "seconds": 0.124964,
+        "passed": true,
+        "assertions": 29
+      },
+      {
+        "name": "queue.integration",
+        "seconds": 18.1689,
+        "passed": true,
+        "assertions": 45
+      },
+      {
+        "name": "engine.unit",
+        "seconds": 0.480758,
+        "passed": true
+      },
+      {
+        "name": "engine.integration",
+        "seconds": 6.36367,
+        "passed": true
+      },
+      {
+        "name": "engine.adaptive",
+        "seconds": 17.8623,
+        "passed": true
+      },
+      {
+        "name": "engine.buffered",
+        "seconds": 2.75606,
+        "passed": true
+      },
+      {
+        "name": "engine.recovery",
+        "seconds": 21.2495,
+        "passed": true
+      },
+      {
+        "name": "foundation.dependencies",
+        "seconds": 0.0552125,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.minimal",
+        "seconds": 1.27735,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.windows",
+        "seconds": 1.3122,
+        "passed": true
+      }
+    ]
+  },
+  "debugFoundationRetry": {
+    "tests": 1,
+    "failures": 0,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.foundation",
+        "seconds": 17.2493,
+        "passed": true,
+        "assertions": 142
+      }
+    ]
+  },
+  "finalTorrentRelease": {
+    "tests": 2,
+    "failures": 0,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.management",
+        "seconds": 97.8201,
+        "passed": true,
+        "assertions": 246,
+        "capObservations": {
+          "download": [
+            {
+              "mode": "global",
+              "selectedBytes": 524389,
+              "seconds": 10.1385,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "selectedBytes": 524389,
+              "seconds": 10.1808,
+              "configuredBytesPerSecond": 65536
+            }
+          ],
+          "upload": [
+            {
+              "mode": "global",
+              "measuredBytes": 240802,
+              "seconds": 4.04958,
+              "ratioAtStop": 0.83466,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "measuredBytes": 241228,
+              "seconds": 3.56757,
+              "ratioAtStop": 0.83566,
+              "configuredBytesPerSecond": 65536
+            }
+          ]
+        }
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 16.6825,
+        "passed": true,
+        "assertions": 142
+      }
+    ]
+  },
+  "finalTorrentDebug": {
+    "tests": 2,
+    "failures": 0,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.management",
+        "seconds": 99.4366,
+        "passed": true,
+        "assertions": 246,
+        "capObservations": {
+          "download": [
+            {
+              "mode": "global",
+              "selectedBytes": 524389,
+              "seconds": 10.6474,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "selectedBytes": 524389,
+              "seconds": 10.1191,
+              "configuredBytesPerSecond": 65536
+            }
+          ],
+          "upload": [
+            {
+              "mode": "global",
+              "measuredBytes": 320430,
+              "seconds": 5.08134,
+              "ratioAtStop": 0.902902,
+              "configuredBytesPerSecond": 65536
+            },
+            {
+              "mode": "per_torrent",
+              "measuredBytes": 240965,
+              "seconds": 4.04782,
+              "ratioAtStop": 0.835043,
+              "configuredBytesPerSecond": 65536
+            }
+          ]
+        }
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 17.2349,
+        "passed": true,
+        "assertions": 142
+      }
+    ]
+  },
+  "totalSeconds": {
+    "fullRelease": 266.01,
+    "fullDebugInitial": 279.31,
+    "debugFoundationRetry": 17.26,
+    "finalTorrentRelease": 114.51,
+    "finalTorrentDebug": 116.68
+  },
+  "qualification": "Initial full Debug passed 17/18: T1 fixture seeder timed out before TorrentEngine construction. Isolated retry and both final frozen torrent suites passed. Final torrent-only reruns supersede earlier torrent groups; unchanged HTTP/media/GUI/browser groups were not repeated.",
+  "cli": {
+    "helpExit": 0,
+    "invalidCombinationExit": 2
+  },
+  "unexecuted": [
+    "Public swarm/DHT/tracker reachability",
+    "Multi-peer load/stress",
+    "Disk-full and physical power loss",
+    "Torrent GUI",
+    "Packaged torrent runtime and clean-VM certification",
+    "New release publication"
+  ],
+  "repairedDuringDevelopment": [
+    "Rasterbar 2.1 ABI/API compile mismatches",
+    "Whole-piece wanted counters overcounted selected-file bytes",
+    "Windows marker reader held open during atomic replacement",
+    "Controlled reconnect/seeding fixture setup",
+    "Idle seeding time policy polling",
+    "Native availability query flag",
+    "Unexplained valid-empty history rejection and encrypted transactional acceptance marker",
+    "QJsonArray test include"
+  ],
+  "sourceBlobs": {
+    "CMakeLists.txt": "e4f949213c069aaa9e72ccda3b2ff460c5f3f9ce",
+    "src/TorrentCli.cpp": "4a20f82874efb0d54b1c1fc937fcab62a6d21ee3",
+    "src/torrent/TorrentEngine.cpp": "6254cfefe1dbcba49230832dbe760b3317dbba7b",
+    "src/torrent/TorrentEngine.h": "81a3fa568b608ec2067aa221237ad656e43fcb9c",
+    "src/torrent/TorrentStore.cpp": "b3ccd692474f4a7e78514416a2d94159b08d31f7",
+    "src/torrent/TorrentStore.h": "df3eb5293200c9a6f1e7f2dc15c3e267e1597d5c",
+    "tests/TorrentTests.cpp": "ac4df8c4a506cccd7a3f58cc233fb54385f15076",
+    "tests/TorrentManagementTests.cpp": "9b757853f832eda15d20260cb0d5d5eafafd6d21"
+  },
+  "normalUserStore": {
+    "encryptedDownloadsSettingsReceiptsUnchanged": true,
+    "integrity": "ok",
+    "counts": {
+      "downloads": 7,
+      "settings": 1,
+      "handoffs": 7
+    },
+    "privateQueuesUsedForTesting": true,
+    "normalAppInitiallyClosedAndLaterOpen": true
+  }
+}

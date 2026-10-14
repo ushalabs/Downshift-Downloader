@@ -19,10 +19,11 @@ find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(LibtorrentRasterbar 2 CONFIG REQUIRED)
 
 add_library(downshift_torrent STATIC
-    src/torrent/TorrentEngine.cpp src/torrent/TorrentEngine.h)
+    src/torrent/TorrentEngine.cpp src/torrent/TorrentEngine.h
+    src/torrent/TorrentStore.cpp src/torrent/TorrentStore.h)
 set_target_properties(downshift_torrent PROPERTIES AUTOMOC ON)
 target_include_directories(downshift_torrent PUBLIC src)
-target_link_libraries(downshift_torrent PUBLIC Qt6::Core PRIVATE LibtorrentRasterbar::torrent-rasterbar)
+target_link_libraries(downshift_torrent PUBLIC Qt6::Core PRIVATE LibtorrentRasterbar::torrent-rasterbar unofficial::sqlite3::sqlite3 crypt32)
 target_compile_options(downshift_torrent PRIVATE /W4 /permissive- /utf-8)
 target_compile_definitions(downshift_torrent PRIVATE _WIN32_WINNT=0x0A00)
 
@@ -113,6 +114,12 @@ add_custom_command(TARGET downshift POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(downshift_torrent_management_tests tests/TorrentManagementTests.cpp)
+    target_link_libraries(downshift_torrent_management_tests PRIVATE downshift_torrent LibtorrentRasterbar::torrent-rasterbar unofficial::sqlite3::sqlite3)
+    target_compile_options(downshift_torrent_management_tests PRIVATE /W4 /permissive- /utf-8)
+    target_compile_definitions(downshift_torrent_management_tests PRIVATE _WIN32_WINNT=0x0A00)
+    add_test(NAME torrent.management COMMAND downshift_torrent_management_tests)
+    set_tests_properties(torrent.management PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
     add_executable(downshift_torrent_tests tests/TorrentTests.cpp)
     target_link_libraries(downshift_torrent_tests PRIVATE downshift_torrent LibtorrentRasterbar::torrent-rasterbar)
     target_compile_options(downshift_torrent_tests PRIVATE /W4 /permissive- /utf-8)

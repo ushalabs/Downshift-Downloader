@@ -1,0 +1,111 @@
+{
+  "sourceCommit": "0fe5d3e23dece02038a1c572d4d1d765eb6c092e",
+  "runId": 38524634142,
+  "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38524634142",
+  "conclusion": "success",
+  "os": "GitHub Windows Server 2022 runner",
+  "Release": {
+    "passed": 14,
+    "seconds": 129.85
+  },
+  "Debug": {
+    "passed": 14,
+    "seconds": 143.6
+  },
+  "portableChecks": 13,
+  "mediaHelpersInstalled": true,
+  "logSha256": "bac81105f84186f3f3391c0fd1c977667944aaae43306815f02b2d088ffea19d",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare pinned vcpkg",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Inspect build prerequisites",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Configure Windows x64",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve completely configured dependency builds",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Build Release",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install verified upstream video tools for Release tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Release",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build Debug",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install verified upstream video tools for Debug tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Debug",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Package clean Release and corresponding library source",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test extracted portable package with built-in Windows PowerShell",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve verified distribution",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "publicationPerformed": false
+}

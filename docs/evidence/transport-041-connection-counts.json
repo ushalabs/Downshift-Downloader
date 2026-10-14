@@ -1,0 +1,103 @@
+{
+  "version": "0.4.1",
+  "engineSourceCommit": "21912f37ca8097e72d5de9a5720fc44907499bc6",
+  "order": [
+    8,
+    16,
+    16,
+    8
+  ],
+  "requestedPauseMiB": 32,
+  "warmupExcludedSeconds": 3,
+  "measurement": "Difference in actual byte counts divided by elapsed time in each post-startup window",
+  "units": "Decimal MB/s = 1000000 bytes/s; GUI formatting uses powers of 1024",
+  "scope": "Four bounded partial samples, two per configuration; no IDM measurements or statistical significance claim",
+  "originalPartialMetadataUnchanged": true,
+  "settingsChanged": false,
+  "samples": [
+    {
+      "label": "1-8",
+      "configuredConnections": 8,
+      "competingAppTcpPeak": 0,
+      "steadyWindowSeconds": 9.1389209,
+      "steadyByteSlopeBps": 3614228.021166044,
+      "steadyMedianSmoothedBps": 3282695.8549940404,
+      "binarySha256": "be6103af7d3a4095f52c59f314075e45e3227d044cb4fd2ec58764c13d84697a",
+      "exitCode": 3,
+      "timedOut": false,
+      "peakObservedTcpConnections": 8,
+      "samples": 39,
+      "lastSampleBytes": 33816576,
+      "lastElapsedSeconds": 12.1512492,
+      "lastSmoothedBps": 3413525.2933535706,
+      "peakActiveRanges": 8,
+      "scope": "Bounded partial live transfer, not full-file verification or IDM measurement"
+    },
+    {
+      "label": "2-16",
+      "configuredConnections": 16,
+      "competingAppTcpPeak": 0,
+      "steadyWindowSeconds": 10.5465579,
+      "steadyByteSlopeBps": 2858426.444517979,
+      "steadyMedianSmoothedBps": 2782046.8088631174,
+      "binarySha256": "be6103af7d3a4095f52c59f314075e45e3227d044cb4fd2ec58764c13d84697a",
+      "exitCode": 3,
+      "timedOut": false,
+      "peakObservedTcpConnections": 16,
+      "samples": 47,
+      "lastSampleBytes": 33619968,
+      "lastElapsedSeconds": 13.5779623,
+      "lastSmoothedBps": 2431586.402936469,
+      "peakActiveRanges": 16,
+      "scope": "Bounded partial live transfer, not full-file verification or IDM measurement"
+    },
+    {
+      "label": "3-16",
+      "configuredConnections": 16,
+      "competingAppTcpPeak": 0,
+      "steadyWindowSeconds": 8.8465519,
+      "steadyByteSlopeBps": 3466983.3339247126,
+      "steadyMedianSmoothedBps": 3223234.2345316033,
+      "binarySha256": "be6103af7d3a4095f52c59f314075e45e3227d044cb4fd2ec58764c13d84697a",
+      "exitCode": 3,
+      "timedOut": false,
+      "peakObservedTcpConnections": 16,
+      "samples": 40,
+      "lastSampleBytes": 33882112,
+      "lastElapsedSeconds": 12.0212842,
+      "lastSmoothedBps": 3264539.9209886105,
+      "peakActiveRanges": 16,
+      "scope": "Bounded partial live transfer, not full-file verification or IDM measurement"
+    },
+    {
+      "label": "4-8",
+      "configuredConnections": 8,
+      "competingAppTcpPeak": 0,
+      "steadyWindowSeconds": 10.4717831,
+      "steadyByteSlopeBps": 2941420.7404658715,
+      "steadyMedianSmoothedBps": 2655278.194967208,
+      "binarySha256": "be6103af7d3a4095f52c59f314075e45e3227d044cb4fd2ec58764c13d84697a",
+      "exitCode": 3,
+      "timedOut": false,
+      "peakObservedTcpConnections": 8,
+      "samples": 45,
+      "lastSampleBytes": 33947648,
+      "lastElapsedSeconds": 13.5921937,
+      "lastSmoothedBps": 2980639.6970993853,
+      "peakActiveRanges": 8,
+      "scope": "Bounded partial live transfer, not full-file verification or IDM measurement"
+    }
+  ],
+  "summary": {
+    "8": {
+      "minMBps": 2.9414207404658717,
+      "maxMBps": 3.614228021166044,
+      "medianMBps": 3.2778243808159577
+    },
+    "16": {
+      "minMBps": 2.858426444517979,
+      "maxMBps": 3.4669833339247127,
+      "medianMBps": 3.162704889221346
+    }
+  }
+}

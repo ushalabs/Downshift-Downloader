@@ -116,3 +116,18 @@ Exact bytes, times, physical socket IDs/protocols and engine metrics are in evid
 The user's saved large-file source negotiated verified TLS 1.2 with ALPN h2. Bounded old/fixed live samples used the same saved URL kept in memory, separate UUID destinations and eight slots. Both paused normally after about 8 MiB. Windows owning-process socket sampling observed one established TCP connection before and eight after. The last sampled smoothed rates were 472,130 B/s and 2,446,178 B/s; sample endpoints were 8,454,144 bytes at 19.90 s and 8,388,608 bytes at 4.40 s respectively. These are short partial samples with ramp-up, not whole-file checksums, a measured IDM comparison or a stable ISP line-rate claim. See evidence/transport-041-live-partial.json. Original user partial/journal sizes and modification times remained unchanged; signed URLs and filenames are excluded from public evidence.
 
 Independent connections can use more available capacity under contention, but an application cannot guarantee priority over other devices without network-level policy. Source limits, latency, congestion, shared link capacity, disk pressure and explicit speed caps still apply. The fixture models a mechanism rather than every router's scheduling. This phase does not install global QoS settings or publish a new release.
+
+## Eight versus sixteen live connections (2026-10-14 follow-up)
+
+The user asked why the earlier 2.45 MB/s sample was below their observed IDM rate and authorized trying more connections. No code or user-setting change was made for this diagnostic. The same 0.4.1 engine supports up to sixteen connections. The desktop's existing conservative reservation allocates floor(16 per-site slots / 2 allowed downloads) = 8 slots per job, including when the other reservation is idle. Standalone tests can compare 8/16 without changing those saved preferences.
+
+Four new same-saved-URL samples ran in order 8,16,16,8, each pausing normally after about 32 MiB into separate private destinations. Existing Downshift/IDM processes had no established TCP connections at the start and their sampled connection counts remained zero throughout; other devices/activity were not controlled. Actual foreground peaks were 8,16,16,8. For comparison, exclude the first three seconds, then divide the observed change in actual byte count by the corresponding elapsed time. Each measured window lasts about 8.85–10.55 seconds.
+
+| Connections | First post-startup MB/s | Second post-startup MB/s | Median MB/s |
+|---|---:|---:|---:|
+| 8 | 3.61 | 2.94 | 3.28 |
+| 16 | 2.86 | 3.47 | 3.16 |
+
+These values use decimal MB/s (1,000,000 B/s); desktop display formatting uses powers of 1024. See evidence/transport-041-connection-counts.json for exact bytes/time, binary fingerprint, TCP counts and smoothed readings. Two samples per setting do not establish statistical significance; sixteen was not consistently faster, so it was not adopted merely to raise the count. No universal connection-count recommendation is inferred.
+
+The earlier 8 MiB endpoint's 2.45 MB/s was not a demonstrated throughput ceiling. SpeedTracker uses a two-second exponential smoothing time constant; a short run includes connection startup and a lagging displayed rate. Longer samples show the corrected eight-connection engine can exceed 3 decimal MB/s on this source, with meaningful variation between runs. This does not prove sustained parity with IDM: no matched full-download IDM measurement was performed. The original user partial/journal metadata remained unchanged, preferences were retained, and only the test outputs were discarded.

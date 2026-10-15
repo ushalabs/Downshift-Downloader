@@ -32,11 +32,15 @@ public:
     [[nodiscard]] std::string sha256Range(std::uint64_t offset, std::uint64_t bytes);
     [[nodiscard]] std::string identity() const;
     void flush();
+    // Delete only this worker's still-open incomplete file, never a finalized file.
+    void discard();
+    static void discardOwnedPartial(const std::filesystem::path& destination,const std::string& identity);
     [[nodiscard]] const FileMetrics& metrics() const noexcept { return metrics_; }
     // Flush and rename the open file by handle, without replacing an existing destination.
     void commit(std::uint64_t expectedSize, const std::optional<std::string>& expectedSha256 = {});
 private:
     void* handle_ = nullptr;
+    bool partial_ = true;
     std::filesystem::path destination_;
     FileMetrics metrics_;
     // Reused bounded heap storage; large verification buffers never occupy the thread stack.

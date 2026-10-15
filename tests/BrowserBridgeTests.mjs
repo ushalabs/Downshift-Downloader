@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {saveImage} from '../extension/image-capture.js';
 import {BrowserTransfers,browserSource,NativeConnection} from '../extension/browser-transfer.js';
 let checks=0;
 const check=(value,message)=>{assert(value,message);checks++;};
@@ -18,7 +19,7 @@ function fixture(){
  const f=fixture();f.item.danger='content';await assert.rejects(f.bridge.run('7',f.record,f.item,f.controller));check(f.log.length===0,'Browser security rejection is never bypassed');
 }
 {
- const f=fixture();f.record.phase='browser-streaming';f.item.state='interrupted';f.item.error='NETWORK_FAILED';f.item.canResume=false;f.nativeStatus='Failed';await f.bridge.run('7',f.record,f.item,f.controller);check(f.last.sourceError==='NETWORK_FAILED' && !f.log.includes('erase'),'Nonrecoverable network errors reach the native row without deleting recovery evidence');
+ const f=fixture();f.record.phase='browser-streaming';f.item.state='interrupted';f.item.error='NETWORK_FAILED';f.item.canResume=false;f.nativeStatus='Failed';await f.bridge.run('7',f.record,f.item,f.controller);check(f.last.sourceError==='NETWORK_FAILED' && f.log.includes('cancel') && f.log.includes('erase'),'Nonrecoverable network errors reach the native row and cancel incomplete Chrome storage');
 }
 check(browserSource({url:'data:application/octet-stream;base64,'+'A'.repeat(100000),mime:'application/octet-stream'})==='data:application/octet-stream','Large inline data is not copied into persistent metadata');
 {
@@ -29,3 +30,11 @@ check(browserSource({url:'data:application/octet-stream;base64,'+'A'.repeat(1000
  const connection=new NativeConnection(()=>port);const replies=await Promise.all([connection.request({number:1}),connection.request({number:2})]);clearTimeout(connection.idle);check(sent.join(',')==='1,2' && replies.map(r=>r.number).join(',')==='1,2','Persistent native connection preserves request/reply order');
 }
 console.log(`Browser bridge checks passed: ${checks}`);
+
+{
+ const f=fixture();f.record.phase='browser-streaming';f.record.routed=true;f.item.filename='';f.nativeStatus='Queued';await f.bridge.run('7',f.record,f.item,f.controller);check(f.log.includes('resume') && f.last.file==='','Accepted queued response resumes before Chrome finalizes its filename');
+}
+{
+ let options;await saveImage({captureEnabled:async()=>true,ensureApp:async()=>{},download:async value=>{options=value;return 42;}},{srcUrl:'https://example.com/photo.webp'},{});check(options.saveAs===false && options.filename==='photo.webp','Image action avoids Chrome chooser and preserves format');
+ await assert.rejects(saveImage({captureEnabled:async()=>false},{srcUrl:'https://example.com/photo.webp'},{}));
+}

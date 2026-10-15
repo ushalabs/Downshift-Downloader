@@ -48,7 +48,7 @@ def main():
         d=Driver(exe,db)
         settings=d.call("snapshot")["settings"]; settings.update(directory=str(root),simultaneous=2,perHost=2,hostConnections=4,connections=4,automatic=False,speedLimit=str(1024*1024))
         d.call("configure",settings=settings)
-        for filename,mime,category in [('clip.MP4','','Videos'),('song.mp3','','Audios'),('archive.rar','','Zip'),('setup.exe','','Programs'),('paper.pdf','','Programs'),('unknown.bin','audio/ogg','Audios'),('unknown.bin','video/mp4','Videos')]:
+        for filename,mime,category in [('clip.MP4','','Videos'),('song.mp3','','Audios'),('archive.rar','','Zip'),('setup.exe','','Programs'),('paper.pdf','','Programs'),('unknown.bin','audio/ogg','Audios'),('unknown.bin','video/mp4','Videos'),('photo.webp','','Pictures'),('opaque.bin','image/png','Pictures')]:
             folder=pathlib.Path(d.call('category',filename=filename,mime=mime)['folder']);assert folder==root/category and folder.is_dir();checks+=1
         ids=[]
         for i in range(3): ids.append(d.call("add",url=url,destination=str(root/f"file{i}.bin"),sha256=expected_sha256(server.size))["id"])
@@ -85,7 +85,7 @@ def main():
         d=Driver(exe,db); row=next(r for r in d.rows() if r["id"]==pending); assert row["status"]==2
         d.call("action",id=pending,action=0); wait(d,lambda rows:next(r for r in rows if r["id"]==pending)["status"]==3)
         assert file_sha256(root/"private-renamed.bin")==expected_sha256(server.size); checks+=2
-        # Per-download cap, pause/recovery, cancellation, removal preserves files.
+        # Per-download cap, pause/recovery, cancellation cleanup and completed-file retention.
         slow=d.call("add",url=url,destination=str(root/"slow.bin"),speedLimit=str(256*1024))["id"]
         wait(d,lambda rows:any(r["id"]==slow and int(r["downloaded"])>100000 for r in rows))
         d.call("action",id=slow,action=1); paused=wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==2)
@@ -106,7 +106,7 @@ def main():
         d.call("action",id=slow,action=0); resumed=wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==1)
         assert int(next(r for r in resumed if r["id"]==slow)["downloaded"])>=retained;checks+=1
         d.call("action",id=slow,action=2); wait(d,lambda rows:next(r for r in rows if r["id"]==slow)["status"]==5)
-        d.call("action",id=slow,action=4); assert (root/"slow.bin.part").exists(); checks+=2
+        d.call("action",id=slow,action=4); assert not (root/"slow.bin.part").exists() and not (root/"slow.bin.part.resume").exists(); checks+=2
         d.call("action",id=ids[0],action=4); assert (root/"file0.bin").exists(); checks+=1
         # Priority scheduling behind a gate, one download per host.
         settings.update(simultaneous=3,perHost=1,speedLimit="0"); d.call("configure",settings=settings)
@@ -152,8 +152,19 @@ def main():
         with sqlite3.connect(clean) as sql:sql.execute('DELETE FROM downloads')
         sql.close()
         d=Driver(exe,clean);assert not d.send('snapshot')['ok'];d.close();checks+=1
-        assert (root/'file0.bin').exists() and (root/'slow.bin.part').exists();checks+=1
+        assert (root/'file0.bin').exists() and not (root/'slow.bin.part').exists();checks+=1
         shutil.copy2(saved,db);d=Driver(exe,db);assert len(d.rows())==6;d.close()
+        cleanup_db=root/'cleanup.sqlite';c=Driver(exe,cleanup_db)
+        failed=c.call('add',url=url,destination=str(root/'bad-hash.bin'),sha256='0'*64)['id']
+        wait(c,lambda rows:next(r for r in rows if r['id']==failed)['status']==4)
+        assert not (root/'bad-hash.bin.part').exists() and not (root/'bad-hash.bin.part.resume').exists() and not (root/'bad-hash.bin').exists();checks+=1
+        paused=c.call('add',url=url,destination=str(root/'paused-clean.bin'),speedLimit=str(128*1024))['id']
+        wait(c,lambda rows:any(r['id']==paused and int(r['downloaded'])>100000 for r in rows));c.call('action',id=paused,action=1)
+        wait(c,lambda rows:next(r for r in rows if r['id']==paused)['status']==2)
+        c.call('action',id=paused,action=2);assert not (root/'paused-clean.bin.part').exists() and not (root/'paused-clean.bin.part.resume').exists();checks+=1
+        unknown=c.call('add',url=url,destination=str(root/'unrelated.bin'),start=False)['id'];foreign=root/'unrelated.bin.part';foreign.write_bytes(b'unrelated replacement')
+        assert not c.send('action',id=unknown,action=4)['ok'] and foreign.read_bytes()==b'unrelated replacement';checks+=1
+        assert any(r['id']==unknown for r in c.rows());c.close();checks+=1
         # Authenticated encrypted record corruption is a visible startup failure.
         import sqlite3
         with sqlite3.connect(db) as sql: sql.execute("UPDATE downloads SET payload=? WHERE id=?",(b"broken",high))

@@ -858,6 +858,11 @@ DownloadResult DownloadEngine::download(const DownloadOptions& options, std::sto
             try{session.retainPausedPrefixes(recovery);}catch(...){}
         }
         session.clear(&telemetry);
+        if (options.discardIncomplete && !(options.control && options.control->pauseRequested())) {
+            writer.discard();
+            if (!journal.remove()) fail(DownloadErrorCode::File, "Incomplete data was removed but recovery metadata cleanup failed.");
+            throw;
+        }
         if (journalActive) {
             recovery.status = options.control && options.control->pauseRequested() ? RecoveryStatus::Paused : RecoveryStatus::Failed;
             try {

@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Network)
 find_package(CURL REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(LibtorrentRasterbar 2 CONFIG REQUIRED)
@@ -76,8 +76,10 @@ target_compile_options(downshift_native_host PRIVATE /W4 /permissive- /utf-8)
 add_library(downshift_gui STATIC
     src/gui/Brand.cpp
     src/gui/Design.cpp
+    src/gui/Controls.cpp
     src/gui/DownloadDelegate.cpp
     src/gui/MainWindow.cpp
+    src/gui/MainWindowPreview.cpp
     src/gui/MainWindowTorrents.cpp
     src/gui/MainWindow.h
     src/gui/Dialogs.cpp
@@ -86,7 +88,7 @@ add_library(downshift_gui STATIC
     src/gui/TorrentDialogs.cpp
     src/gui/TorrentDialogs.h
 )
-target_link_libraries(downshift_gui PUBLIC downshift_queue downshift_torrent Qt6::Widgets PRIVATE dwmapi)
+target_link_libraries(downshift_gui PUBLIC downshift_queue downshift_torrent Qt6::Widgets PRIVATE Qt6::Network dwmapi)
 qt_add_resources(downshift_gui "branding" PREFIX "/branding" BASE "assets"
     FILES assets/downshift.rgba assets/chevron.xpm)
 target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)
@@ -115,8 +117,48 @@ add_custom_command(TARGET downshift POST_BUILD
     VERBATIM
 )
 
+# Preview image and Windows TLS plugins are part of the pinned Qt runtime.
+foreach(plugin IN ITEMS QJpegPlugin QWebpPlugin QSchannelBackendPlugin)
+    if(TARGET Qt6::${plugin})
+        if(NOT plugin STREQUAL "QSchannelBackendPlugin")
+            set(plugin_folder imageformats)
+        else()
+            set(plugin_folder tls)
+        endif()
+        add_custom_command(TARGET downshift POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:downshift>/${plugin_folder}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Qt6::${plugin}>" "$<TARGET_FILE_DIR:downshift>/${plugin_folder}/" VERBATIM)
+    endif()
+endforeach()
+
+add_custom_command(TARGET downshift POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/$<$<CONFIG:Debug>:debug/>bin/jpeg62.dll"
+        "$<TARGET_FILE_DIR:downshift>/" VERBATIM)
+foreach(webp_runtime IN ITEMS libwebp libwebpdemux libwebpmux libsharpyuv)
+    add_custom_command(TARGET downshift POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/$<$<CONFIG:Debug>:debug/>bin/${webp_runtime}.dll"
+            "$<TARGET_FILE_DIR:downshift>/" VERBATIM)
+endforeach()
+
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(downshift_preview_live_tests tests/PreviewLiveTests.cpp)
+    target_link_libraries(downshift_preview_live_tests PRIVATE downshift_gui)
+    target_compile_options(downshift_preview_live_tests PRIVATE /W4 /permissive- /utf-8)
+    add_executable(downshift_cleanup_tests tests/CleanupTests.cpp)
+    target_link_libraries(downshift_cleanup_tests PRIVATE downshift_queue)
+    target_compile_options(downshift_cleanup_tests PRIVATE /W4 /permissive- /utf-8)
+    add_test(NAME queue.cleanup COMMAND downshift_cleanup_tests)
+    add_executable(downshift_gui_overhaul_tests tests/GuiOverhaulTests.cpp)
+    set_target_properties(downshift_gui_overhaul_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(downshift_gui_overhaul_tests PRIVATE downshift_gui Qt6::Network)
+    target_compile_options(downshift_gui_overhaul_tests PRIVATE /W4 /permissive- /utf-8)
+    foreach(scale IN ITEMS 1 1.25 1.5)
+        add_test(NAME gui.overhaul.${scale} COMMAND ${CMAKE_COMMAND} -E env "QT_SCALE_FACTOR=${scale}" "$<TARGET_FILE:downshift_gui_overhaul_tests>" "${CMAKE_CURRENT_BINARY_DIR}/overhaul-shots/$<CONFIG>/${scale}")
+        set_tests_properties(gui.overhaul.${scale} PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
+    endforeach()
     add_executable(downshift_torrent_gui_tests tests/TorrentGuiTests.cpp)
     target_link_libraries(downshift_torrent_gui_tests PRIVATE downshift_gui LibtorrentRasterbar::torrent-rasterbar dbghelp)
     target_compile_options(downshift_torrent_gui_tests PRIVATE /W4 /permissive- /utf-8 /Zi)

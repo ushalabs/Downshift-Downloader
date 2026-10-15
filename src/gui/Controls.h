@@ -1,13 +1,22 @@
 #pragma once
 #include <QComboBox>
-#include <QListView>
-#include <QStyledItemDelegate>
-#include <QFrame>
+#include <QLabel>
+#include <QTimer>
+class QPushButton;
 namespace downshift {
-inline void modernCombo(QComboBox* combo) {
-    combo->setView(new QListView(combo));
-    combo->setItemDelegate(new QStyledItemDelegate(combo));
-    combo->view()->setFrameShape(QFrame::NoFrame);
-    if(auto* frame=qobject_cast<QFrame*>(combo->view()->parentWidget())){frame->setFrameShape(QFrame::NoFrame);frame->setLineWidth(0);frame->setWindowFlag(Qt::FramelessWindowHint);frame->setBackgroundRole(QPalette::Base);frame->setAutoFillBackground(true);}
-}
+void modernCombo(QComboBox* combo);
+enum class Notice { Success, Information, Warning, Critical };
+class Notification final:public QLabel {
+public:
+    explicit Notification(QWidget* parent);
+    void present(const QString& text,Notice kind);
+    void position();
+private:
+    bool eventFilter(QObject*,QEvent*) override;
+    QTimer timer_;
+    QPushButton* close_;
+    QString lastText_;
+    Notice lastKind_=Notice::Information;
+    bool dismissed_=false;
+};
 }

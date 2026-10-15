@@ -5,7 +5,7 @@
   "minimum_chrome_version": "123",
   "description": "Download files and videos with Downshift.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy/r3t/ukMCHfxgbwqUKk+r85bsf8DgF9CTsARypAyUB6kgwHrAQ1pEU/45Z3yklkFtKL6wR35gLd9hfnsBwet6HbIq/UdWfyr96MMzgaR2jaf2Wz73pFydNbDYaWt80NUftqnUwSzfEIYmXOMTS6Dyr1MxJL3lqwsXpaeNM+zyzPFqQGUBpvZFNt59bIEBkKaHF/kGfIY/h3e+1NLvMBT1xWbNk3r/DHp57bC6N2AWOTAgqGQ8PL2U5CIrL6FQEtDicvPDL/bLmzs8CMrtGNmvqErcwwssXMfNnqho0PcwPNIgqkQX4g35LVxTzbRG2hd/NmsocLIrR+ssdXrFo1xwIDAQAB",
-  "permissions": ["downloads", "downloads.ui", "nativeMessaging", "storage", "alarms", "webRequest"],
+  "permissions": ["downloads", "downloads.ui", "nativeMessaging", "storage", "alarms", "webRequest", "contextMenus"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
     {"matches": ["http://*/*", "https://*/*"], "js": ["file-links.js"], "all_frames": true, "run_at": "document_start"},

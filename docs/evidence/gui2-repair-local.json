@@ -1,0 +1,327 @@
+{
+  "date": "2026-10-15T15:12:54.942454+00:00",
+  "version": "0.4.4",
+  "head": "67c294aac72e5956e856557c43cfbfbdc327411f",
+  "localUncommittedRepair": true,
+  "gitMutationsPerformed": false,
+  "t4Started": false,
+  "freshCI": false,
+  "releasePackagingRun": false,
+  "release": {
+    "passingCoverageAcrossBatches": 25,
+    "batches": [
+      {
+        "file": "gui2-repair-release-junit.xml",
+        "tests": 25,
+        "failures": 6,
+        "skipped": 0,
+        "seconds": 452.0
+      },
+      {
+        "file": "gui2-repair-release-recheck-junit.xml",
+        "tests": 10,
+        "failures": 5,
+        "skipped": 0,
+        "seconds": 198.0
+      },
+      {
+        "file": "gui2-repair-release-final-gui-junit.xml",
+        "tests": 7,
+        "failures": 0,
+        "skipped": 0,
+        "seconds": 217.0
+      },
+      {
+        "file": "gui2-repair-release-final-popup-junit.xml",
+        "tests": 4,
+        "failures": 3,
+        "skipped": 0,
+        "seconds": 30.0
+      },
+      {
+        "file": "gui2-repair-release-final-rounding-junit.xml",
+        "tests": 3,
+        "failures": 0,
+        "skipped": 0,
+        "seconds": 49.0
+      }
+    ],
+    "latestPerGroup": {
+      "queue.cleanup": {
+        "passed": true,
+        "seconds": 0.280662,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "gui.overhaul.1": {
+        "passed": true,
+        "seconds": 17.9082,
+        "batch": "gui2-repair-release-final-rounding-junit.xml"
+      },
+      "gui.overhaul.1.25": {
+        "passed": true,
+        "seconds": 15.4436,
+        "batch": "gui2-repair-release-final-rounding-junit.xml"
+      },
+      "gui.overhaul.1.5": {
+        "passed": true,
+        "seconds": 15.7616,
+        "batch": "gui2-repair-release-final-rounding-junit.xml"
+      },
+      "torrent.gui": {
+        "passed": true,
+        "seconds": 19.0576,
+        "batch": "gui2-repair-release-recheck-junit.xml"
+      },
+      "torrent.management": {
+        "passed": true,
+        "seconds": 126.43,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "torrent.foundation": {
+        "passed": true,
+        "seconds": 19.3388,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "browser.extension": {
+        "passed": true,
+        "seconds": 4.85289,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "browser.bridge": {
+        "passed": true,
+        "seconds": 0.318964,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "browser.media": {
+        "passed": true,
+        "seconds": 0.23171,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "engine.transport": {
+        "passed": true,
+        "seconds": 25.4082,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "browser.native": {
+        "passed": true,
+        "seconds": 9.74821,
+        "batch": "gui2-repair-release-recheck-junit.xml"
+      },
+      "browser.transfer": {
+        "passed": true,
+        "seconds": 7.76956,
+        "batch": "gui2-repair-release-recheck-junit.xml"
+      },
+      "gui.media": {
+        "passed": true,
+        "seconds": 141.851,
+        "batch": "gui2-repair-release-final-gui-junit.xml"
+      },
+      "gui.integration": {
+        "passed": true,
+        "seconds": 17.7686,
+        "batch": "gui2-repair-release-final-popup-junit.xml"
+      },
+      "queue.location": {
+        "passed": true,
+        "seconds": 0.346993,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "queue.integration": {
+        "passed": true,
+        "seconds": 23.1873,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "engine.unit": {
+        "passed": true,
+        "seconds": 0.616664,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "engine.integration": {
+        "passed": true,
+        "seconds": 11.446,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "engine.adaptive": {
+        "passed": true,
+        "seconds": 20.5959,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "engine.buffered": {
+        "passed": true,
+        "seconds": 3.78314,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "engine.recovery": {
+        "passed": true,
+        "seconds": 27.0302,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "foundation.dependencies": {
+        "passed": true,
+        "seconds": 0.12398,
+        "batch": "gui2-repair-release-junit.xml"
+      },
+      "foundation.gui.minimal": {
+        "passed": true,
+        "seconds": 1.69751,
+        "batch": "gui2-repair-release-final-gui-junit.xml"
+      },
+      "foundation.gui.windows": {
+        "passed": true,
+        "seconds": 1.69748,
+        "batch": "gui2-repair-release-final-gui-junit.xml"
+      }
+    }
+  },
+  "debug": {
+    "file": "gui2-repair-debug-junit.xml",
+    "tests": 25,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 570.0
+  },
+  "chrome": {
+    "release": {
+      "checks": 26,
+      "chromeVersion": "155.0.8059.39",
+      "nativeFiles": 13,
+      "queueRecords": 14,
+      "browserTransportRecords": 9,
+      "profile": "isolated",
+      "nativeBridge": "separate test host and pipe; normal registration untouched"
+    },
+    "debug": {
+      "checks": 26,
+      "chromeVersion": "155.0.8059.39",
+      "nativeFiles": 13,
+      "queueRecords": 14,
+      "browserTransportRecords": 9,
+      "profile": "isolated",
+      "nativeBridge": "separate test host and pipe; normal registration untouched"
+    }
+  },
+  "imageAcceptance": {
+    "productionImageMenuListenerDispatchedInHeadlessChrome": true,
+    "originalBrowserResponseImported": true,
+    "picturesCategory": true,
+    "independentByteHashAnd32x16DimensionsMatched": true,
+    "physicalOSMenuClickAutomated": false
+  },
+  "actualHTTPSWebpPreviews": [
+    {
+      "configuration": "Release",
+      "host": "i.ytimg.com",
+      "format": ".webp",
+      "actualNativePreview": true,
+      "privateQueue": true
+    },
+    {
+      "configuration": "Debug",
+      "host": "i.ytimg.com",
+      "format": ".webp",
+      "actualNativePreview": true,
+      "privateQueue": true
+    }
+  ],
+  "normalQueue": {
+    "records": 11,
+    "paused": 1,
+    "active": 0,
+    "encryptedStateUnchanged": true,
+    "pausedFileAndCheckpointEvidenceUnchanged": true,
+    "physicalStoreBindingMatched": true,
+    "sqliteQuickCheck": "ok",
+    "schemaVersion": 2
+  },
+  "historicalCleanup": {
+    "authenticatedFailedFragmentsRemoved": 3,
+    "incompleteBytesRemoved": 7279629,
+    "pausedFragmentsKept": 2,
+    "currentPausedFragmentsKept": 1,
+    "pausedEvidenceUnchanged": true,
+    "historyRecordsRemoved": 0,
+    "completedDestinationsTargeted": false
+  },
+  "sourceSha256": {
+    "CMakeLists.txt": "2efb4ebdd6eed4dbdd4fc88b522cba3db3a46bf4cfbcd77eecc393175f39eac4",
+    "extension/background.js": "bfa87b45935ff5caab90fee48fcaffb5c7a2914befa0c7bc7fa80bc7f31d9a2c",
+    "extension/browser-transfer.js": "d4aa95d6ba5389e9a69174f155a04dd94192f81a24fbd3ebdfac77a156ec7290",
+    "extension/image-capture.js": "a66e0d7db3051f43d88a7968ceb945f4d7f345730cefe6af8bcb8757963120fb",
+    "extension/manifest.json": "9ec3b5881c91fbe020c4ae8a771c347725064f3339f6a3ed22df777b11c525c1",
+    "scripts/Build-Portable.ps1": "13a741b2f4140cdcd12637a97567f8b1f7289e7594504813ae6e7157cc98012a",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "3c35f0c1c47741dd4ea7f4d92a1a9bbf27c961c8be36fe904490b138548d8b70",
+    "src/core/DownloadEngine/DownloadEngine.h": "cefcbbcf2a30f2fa9feb0c59c2132aada5e79ed39f820cac12efa3b65322a2f8",
+    "src/core/DownloadQueue/Categories.h": "d202f03e12099284047631ec8820ed8ba47dc6f51198398057669924c6fb4dae",
+    "src/core/DownloadQueue/OwnedMedia.h": "a30b95a7a336fc4b107b72e897f742ddf54f2ffaf8f06c3cf6702a013df8de19",
+    "src/core/DownloadQueue/QueueManager.cpp": "ef8e629b7f153d092af9593bbfedd4818decf0d693157ea9e6758c94dafb29af",
+    "src/core/DownloadQueue/QueueManager.h": "5b9d6e513b2f941d4b0a47c22357504d04140f877f48b525a4c9edbcdc2e3932",
+    "src/core/FileWriter/FileWriter.cpp": "dc775e412fbc0b2630bc9c7a5bffee42f8f7f49a2f9c946d4d11c4a18e4a87d4",
+    "src/core/FileWriter/FileWriter.h": "6d23430f8a778229684120424a8f76e2800c9902e6f5dfe023b368d9188e9e7e",
+    "src/core/ResumeManager/ResumeJournal.cpp": "361230c74147fb4eeb8c8a70c585e918f2598f77f4623448e3bee2529e60f8a1",
+    "src/core/ResumeManager/ResumeJournal.h": "3334c3e7a278de1067f6a7cd881c4e057903c70c8c8951b92ffd1a018a7e53f6",
+    "src/gui/Controls.cpp": "972b9ba49ceb8ee3a96adffe119dec1e8325f3751eb7cab9b304f29404ef89d1",
+    "src/gui/Controls.h": "b22cf4d585a1d587bf140dbd99be1d868f2cf6961923387e4411ccd3dfcb647a",
+    "src/gui/Design.cpp": "43d95e4a33631cd09f6732821b4d5d7b0dd7a61374ed9d03803aded9674327c3",
+    "src/gui/Design.h": "fe740def7e3df14a7f7e96e7a4d181609f7539a8f1ca46b6233cf674dd4852f3",
+    "src/gui/Dialogs.cpp": "adc4ab38fb5f13d59b4bb2ba6e937f7f120d9d8a62cb530b7f38491825e8df22",
+    "src/gui/DownloadDelegate.cpp": "6846e98fd6f53fee69176b43f90601fd8b8cd177e873c2ccf590c67c732f2c60",
+    "src/gui/MainWindow.cpp": "68085a0c7a9cdd25c481188c402bace9f24d70350a04212972a9fcb1d80e6db7",
+    "src/gui/MainWindow.h": "7ce2b86b295323257415f23e34cf8891f0231b99d0143679294b88b583f6b4a7",
+    "src/gui/MainWindowPreview.cpp": "fb939e571d2551984079358208ace9fa2b432c864e01ca5d5dc15ca0693b3fe3",
+    "src/gui/MainWindowTorrents.cpp": "dc3aed422fbef2f3a90c7a07201ca7e27f51b69641bf2b590532914f44d9f38f",
+    "src/gui/MediaDialog.cpp": "495b28b405203d84b07a681051d93e839beb489f3e813d20f914615081c72fba",
+    "src/gui/MediaDialog.h": "20892eab961d9ec95163d3806d2fe7eb2cc3f60d775b8028e570e7b18c8c6180",
+    "src/gui/TorrentDialogs.cpp": "78884538ac71b139f975d73ac5ccf0a568dfb159b799622ff74875ab3489b9ac",
+    "src/torrent/TorrentEngine.cpp": "a1a7cc18cab6b7fce2aef75324d45139ecfdc71e14f635414234fb9ca26f8b15",
+    "tests/BrowserBridgeTests.mjs": "110f14e870dd5b2996b497c43fe18d60d431876d933253189a5e6f95d9dac5b2",
+    "tests/BrowserTransferTests.py": "4b5ae3f62fa466ae13675f5fe52ee237affed6bbdbf5359629960c5a95514d36",
+    "tests/ChromeFixture.py": "be9388e92a1597c553ab7cc5a3e2f94e7bce8f8e8fd333bc868b15d2bf84c638",
+    "tests/ChromeTests.cjs": "bc3b27d56f94a41c6db881e0a6bd2f1c9b38d797169cfb3b636ef49611f29968",
+    "tests/CleanupTests.cpp": "f1d7753c352cc926824a6ec4fd0bc4d1ffa30db9a98ced3a0fcafce7ee19c332",
+    "tests/GuiOverhaulTests.cpp": "77e51ce2a5d6a152e6acb28c8b78372fa0d13782903fceddf2c0a8ecfa9ccf0d",
+    "tests/GuiTests.cpp": "36ef1d3f62a397ae19b7454615044278c04efb7eb80500b289d9af99a203f545",
+    "tests/MediaIntegration.py": "b4e34f64da160b8c4c5506151ee64d4378ce42be910afbf82034dafb8828d800",
+    "tests/MediaTests.cpp": "021c929974e07a6c64343f246ff4106d0372b6ec273e9745aab05c9b6de95cbf",
+    "tests/PreviewLiveTests.cpp": "8d0f01e709645d0a4da98aaf982f83a95303434bc9f0b342cfe24af67b946e4b",
+    "tests/QueueTests.py": "d0874780ab6d42dc50056b8f77f00c9ff03aa4c39fddce005c9454f1b37e58bb",
+    "tests/TestWindows.h": "210653e5102298e1ef8000f8abf806958f6ee8ed29908e934ab244ec64627a60",
+    "tests/TorrentGuiTests.cpp": "afba7ba328119ee253ff64f25c22adfc753568f638b5e088945b318eeb784a35",
+    "tests/TorrentManagementTests.cpp": "12a146b7b12675e5e06fb91290de6da3453c13007973383ac8253ee46034989f",
+    "vcpkg.json": "b53110f4ec07955b3d0372ee076660ba390c6faedc814da8d32271e657d153be"
+  },
+  "runtimeSha256": {
+    "Release": {
+      "Downshift.exe": "ac80775d2cb19cc57bf54a375b76c8ea85537a1648a0dca89a7d05ca09a0344e",
+      "Qt6Network.dll": "ec959d3cae91b03e189f99c223d0945e25e1b4c3d26bc1d1331b96c3ffff32fd",
+      "imageformats/qjpeg.dll": "31a36357f9c1ceabcc6b0b51c9907269d58521dadd10711c5cce8cabaab1cae0",
+      "imageformats/qwebp.dll": "9e34eb2d6e657faa7aeff5f007b2b81a38d5acfa3dfa23fb7e95ff4eadae52e8",
+      "tls/qschannelbackend.dll": "34fd4954482ff0e91cec48b699219c5bdd9f16681a8c102feb5b046d10688339",
+      "jpeg62.dll": "af628c7dcd744adca0964c876cbec18901a37e98be192f195605cc1853a69e57",
+      "libwebp.dll": "c2582a1533d635ed3f1b7ba104431649396ae24177f52d0a90d4dcafa3d7cb9a",
+      "libwebpdemux.dll": "5227081f29e2953dbf63abe5d46d9cbe215092e1b8cf81eb79974f7df8e35a3c",
+      "libwebpmux.dll": "018c5da58eabfd8216560bc16586ced4aadb0671eb93e23967947c0f3832d15f",
+      "libsharpyuv.dll": "282ddde7139e8747fbd98798f438757f9ef2bdb297d87e5748c920db57975e5d"
+    },
+    "Debug": {
+      "Downshift.exe": "38916b4c2fdb9415121d6e596966f4a2c4b34d0c37a6892bfb60e7343eb8dd9b",
+      "Qt6Networkd.dll": "f41d319b592b48aec94d6d51a4ed631f0ecd49997748bc31507dfe9017a4ac40",
+      "imageformats/qjpegd.dll": "505de376b239cf135f0e167fb1e52f227bad1ff4c4c35b2ebda8118098898819",
+      "imageformats/qwebpd.dll": "5b248e436f16279f58fdf0249dd34ca32e54c4b28d67be1bb6d329d7a44f933d",
+      "tls/qschannelbackendd.dll": "35a9d9eb0e070dd118d5c443bf4b9727f5c01b5e310b0f12fdf809ddcc91a5dd",
+      "jpeg62.dll": "9d77e88053913a403bc512adbb5026140ca9000dd35ead1a41c2fca12ced0cb6",
+      "libwebp.dll": "ad5ca5f49720ee4530e9a1ef3a68def37971077f73975c7fe6bf5895380546c4",
+      "libwebpdemux.dll": "ee523faefb7822b0a169bdda51244725e2b2ae191f6c2054de013e7a57c57447",
+      "libwebpmux.dll": "250ba9c4028a7a25ba565fb950d02af43f28b23918a8eb0398c9e879a76a5c5b",
+      "libsharpyuv.dll": "4ae25c0794c12f8de33622e8125c599ec0f67b8792d08b711f4222fe85294605"
+    }
+  },
+  "qualifications": [
+    "Initial Release runtime, torrent GUI timing and outdated GUI/media fixture failures were fixed; passing coverage combines the full batch and targeted reruns, not a clean first full run.",
+    "A preliminary Chrome run failed because dynamic import is prohibited in service workers. The accepted harness dispatches the production registered image listener in an isolated extension copy.",
+    "Qt process scale factors do not change Windows display settings or establish multi-monitor testing.",
+    "Chrome remains the original response transport when required. Its built-in Save image as chooser cannot universally be replaced; reload the extension and use Save image to Downshift to avoid that chooser.",
+    "No fresh full public video transfer, installer, clean-VM test, release or exact-source remote CI is claimed.",
+    "Cleanup retains unknown/replaced/linked/paused data and the sole fully received browser copy until verified native publication."
+  ]
+}

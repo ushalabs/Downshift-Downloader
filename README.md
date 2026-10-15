@@ -2,6 +2,8 @@
 
 The current local source is **0.4.4**. It prevents completed Chrome history from opening new save dialogs and reduces video quality inspection to the metadata the form actually needs, fixing long-video results that exceeded the old buffer limit. Reload the unpacked extension and use the updated Desktop app together. This remains local and uncommitted.
 
+The pre-T4 GUI repair restores white light-theme surfaces, rounded dropdowns and video previews, removes redundant bars and adds clear detail controls. Images use the Pictures category without conversion. Reload the extension for the queued-image handoff repair and the **Save image to Downshift** image-menu action. Chrome’s built-in Save image as chooser can still appear; the Downshift action avoids it. See [GUI behavior and cleanup](docs/GUI_2.md).
+
 The **0.4.3 browser response delivery** foundation receives generated blob/data files and session/POST downloads from their original browser response and finishes them in Downshift with a save dialog, encrypted history and verified native files. Public representations can use the existing segmented engine after validator matching. See [browser response delivery, recovery and limits](docs/BROWSER_RESPONSE_CAPTURE.md). No newer public package is published.
 
 The 0.4.2 development history repair and storage-binding recovery procedure are documented in [HISTORY_RECOVERY.md](docs/HISTORY_RECOVERY.md). Public release artifacts remain at the separately verified v0.3.3 preview.
@@ -31,6 +33,7 @@ For video extraction/quality selection and merging, run **Enable-video.cmd** onc
 | Content | Initial destination |
 |---|---|
 | Videos | Downloads → Videos |
+| Images | Downloads → Pictures |
 | Audio | Downloads → Audios |
 | ZIP, RAR and other archives | Downloads → Zip |
 | Programs and all other files | Downloads → Programs |

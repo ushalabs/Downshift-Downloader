@@ -32,8 +32,8 @@ def main():
             payload=bytes(range(256))*32768
             _,identifier,_,target=add('blob:https://example.com/resume','prefix.bin',payload,payload[:1234567]);finished(identifier);assert hashlib.sha256(target.read_bytes()).digest()==hashlib.sha256(payload).digest();checks+=1
             changed_key,identifier,changed_source,target=add('blob:https://example.com/changed','changed.bin',payload,b'wrong prefix');finished(identifier,4);assert not target.exists() and pathlib.Path(str(target)+'.part').read_bytes()==b'wrong prefix';checks+=1
-            command('restart '+identifier);request(exe,'browser-update',key=changed_key,file=str(changed_source),complete=True,total=str(len(payload)),received=str(len(payload)));finished(identifier);assert target.read_bytes()==payload and any(file.read_bytes()==b'wrong prefix' for file in target.parent.glob('Downshift.previous-*.part'));checks+=1
-            _,identifier,_,target=add('blob:https://example.com/size','wrong-size.bin',b'correct bytes',total=999);finished(identifier,4);assert not target.exists();checks+=1
+            pathlib.Path(str(target)+'.part').unlink();command('restart '+identifier);request(exe,'browser-update',key=changed_key,file=str(changed_source),complete=True,total=str(len(payload)),received=str(len(payload)));finished(identifier);assert target.read_bytes()==payload and not list(target.parent.glob('Downshift.previous-*.part'));checks+=1
+            _,identifier,_,target=add('blob:https://example.com/size','wrong-size.bin',b'correct bytes',total=999);finished(identifier,4);assert not target.exists() and not pathlib.Path(str(target)+'.part').exists();checks+=1
             # Preallocated/out-of-order source must not be copied before Chrome
             # reports the full response completed and its actual final size.
             key=uuid.uuid4().hex;spool=root/'receiving.source';spool.write_bytes(b'\0'*len(payload))

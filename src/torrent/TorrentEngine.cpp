@@ -1,5 +1,6 @@
 #include "TorrentEngine.h"
 #include "TorrentStore.h"
+#include "core/DownloadQueue/OwnedMedia.h"
 #include <libtorrent/read_resume_data.hpp>
 #include <libtorrent/write_resume_data.hpp>
 #include <libtorrent/peer_info.hpp>
@@ -106,13 +107,14 @@ std::exception_ptr failure(const char* message){return std::make_exception_ptr(s
 }
 
 struct TorrentEngine::Impl {
-    enum class Removal { None, Cancel, Keep, Delete };
+    enum class Removal { None, Cancel, Keep, Delete, Failure };
     struct Row {
         Snapshot view;
         lt::info_hash_t info;
         lt::torrent_handle handle;
         std::shared_ptr<std::promise<QString>> adding;
         QByteArray native;
+        QJsonObject fileProofs;
         std::vector<int> priorities;
         bool paused=false, restored=false, saving=false, flushing=false, saveAgain=false, completionPending=false, seedingPending=false, blocked=false;
         bool priorityPending=false, saveAfterPriorities=false, recheckAfterPriorities=false;
@@ -179,6 +181,17 @@ struct TorrentEngine::Impl {
         if(params)params->file_priorities=std::move(native);
         else{row.priorityPending=true;row.handle.prioritize_files(native);}
     }
+    void reserveFiles(Row& row){
+        if(!row.view.metadata||row.view.metadataOnly)return;
+        for(const auto& file:row.view.files)if(file.priority&&!row.fileProofs.contains(file.path)){
+            const auto target=QDir(row.view.directory).filePath(file.path);noLinks(target);
+            if(QFileInfo::exists(target)){row.fileProofs[file.path]=QJsonObject{{"external",true}};continue;}
+            if(!QDir().mkpath(QFileInfo(target).absolutePath()))reject("Cannot create the torrent payload folder.");noLinks(target);
+            ownedMedia::Handle handle{CreateFileW(std::filesystem::path(target.toStdWString()).c_str(),GENERIC_READ|GENERIC_WRITE|DELETE,0,nullptr,CREATE_NEW,FILE_FLAG_OPEN_REPARSE_POINT,nullptr)};BY_HANDLE_FILE_INFORMATION info{};
+            if(handle.value==INVALID_HANDLE_VALUE||!GetFileInformationByHandle(handle.value,&info)||info.nNumberOfLinks!=1||(info.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)))reject("Cannot reserve the torrent payload file safely.");
+            row.fileProofs[file.path]=QJsonObject{{"identity",ownedMedia::identity(info)},{"complete",file.bytes==0}};
+        }
+    }
     void prepare(Row& row,lt::add_torrent_params& params,bool restore){
         params.save_path=QDir::toNativeSeparators(row.view.directory).toUtf8().toStdString();
         params.renamed_files.clear();params.url_seeds.clear();params.file_priorities.clear();params.piece_priorities.clear();
@@ -197,8 +210,8 @@ struct TorrentEngine::Impl {
     void persist(Row& row){
         if(!store)return;
         QJsonArray priorities,info;for(auto p:row.priorities)priorities.append(p);for(const auto& hash:hashes(row.info))info.append(hash);
-        const QJsonObject object{{"version",1},{"id",row.view.id},{"directory",row.view.directory},{"hashes",info},{"paused",row.paused},{"metadataOnly",row.view.metadataOnly},{"created",QString::number(row.view.created)},{"cancelled",row.view.state==State::Cancelled},{"removing",static_cast<int>(row.removal)},
-            {"priorities",priorities},{"limits",encode(row.view.limits)},{"seeding",encode(row.view.seeding)},{"seedMilliseconds",QString::number(row.seedMilliseconds)},{"native",QString::fromLatin1(row.native.toBase64())}};
+        const QJsonObject object{{"version",1},{"id",row.view.id},{"directory",row.view.directory},{"hashes",info},{"paused",row.paused},{"metadataOnly",row.view.metadataOnly},{"created",QString::number(row.view.created)},{"cancelled",row.view.state==State::Cancelled},{"failed",row.view.state==State::Failed},{"removing",static_cast<int>(row.removal)},
+            {"priorities",priorities},{"limits",encode(row.view.limits)},{"seeding",encode(row.view.seeding)},{"seedMilliseconds",QString::number(row.seedMilliseconds)},{"files",row.fileProofs},{"native",QString::fromLatin1(row.native.toBase64())}};
         try{store->save(row.view.id,QJsonDocument(object).toJson(QJsonDocument::Compact));}
         catch(...){row.paused=true;row.view.state=State::Failed;row.view.error="Torrent persistence failed; previous recovery data was retained.";if(row.handle.is_valid())row.handle.pause();throw;}
     }
@@ -212,7 +225,7 @@ struct TorrentEngine::Impl {
             const auto object=QJsonDocument::fromJson(bytes).object();
             if(object.value("version").toInt()!=1||object.value("id").toString()!=id||!QRegularExpression("^[a-f0-9]{32}$").match(id).hasMatch())reject("Invalid torrent history record.");
             Row row;row.view.id=id;row.view.limits=decodeLimits(object.value("limits").toObject());row.view.seeding=decodePolicy(object.value("seeding").toObject());
-            row.view.metadataOnly=object.value("metadataOnly").toBool();row.view.created=object.value("created").toString().toLongLong();
+            row.fileProofs=object.value("files").toObject();row.view.metadataOnly=object.value("metadataOnly").toBool();row.view.created=object.value("created").toString().toLongLong();
             row.view.directory=destination(object.value("directory").toString());row.paused=true;row.restored=true;
             bool validTime=false;row.seedMilliseconds=object.value("seedMilliseconds").toString().toLongLong(&validTime);if(!validTime||row.seedMilliseconds<0||row.seedMilliseconds>100LL*366*86400*1000)reject("Invalid torrent seeding counters.");
             for(const auto& p:object.value("priorities").toArray())row.priorities.push_back(p.toInt(-1));validate(row.priorities);
@@ -223,9 +236,9 @@ struct TorrentEngine::Impl {
             if(hashes(row.info).empty()||expected.isEmpty())reject("Torrent resume info hash is missing.");
             for(const auto& hash:hashes(row.info))if(!expected.contains(hash))reject("Torrent resume info hash does not match its record.");
             unique(row.info,row.view.directory);prepare(row,params,true);
-            row.view.state=object.value("cancelled").toBool()?State::Cancelled:State::Paused;
+            row.view.state=object.value("cancelled").toBool()?State::Cancelled:object.value("failed").toBool()?State::Failed:State::Paused;
             if(object.value("removing").toInt()!=0){row.view.state=State::Cancelled;row.view.error="Removal was interrupted. Files were retained where available; confirm removal again.";}
-            rows.emplace(id,std::move(row));if(rows.at(id).view.state!=State::Cancelled)pending.emplace_back(id,std::move(params));
+            rows.emplace(id,std::move(row));if(rows.at(id).view.state!=State::Cancelled&&rows.at(id).view.state!=State::Failed)pending.emplace_back(id,std::move(params));
         }
         lt::settings_pack settings;settings.set_int(lt::settings_pack::download_rate_limit,global.download);settings.set_int(lt::settings_pack::upload_rate_limit,global.upload);settings.set_int(lt::settings_pack::connections_limit,global.connections);session->apply_settings(settings);
         for(auto& [id,params]:pending){lt::error_code error;rows.at(id).handle=session->add_torrent(std::move(params),error);if(error)reject("Saved torrent could not be restored.");}
@@ -241,7 +254,7 @@ struct TorrentEngine::Impl {
                 else{QFile file(source);if(!file.open(QIODevice::ReadOnly)||file.size()>maxMetadata)reject("Torrent metadata is unavailable or exceeds the input limit.");const auto bytes=file.read(maxMetadata+1);params=lt::load_torrent_buffer(lt::span<char const>(bytes.constData(),static_cast<std::size_t>(bytes.size())),error,lt::load_torrent_limits{});if(error)reject("Invalid torrent metadata.");}
                 if(params.ti)params.info_hashes=params.ti->info_hashes();if(hashes(params.info_hashes).empty())reject("Torrent has no supported info hash.");
                 Row row;row.view.directory=destination(directory);row.info=params.info_hashes;row.adding=promise;row.paused=config.paused;row.priorities=config.priorities;row.view.limits=config.limits;row.view.seeding=config.seeding;row.view.metadataOnly=config.metadataOnly;row.view.created=QDateTime::currentSecsSinceEpoch();
-                unique(row.info,row.view.directory);prepare(row,params,false);
+                unique(row.info,row.view.directory);prepare(row,params,false);for(const auto& file:row.view.files)if(QFileInfo::exists(QDir(row.view.directory).filePath(file.path)))row.fileProofs[file.path]=QJsonObject{{"external",true}};if(!row.paused)reserveFiles(row);
                 id=QUuid::createUuid().toString(QUuid::Id128);row.view.id=id;row.native=nativeBytes(params);persist(row);rows.emplace(id,std::move(row));session->async_add_torrent(std::move(params));
             }catch(...){if(!id.isEmpty()){rows.erase(id);try{if(store)store->erase(id);}catch(...){}}promise->set_exception(std::current_exception());}
         }))promise->set_exception(failure("Torrent engine is shutting down."));
@@ -266,7 +279,15 @@ struct TorrentEngine::Impl {
         if(promise)row.waiters.push_back(promise);
     }
     void removeNative(Row& row){
-        auto flags=row.removal==Removal::Delete?lt::session::delete_files:lt::remove_flags_t{};
+        const bool incomplete=!row.view.metadataOnly&&(row.removal==Removal::Cancel||row.removal==Removal::Failure||row.removal==Removal::Keep);
+        if(incomplete && row.view.metadata){
+            noLinks(row.view.directory);for(const auto& file:row.view.files)noLinks(QDir(row.view.directory).filePath(file.path));
+            const auto progress=row.handle.file_progress(lt::torrent_handle::piece_granularity);
+            for(auto& file:row.view.files){if(static_cast<std::size_t>(file.index)<progress.size())file.verifiedBytes=progress[static_cast<std::size_t>(file.index)];
+                const auto proof=row.fileProofs.value(file.path).toObject();if(proof.value("complete").toBool()&&QFileInfo::exists(QDir(row.view.directory).filePath(file.path)))file.verifiedBytes=file.bytes;
+            }
+        }
+        auto flags=row.removal==Removal::Delete?lt::session::delete_files:incomplete&&row.view.metadata?lt::session::delete_partfile:lt::remove_flags_t{};
         session->remove_torrent(row.handle,flags);
     }
     void saved(Row& row,const lt::add_torrent_params& params){
@@ -312,7 +333,10 @@ struct TorrentEngine::Impl {
         row.view.state=State::Failed;row.view.error=QString::fromUtf8(message);row.paused=true;
         try{if(row.handle.is_valid())row.handle.pause();persist(row);}catch(...){}
         auto error=failure(message);if(row.adding){row.adding->set_exception(error);row.adding.reset();}resolve(row.waiters,error);resolve(row.nextWaiters,error);resolve(row.priorityWaiters,error);row.saving=false;row.flushing=false;row.saveAgain=false;row.priorityPending=false;row.saveAfterPriorities=false;row.completionPending=false;row.seedingPending=false;
-        if(row.removing){row.removing->set_exception(error);row.removing.reset();}emit owner.updated(row.view);
+        if(row.removing){row.removing->set_exception(error);row.removing.reset();}
+        if(!row.handle.is_valid()&&!row.fileProofs.isEmpty()&&row.removal==Removal::None){row.removal=Removal::Failure;removed(row,true);}
+        if(row.handle.is_valid()&&row.removal==Removal::None&&!row.view.files.empty())try{row.removal=Removal::Failure;persist(row);removeNative(row);}catch(...){row.removal=Removal::None;row.view.error+=" Incomplete file cleanup could not finish.";}
+        emit owner.updated(row.view);
     }
     void metadata(Row& row){
         const auto info=row.handle.torrent_file();if(!info)return;
@@ -320,7 +344,7 @@ struct TorrentEngine::Impl {
             for(const auto& [id,other]:rows)if(id!=row.view.id&&other.view.state!=State::Cancelled&&overlaps(other.info,info->info_hashes()))reject("Duplicate metadata info hash.");
             row.view.files=files(*info,row.view.directory);row.info=info->info_hashes();row.view.name=text(info->name());row.view.totalBytes=info->size_on_disk();row.view.metadata=true;
             if(row.view.metadataOnly){row.paused=true;row.handle.pause();row.view.state=State::Paused;}
-            applyPriorities(row);save(row);emit owner.updated(row.view);
+            reserveFiles(row);applyPriorities(row);save(row);emit owner.updated(row.view);
         }catch(...){row.blocked=true;fail(row,"Received torrent metadata has unsupported paths or file selection.");}
     }
     void update(const lt::torrent_status& status){
@@ -334,6 +358,7 @@ struct TorrentEngine::Impl {
             const auto progress=row->handle.file_progress(lt::torrent_handle::piece_granularity);
             for(auto& file:view.files){
                 file.verifiedBytes=static_cast<std::size_t>(file.index)<progress.size()?std::clamp<qint64>(progress[static_cast<std::size_t>(file.index)],0,file.bytes):0;
+                if(file.verifiedBytes>0){auto proof=row->fileProofs.value(file.path).toObject();if(proof.isEmpty())try{const auto target=QDir(view.directory).filePath(file.path);noLinks(target);proof["identity"]=ownedMedia::identity(target);}catch(...){}if(!proof.isEmpty()){if(file.verifiedBytes==file.bytes)proof["complete"]=true;row->fileProofs[file.path]=proof;}}
                 if(file.priority)view.verifiedBytes+=file.verifiedBytes;
             }
         }
@@ -359,9 +384,20 @@ struct TorrentEngine::Impl {
         emit owner.updated(view);
     }
     void removed(Row& row,bool deleted){
-        if(row.removal==Removal::Delete&&!deleted)return;
+        const bool incomplete=!row.view.metadataOnly&&(row.removal==Removal::Cancel||row.removal==Removal::Failure||row.removal==Removal::Keep);
+        if(incomplete)for(auto& file:row.view.files)if(row.fileProofs.value(file.path).toObject().value("complete").toBool())file.verifiedBytes=file.bytes;
+        if((row.removal==Removal::Delete||(incomplete&&row.view.metadata))&&!deleted)return;
+        if(incomplete)try{
+            for(auto& file:row.view.files)if(file.verifiedBytes<file.bytes){
+                const auto target=QDir(row.view.directory).filePath(file.path);noLinks(target);if(row.fileProofs.value(file.path).toObject().value("external").toBool())continue;const auto identity=row.fileProofs.value(file.path).toObject().value("identity").toString();
+                if(QFileInfo::exists(target)&&identity.isEmpty())reject("Incomplete torrent file ownership is unavailable; it was retained for review.");
+                ownedMedia::erase(std::filesystem::path(target.toStdWString()),0,false,identity);file.verifiedBytes=0;
+                auto parent=QFileInfo(target).absolutePath();while(parent!=row.view.directory&&parent.startsWith(row.view.directory+"/",Qt::CaseInsensitive)&&QDir().rmdir(parent))parent=QFileInfo(parent).absolutePath();
+            }
+            row.view.verifiedBytes=0;for(const auto& file:row.view.files)if(file.priority)row.view.verifiedBytes+=file.verifiedBytes;
+        }catch(const std::exception& error){row.view.error+=" Incomplete file cleanup: "+QString::fromUtf8(error.what());row.handle={};row.removal=Removal::None;persist(row);if(row.removing){row.removing->set_exception(std::current_exception());row.removing.reset();}emit owner.updated(row.view);return;}
         const auto id=row.view.id;auto promise=row.removing;
-        if(row.removal==Removal::Cancel){row.handle={};row.removal=Removal::None;persist(row);if(promise)promise->set_value();row.removing.reset();emit owner.updated(row.view);}
+        if(row.removal==Removal::Cancel||row.removal==Removal::Failure){row.handle={};row.removal=Removal::None;persist(row);if(promise)promise->set_value();row.removing.reset();emit owner.updated(row.view);}
         else if(row.removal!=Removal::None){if(store)store->erase(id);rows.erase(id);if(promise)promise->set_value();}
     }
     void alerts(){
@@ -374,7 +410,7 @@ struct TorrentEngine::Impl {
                 }
             }else if(auto* received=lt::alert_cast<lt::metadata_received_alert>(alert)){if(auto* row=find(received->handle))metadata(*row);}
             else if(auto* priority=lt::alert_cast<lt::file_prio_alert>(alert)){if(auto* row=find(priority->handle))prioritiesApplied(*row);}
-            else if(auto* disk=lt::alert_cast<lt::file_error_alert>(alert)){if(auto* row=find(disk->handle))fail(*row,"Torrent disk operation failed. Files and previous checkpoints were retained.");}
+            else if(auto* disk=lt::alert_cast<lt::file_error_alert>(alert)){if(auto* row=find(disk->handle))fail(*row,"Torrent disk operation failed. Incomplete data cleanup will be attempted.");}
             else if(auto* state=lt::alert_cast<lt::state_update_alert>(alert)){for(const auto& item:state->status)update(item);}
             else if(auto* flushed=lt::alert_cast<lt::cache_flushed_alert>(alert)){if(auto* row=find(flushed->handle);row&&row->saving&&row->flushing){row->flushing=false;row->handle.save_resume_data(lt::torrent_handle::save_info_dict);}}
             else if(auto* rd=lt::alert_cast<lt::save_resume_data_alert>(alert)){if(auto* row=find(rd->handle);row&&row->saving)saved(*row,rd->params);}
@@ -460,10 +496,10 @@ std::future<QString> TorrentEngine::addMagnet(QString uri,QString directory,AddO
 std::future<std::vector<Snapshot>> TorrentEngine::snapshots(){return impl_->submit([this]{std::vector<Snapshot> result;for(const auto& [id,row]:impl_->rows)result.push_back(row.view);return result;});}
 std::future<void> TorrentEngine::checkpoint(QString id){return impl_->durable(std::move(id),[](auto&){});}
 std::future<void> TorrentEngine::pause(QString id){return impl_->durable(std::move(id),[](auto& row){row.paused=true;row.completionPending=false;row.seedingPending=false;row.view.state=State::Paused;row.handle.pause();row.view.downloadBytesPerSecond=row.view.uploadBytesPerSecond=0;});}
-std::future<void> TorrentEngine::resume(QString id){return impl_->durable(std::move(id),[](auto& row){if(row.view.metadataOnly&&row.view.metadata)reject("Confirm the torrent file selection before starting.");row.paused=false;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=row.view.metadata?State::Checking:State::Metadata;row.handle.clear_error();if(row.restored){row.handle.force_recheck();row.restored=false;}row.handle.resume();});}
-std::future<void> TorrentEngine::startSelected(QString id,bool paused){return impl_->durable(std::move(id),[paused](auto& row){if(!row.view.metadata)reject("Wait for torrent metadata before confirming files.");row.view.metadataOnly=false;row.paused=paused;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=paused?State::Paused:State::Checking;row.handle.clear_error();row.handle.unset_flags(lt::torrent_flags::upload_mode);if(row.restored){row.handle.force_recheck();row.restored=false;}if(paused)row.handle.pause();else row.handle.resume();});}
+std::future<void> TorrentEngine::resume(QString id){return impl_->durable(std::move(id),[this](auto& row){impl_->reserveFiles(row);if(row.view.metadataOnly&&row.view.metadata)reject("Confirm the torrent file selection before starting.");row.paused=false;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=row.view.metadata?State::Checking:State::Metadata;row.handle.clear_error();if(row.restored){row.handle.force_recheck();row.restored=false;}row.handle.resume();});}
+std::future<void> TorrentEngine::startSelected(QString id,bool paused){return impl_->durable(std::move(id),[this,paused](auto& row){if(!row.view.metadata)reject("Wait for torrent metadata before confirming files.");row.view.metadataOnly=false;impl_->reserveFiles(row);row.paused=paused;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=paused?State::Paused:State::Checking;row.handle.clear_error();row.handle.unset_flags(lt::torrent_flags::upload_mode);if(row.restored){row.handle.force_recheck();row.restored=false;}if(paused)row.handle.pause();else row.handle.resume();});}
 std::future<void> TorrentEngine::configure(QString id,Limits limits,SeedPolicy policy){return impl_->durable(std::move(id),[limits,policy](auto& row){validate(limits);validate(policy);row.view.limits=limits;row.view.seeding=policy;row.handle.set_download_limit(limits.download);row.handle.set_upload_limit(limits.upload);row.handle.set_max_connections(limits.connections);});}
-std::future<void> TorrentEngine::selectFiles(QString id,std::vector<int> priorities){return impl_->durable(std::move(id),[this,priorities=std::move(priorities)](auto& row){validate(priorities);if(row.priorityPending)reject("A torrent file selection update is still pending.");if(!row.view.metadata)reject("Wait for metadata before choosing files.");if(priorities.size()!=row.view.files.size())reject("File priorities do not match the torrent file list.");for(std::size_t n=0;n<priorities.size();++n)if(row.priorities[n]==0&&priorities[n]>0)row.recheckAfterPriorities=true;row.priorities=priorities;row.completionPending=false;row.seedingPending=false;row.view.state=row.paused?State::Paused:State::Checking;impl_->applyPriorities(row);});}
+std::future<void> TorrentEngine::selectFiles(QString id,std::vector<int> priorities){return impl_->durable(std::move(id),[this,priorities=std::move(priorities)](auto& row){validate(priorities);if(row.priorityPending)reject("A torrent file selection update is still pending.");if(!row.view.metadata)reject("Wait for metadata before choosing files.");if(priorities.size()!=row.view.files.size())reject("File priorities do not match the torrent file list.");for(std::size_t n=0;n<priorities.size();++n)if(row.priorities[n]==0&&priorities[n]>0)row.recheckAfterPriorities=true;row.priorities=priorities;row.completionPending=false;row.seedingPending=false;row.view.state=row.paused?State::Paused:State::Checking;for(std::size_t n=0;n<row.view.files.size();++n)row.view.files[n].priority=row.priorities[n];impl_->reserveFiles(row);impl_->applyPriorities(row);});}
 std::future<void> TorrentEngine::setSessionLimits(Limits limits){return impl_->submit([this,limits]{validate(limits);if(impl_->store)impl_->store->settings(QJsonDocument(QJsonObject{{"version",1},{"limits",encode(limits)}}).toJson(QJsonDocument::Compact));lt::settings_pack settings;settings.set_int(lt::settings_pack::download_rate_limit,limits.download);settings.set_int(lt::settings_pack::upload_rate_limit,limits.upload);settings.set_int(lt::settings_pack::connections_limit,limits.connections);impl_->session->apply_settings(settings);impl_->global=limits;});}
 std::future<Limits> TorrentEngine::sessionLimits(){return impl_->submit([this]{return impl_->global;});}
 std::future<quint16> TorrentEngine::listeningPort(){return impl_->submit([this]{return impl_->session->listen_port();});}
@@ -495,7 +531,7 @@ std::future<void> TorrentEngine::remove(QString id,bool deleteData,bool confirme
                 if(error)reject("Cancelled torrent could not be attached for deletion; files were retained.");
                 row.removal=Impl::Removal::Delete;row.removing=promise;impl_->persist(row);impl_->removeNative(row);return;
             }
-            if(impl_->store)impl_->store->erase(id);impl_->rows.erase(found);promise->set_value();return;
+            row.removal=Impl::Removal::Keep;row.removing=promise;impl_->removed(row,true);return;
         }
         row.paused=true;row.handle.pause();row.view.state=State::Cancelled;row.removal=deleteData?Impl::Removal::Delete:Impl::Removal::Keep;row.removing=promise;impl_->persist(row);impl_->save(row);
     }catch(...){if(pendingRow&&pendingRow->removing==promise){pendingRow->removing.reset();pendingRow->removal=Impl::Removal::None;}promise->set_exception(std::current_exception());}}))promise->set_exception(failure("Torrent engine is shutting down."));return future;

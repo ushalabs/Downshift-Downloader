@@ -16,6 +16,7 @@ New-Item -ItemType Directory -Force -Path $portable,$OutputDirectory | Out-Null
 foreach($exe in @('Downshift.exe','DownshiftNativeHost.exe')){Copy-Item -LiteralPath (Join-Path $build $exe) -Destination $portable}
 Get-ChildItem -LiteralPath $build -Filter '*.dll' -File | Copy-Item -Destination $portable
 Copy-Item -LiteralPath (Join-Path $build 'platforms') -Destination $portable -Recurse
+foreach($pluginDirectory in @('imageformats','tls')) { Copy-Item -LiteralPath (Join-Path $build $pluginDirectory) -Destination $portable -Recurse }
 $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $vs=& $vswhere -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if(!$vs){throw 'Visual Studio redist directory not found.'}

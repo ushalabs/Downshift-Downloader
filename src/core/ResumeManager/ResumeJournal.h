@@ -30,6 +30,9 @@ public:
     [[nodiscard]] bool remove() noexcept;
     // Explicit restart archives old partial/ledger; it never silently overwrites them.
     void archivePrevious();
+    // Requires the encrypted ledger and physical file identity to agree.
+    void discardPartial(const std::string& url);
+    void discardFailedPartial(); // Authenticated legacy repair; rejects paused/finalizing data.
     [[nodiscard]] static std::string newId();
     [[nodiscard]] static std::string pathText(const std::filesystem::path& path);
     static void validate(const RecoveryRecord& record);

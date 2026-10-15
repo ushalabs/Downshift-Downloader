@@ -1,4 +1,5 @@
 #include "ResumeJournal.h"
+#include "core/FileWriter/FileWriter.h"
 #include "core/DownloadEngine/DownloadEngine.h"
 #include "core/DownloadEngine/HttpResponse.h"
 
@@ -177,6 +178,27 @@ void ResumeJournal::save(RecoveryRecord& r) {
     } catch (...) { DeleteFileW(temp.c_str()); throw; }
 }
 bool ResumeJournal::remove() noexcept { return DeleteFileW(path_.c_str()) != 0 || GetLastError() == ERROR_FILE_NOT_FOUND; }
+void ResumeJournal::discardPartial(const std::string& url) {
+    auto partial = destination_; partial += L".part";
+    if (!present(partial) && !exists()) return;
+    const auto record = load();
+    if (record.url != url || record.destination != pathText(destination_)) invalid();
+    if (present(partial)) {
+        FileWriter::discardOwnedPartial(destination_,record.fileIdentity);
+    }
+    if (!remove()) fileFail();
+}
+void ResumeJournal::discardFailedPartial() {
+    const auto record=load();if(record.status!=RecoveryStatus::Failed||!record.finalSha256.empty())invalid();
+    if(record.destination!=pathText(destination_)){
+        const std::wstring prefix=L"Downshift.previous-";const auto name=destination_.filename().wstring();
+        if(!name.starts_with(prefix)||name.size()!=prefix.size()+32||std::any_of(name.begin()+prefix.size(),name.end(),[](wchar_t c){return !((c>=L'0'&&c<=L'9')||(c>=L'a'&&c<=L'f'));}))invalid();
+        const auto original=std::filesystem::u8path(record.destination).parent_path().lexically_normal().wstring();
+        if(_wcsicmp(original.c_str(),destination_.parent_path().lexically_normal().wstring().c_str())!=0)invalid();
+    }
+    FileWriter::discardOwnedPartial(destination_,record.fileIdentity);
+    if(!remove())fileFail();
+}
 void ResumeJournal::archivePrevious() {
     if (present(destination_)) throw DownloadError(DownloadErrorCode::File, "The destination already exists; it will not be overwritten.");
     auto partial = destination_; partial += L".part";

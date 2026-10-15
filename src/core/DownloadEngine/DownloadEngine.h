@@ -32,6 +32,7 @@ private:
 };
 
 struct DownloadOptions {
+    bool discardIncomplete = false; // Desktop lifecycle policy; Pause always retains recovery data.
     std::string url;
     std::filesystem::path destination;
     std::optional<std::string> expectedSha256;

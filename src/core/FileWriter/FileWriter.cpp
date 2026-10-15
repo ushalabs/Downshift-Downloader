@@ -67,6 +67,7 @@ std::filesystem::path FileWriter::validatedDestination(const std::filesystem::pa
 }
 
 FileWriter::FileWriter(const std::filesystem::path& destination, FileOpenMode mode) {
+    partial_ = mode != FileOpenMode::InspectCompleted;
     destination_ = validatedDestination(destination);
     const auto path = destination_.wstring();
     if (mode != FileOpenMode::InspectCompleted && GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES) fileError("The destination already exists; it will not be overwritten.");
@@ -143,6 +144,24 @@ std::string FileWriter::identity() const {
 void FileWriter::flush() {
     Timer timer{metrics_.flushSeconds};
     if (!FlushFileBuffers(handle_)) fileError("Unable to flush the partial data to disk.");
+}
+
+void FileWriter::discard() {
+    if (!partial_) fileError("Completed files require explicit deletion confirmation.");
+    if (!handle_) return; // commit() already closed the completed destination.
+    FILE_DISPOSITION_INFO info{TRUE};
+    if (!SetFileInformationByHandle(handle_, FileDispositionInfo, &info, sizeof(info)))
+        fileError("Incomplete file cleanup failed. Close applications using it and remove the task again.");
+    CloseHandle(handle_); handle_ = nullptr;
+}
+void FileWriter::discardOwnedPartial(const std::filesystem::path& destination,const std::string& expected) {
+    auto partial=validatedDestination(destination);partial+=L".part";
+    const auto handle=CreateFileW(partial.c_str(),GENERIC_READ|DELETE,0,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+    if(handle==INVALID_HANDLE_VALUE)fileError("The incomplete file could not be opened for cleanup.");
+    BY_HANDLE_FILE_INFORMATION info{};bool safe=GetFileInformationByHandle(handle,&info)&&info.nNumberOfLinks==1&&!(info.dwFileAttributes&(FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_DIRECTORY));
+    if(safe)safe=expected==std::to_string(info.dwVolumeSerialNumber)+":"+std::to_string(info.nFileIndexHigh)+":"+std::to_string(info.nFileIndexLow);
+    FILE_DISPOSITION_INFO disposition{TRUE};const bool deleted=safe&&SetFileInformationByHandle(handle,FileDispositionInfo,&disposition,sizeof(disposition));CloseHandle(handle);
+    if(!deleted)fileError("Incomplete file cleanup refused a replaced, linked or unavailable file. It was retained.");
 }
 
 std::string FileWriter::sha256Range(std::uint64_t offset, std::uint64_t bytes) {

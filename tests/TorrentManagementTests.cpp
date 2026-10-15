@@ -246,6 +246,15 @@ void crash(const QString& root,const QString& metadata){
     const auto name=QString::fromStdString(lt::load_torrent_file(metadata.toUtf8().toStdString()).ti->name());const auto final=QDir(save).filePath(name+"/file0.bin");require(digest(final)==digest(QDir(root).filePath("seed/"+name+"/file0.bin")),"Process-death recovery final SHA-256");
     engine.remove(id).get();require(QFileInfo::exists(final)&&engine.snapshots().get().empty(),"Remove-only retains downloaded file");engine.shutdown().get();
 }
+void incompleteCleanup(const QString& root,const QString& metadata){
+    std::cout<<"Incomplete payload cleanup"<<std::endl;Seed seed(root,metadata);const auto store=QDir(root).filePath("cleanup-store.sqlite"),save=QDir(root).filePath("cleanup-payload");QString id;
+    {
+        TorrentEngine engine({false,true,store});AddOptions options;options.priorities={4,0};options.limits={64*1024,128*1024,3};id=engine.addFile(metadata,save,options).get();engine.connectPeer(id,"127.0.0.1",seed.port()).get();wait([&]{const auto s=row(engine,id);return s.verifiedBytes>=32768&&s.verifiedBytes<s.selectedBytes;});
+        QFile unrelated(QDir(save).filePath("unrelated.txt"));require(unrelated.open(QIODevice::WriteOnly),"Cleanup unrelated fixture");unrelated.write("keep");unrelated.close();
+        engine.cancel(id).get();require(row(engine,id).state==State::Cancelled,"Cancel remains in history after cleanup");require(!QFileInfo::exists(QDir(save).filePath("manage-v1/file0.bin")),"Cancelled incomplete torrent payload removed");require(QFileInfo::exists(unrelated.fileName()),"Automatic cleanup preserves unrelated file");engine.shutdown().get();
+    }
+    {TorrentEngine engine({false,true,store});require(row(engine,id).state==State::Cancelled,"Cleanup state survives restart");engine.remove(id).get();require(engine.snapshots().get().empty(),"Cleaned cancelled row can be removed");engine.shutdown().get();}
+}
 int crashChild(const QStringList& args){
     TorrentEngine engine({false,true,args[2]});AddOptions config;config.priorities={4,0};config.limits={64*1024,128*1024,3};const auto id=engine.addFile(args[3],args[4],config).get();engine.connectPeer(id,"127.0.0.1",static_cast<quint16>(args[5].toUInt())).get();
     wait([&]{const auto value=row(engine,id);return value.verifiedBytes>=32768&&value.verifiedBytes<value.selectedBytes;});engine.checkpoint(id).get();QSaveFile marker(args[6]);if(!marker.open(QIODevice::WriteOnly)||marker.write(id.toUtf8())!=id.toUtf8().size()||!marker.commit())throw std::runtime_error("Crash marker failed");
@@ -262,7 +271,7 @@ int main(int argc,char** argv){
         const auto v1=create(temp.path(),lt::create_torrent::v1_only,"manage-v1"),v2=create(temp.path(),lt::create_torrent::v2_only,"manage-v2"),hybrid=create(temp.path(),{},"manage-hybrid");
         if(app.arguments().contains("--selection-race")){for(const auto& metadata:{v1,v2,hybrid})selectionStress(temp.path(),metadata);std::cout<<"Selection ordering checks: "<<checks<<std::endl;return 0;}
         if(app.arguments().contains("--caps")){capsAndRatio(temp.path(),v1);std::cout<<"Caps/ratio checks: "<<checks<<std::endl;return 0;}
-        management(temp.path(),v1,"manage-v1");management(temp.path(),v2,"manage-v2");management(temp.path(),hybrid,"manage-hybrid");std::cout<<"Storage validation"<<std::endl;storage(temp.path(),v1);std::cout<<"Lifecycle validation"<<std::endl;lifecycle(temp.path(),v1,v2);capsAndRatio(temp.path(),v1);std::cout<<"Process-death validation"<<std::endl;crash(temp.path(),v1);physicalIdentity(temp.path(),v1);resolvedMagnet(temp.path(),hybrid);for(const auto& metadata:{v1,v2,hybrid})selectionStress(temp.path(),metadata);unexplainedEmpty(temp.path(),v1);
+        incompleteCleanup(temp.path(),v1);management(temp.path(),v1,"manage-v1");management(temp.path(),v2,"manage-v2");management(temp.path(),hybrid,"manage-hybrid");std::cout<<"Storage validation"<<std::endl;storage(temp.path(),v1);std::cout<<"Lifecycle validation"<<std::endl;lifecycle(temp.path(),v1,v2);capsAndRatio(temp.path(),v1);std::cout<<"Process-death validation"<<std::endl;crash(temp.path(),v1);physicalIdentity(temp.path(),v1);resolvedMagnet(temp.path(),hybrid);for(const auto& metadata:{v1,v2,hybrid})selectionStress(temp.path(),metadata);unexplainedEmpty(temp.path(),v1);
         std::cout<<"Torrent management checks passed: "<<checks<<" (native selected transfers, pause/restart/rehash, policies, encryption, ownership and deletion)\n";return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

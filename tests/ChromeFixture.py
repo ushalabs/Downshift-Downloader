@@ -12,6 +12,8 @@ class ChromeHandler(Handler):
     def do_GET(self):
         import sys
         print("Chrome fixture request range="+str(self.headers.get("Range")),file=sys.stderr,flush=True)
+        if self.path.startswith('/picture'):
+            payload=self.server.picture_bytes;self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith("/video.mp4") and getattr(self.server,'media_file',None):
             payload=self.server.media_file.read_bytes();self.send_response(200);self.send_header('Content-Type','video/mp4');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith("/page"):
@@ -38,6 +40,10 @@ class ChromeHandler(Handler):
 class ChromeServer(ControlledServer):
     def __init__(self):
         super().__init__();self.RequestHandlerClass=ChromeHandler
+        import struct,zlib
+        def chunk(kind,data):return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+        pixels=b''.join(b'\0'+bytes(value for x in range(32) for value in (x*7,y*11,123)) for y in range(16))
+        self.picture_bytes=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',32,16,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(pixels))+chunk(b'IEND',b'')
 if __name__=="__main__":
     import pathlib,sys
     server=ChromeServer();server.configure(4*1024*1024,per_connection_bps=1024*1024)

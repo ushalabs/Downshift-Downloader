@@ -1,6 +1,7 @@
 #include "QueueManager.h"
 #include "Categories.h"
 #include "VideoUrl.h"
+#include "OwnedMedia.h"
 #include "database/QueueStore.h"
 #include "core/FileWriter/FileWriter.h"
 #include "core/ResumeManager/ResumeJournal.h"
@@ -59,13 +60,14 @@ QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
     return s;
 }
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
-    {"media",media},{"mediaTitle",mediaTitle},{"mediaFolder",mediaFolder},{"browserTransfer",browserTransfer},{"browserComplete",browserComplete},{"browserFile",browserFile},
+    {"mediaIdentity",mediaIdentity},{"mediaStaged",mediaStaged},{"videoMetadata",videoMetadata},{"partialIdentity",partialIdentity},{"media",media},{"mediaTitle",mediaTitle},{"mediaFolder",mediaFolder},{"browserTransfer",browserTransfer},{"browserComplete",browserComplete},{"browserFile",browserFile},
     {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"},
     {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)},
     {"handoffKey",handoffKey},{"requiredEtag",requiredEtag},{"requiredResolvedUrl",requiredResolvedUrl},{"requiredTotal",requiredTotal ? QString::number(*requiredTotal):QString()}}; }
 QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString();e.browserTransfer=o.value("browserTransfer").toBool();e.browserComplete=o.value("browserComplete").toBool();e.browserFile=o.value("browserFile").toString();e.origin=e.browserTransfer ? browserOrigin(e.url):downshift::origin(e.url);
     if(e.browserTransfer && (o.value("media").toBool() || (!e.browserFile.isEmpty() && (!QFileInfo(e.browserFile).isAbsolute() || e.browserFile.size()>32768 || e.browserFile.contains(QChar(0))))))invalid("Damaged browser transfer record.");
+    e.mediaIdentity=o.value("mediaIdentity").toString();e.mediaStaged=o.value("mediaStaged").toBool();e.videoMetadata=o.value("videoMetadata").toObject();e.partialIdentity=o.value("partialIdentity").toString();
     e.media=o.value("media").toBool();e.mediaTitle=o.value("mediaTitle").toString();e.mediaFolder=o.value("mediaFolder").toString();
     e.error=o.value("error").toString(); e.sha256=o.value("sha256").toString(); e.status=static_cast<QueueStatus>(o.value("status").toInt(-1)); e.priority=o.value("priority").toInt();
     e.created=o.value("created").toString().toLongLong(); e.updated=o.value("updated").toString().toLongLong(); e.existing=static_cast<ExistingDownload>(o.value("existing").toInt(-1)); e.speedLimit=o.value("speedLimit").toString().toULongLong();
@@ -87,7 +89,7 @@ public:
         { std::lock_guard lock(mutex); if (!rate) return; version=generation; next=std::max(next,std::chrono::steady_clock::now()) + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(static_cast<double>(count)/static_cast<double>(rate))); due=next; }
         while (std::chrono::steady_clock::now() < due) {
             { std::lock_guard lock(mutex); if(generation!=version) return; }
-            if (stop.stop_requested()) throw DownloadError(DownloadErrorCode::Cancelled,"Download cancelled; partial files preserved.");
+            if (stop.stop_requested()) throw DownloadError(DownloadErrorCode::Cancelled,"Download cancelled.");
             if (control->pauseRequested()) throw DownloadError(DownloadErrorCode::Paused,"Download paused.");
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -99,7 +101,7 @@ struct QueueManager::Worker {
     DownloadProgress progress;
     bool done=false, cancel=false;
     QueueStatus status=QueueStatus::Running;
-    QString error;
+    QString error,partialIdentity;
     bool browser=false;
     std::atomic_bool browserPaused=false, browserComplete=false;
     std::atomic<qint64> browserSize=-1;
@@ -130,8 +132,9 @@ void QueueManager::initialize() {
         try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());}
         for(auto& e:entries_){
             if(!e.media && !e.browserTransfer && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
-            if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to continue in a video window.";save(e);}
+            if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to start a fresh transfer.";if(e.mediaStaged)try{cleanup(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());}save(e);}
             else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
+            if(e.mediaStaged&&(e.status==QueueStatus::Failed||e.status==QueueStatus::Cancelled)&&QFileInfo::exists(ownedMedia::workspace(e.mediaFolder,e.id)))try{cleanup(e);e.error+=" Incomplete video data removed after restart.";save(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());save(e);}
             e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();
         }
         initialized_=true;fatal_={};
@@ -164,13 +167,31 @@ void QueueManager::save(QueueEntry& e) {
             log.write(QString("%1 %2 %3\n").arg(e.updated).arg(e.id).arg(statusText(e.status)).toUtf8());
     }
 }
+void QueueManager::cleanup(QueueEntry& e) {
+    if(e.status==QueueStatus::Completed){
+        if(e.media&&e.mediaStaged)ownedMedia::erase(path(ownedMedia::workspace(e.mediaFolder,e.id)),0,true,e.mediaIdentity);
+        else if(!e.media&&!e.browserTransfer){ResumeJournal journal(path(e.destination));journal.discardPartial(e.url.toStdString());}
+        return;
+    }
+    if(e.media){
+        if(e.mediaStaged){const auto stage=ownedMedia::workspace(e.mediaFolder,e.id);ordinaryParents(path(stage));if(e.mediaIdentity.isEmpty())invalid("Video staging ownership is unavailable; the folder was retained.");ownedMedia::erase(path(stage),0,true,e.mediaIdentity);}
+    } else if(e.browserTransfer){
+        if(QFileInfo::exists(e.destination+".part")){
+            if(e.partialIdentity.isEmpty())invalid("This older partial has no ownership identity. It was retained for manual review.");
+            ordinaryParents(path(e.destination));FileWriter::discardOwnedPartial(path(e.destination),e.partialIdentity.toStdString());e.partialIdentity.clear();
+        }
+    } else {
+        ordinaryParents(path(e.destination));ResumeJournal journal(path(e.destination));journal.discardPartial(e.url.toStdString());
+    }
+    e.progress.downloadedBytes=e.progress.verifiedBytes=0;e.progress.resumable=false;e.existing=ExistingDownload::New;
+}
 std::future<QString> QueueManager::add(QString url,QString dest,int priority,bool start,QString sha256,std::uint64_t speedLimit) {
     return submit([this,url=std::move(url),dest=std::move(dest),priority,start,sha256=std::move(sha256),speedLimit] {
         if(youtubeHost(QUrl(url).host())) invalid("This is a YouTube page, not a file. Use Download video to resolve its streams and qualities.");
         if(entries_.size()>=10000 || priority < -1 || priority > 1 || speedLimit > 10ULL*1024*1024*1024) invalid("Queue limit or invalid download options.");
         QueueEntry e; e.url=url; e.origin=origin(url); e.destination=destination(dest); e.sha256=sha256.toLower();
         const auto parent=QFileInfo(e.destination).absolutePath();
-        for(const auto& category:QStringList{"Videos","Audios","Zip","Programs"})if(parent.compare(QDir(settings_.directory).filePath(category),Qt::CaseInsensitive)==0 && !QDir().mkpath(parent))invalid("The category folder could not be created.");
+        for(const auto& category:QStringList{"Videos","Audios","Zip","Programs","Pictures"})if(parent.compare(QDir(settings_.directory).filePath(category),Qt::CaseInsensitive)==0 && !QDir().mkpath(parent))invalid("The category folder could not be created.");
         if(!e.sha256.isEmpty() && (e.sha256.size()!=64 || std::any_of(e.sha256.begin(),e.sha256.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))) invalid("SHA-256 must contain 64 hexadecimal characters.");
         for(const auto& old:entries_) if(old.destination.compare(e.destination,Qt::CaseInsensitive)==0) invalid("A download already owns this destination. Choose a different filename.");
         if(QFileInfo::exists(e.destination) || QFileInfo::exists(e.destination+".part") || QFileInfo::exists(e.destination+".part.resume")) invalid("The destination or its partial already exists. Choose a different filename.");
@@ -197,15 +218,15 @@ std::future<void> QueueManager::action(QString id,QueueAction action) { return s
         else if(action!=QueueAction::Start) invalid("Pause the download before changing or removing it.");
         return;
     }
-    if(action==QueueAction::Remove) { store_->erase(id); std::erase_if(entries_,[&](const auto& row){return row.id==id;}); return; }
+    if(action==QueueAction::Remove) { cleanup(e);store_->erase(id); std::erase_if(entries_,[&](const auto& row){return row.id==id;}); return; }
     if(e.status==QueueStatus::Completed) invalid("This download is already complete.");
     if(action==QueueAction::Start && e.status==QueueStatus::Paused && e.error.startsWith("Download paused") && e.progress.resumable && e.progress.downloadedBytes && !e.progress.verifiedBytes && QFileInfo::exists(e.destination+".part.resume")) {
         ResumeJournal journal(path(e.destination));
         if(journal.load().completed.empty())invalid("This earlier pause has no reusable checkpoint. Choose Restart explicitly; the old partial is preserved.");
     }
     if(action==QueueAction::Pause) e.status=QueueStatus::Paused;
-    else if(action==QueueAction::Cancel) e.status=QueueStatus::Cancelled;
-    else {if(e.browserTransfer && action==QueueAction::Restart){ResumeJournal journal(path(e.destination));journal.archivePrevious();e.progress={};} e.existing=action==QueueAction::Restart ? ExistingDownload::Restart : QFileInfo::exists(e.destination+".part.resume") ? ExistingDownload::Resume : ExistingDownload::New; e.status=QueueStatus::Queued; e.error.clear(); }
+    else if(action==QueueAction::Cancel) {cleanup(e);e.status=QueueStatus::Cancelled;e.error="Cancelled. Incomplete data removed.";}
+    else {if(action==QueueAction::Restart){cleanup(e);e.progress={};} e.existing=action==QueueAction::Restart ? ExistingDownload::New : QFileInfo::exists(e.destination+".part.resume") ? ExistingDownload::Resume : ExistingDownload::New; e.status=QueueStatus::Queued; e.error.clear(); }
     save(e);
 }); }
 std::future<void> QueueManager::rename(QString id,QString dest) { return submit([this,id=std::move(id),dest=std::move(dest)] {
@@ -231,43 +252,55 @@ std::future<void> QueueManager::configure(QueueSettings s) { return submit([this
 }); }
 std::future<QueueSnapshot> QueueManager::snapshot() { return submit([this] { tick(); return QueueSnapshot{entries_,settings_,backupWarning_}; }); }
 std::future<QString> QueueManager::categoryFolder(QString filename,QString mime) {return submit([this,filename=std::move(filename),mime=std::move(mime)]{const auto folder=QDir(settings_.directory).filePath(downloadCategory(filename,mime));if(!QDir().mkpath(folder))invalid("The download category folder could not be created.");return folder;});}
-std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString title) {
-    return submit([this,url=std::move(url),folder=std::move(folder),title=std::move(title)] {
+std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString title,QJsonObject metadata) {
+    return submit([this,url=std::move(url),folder=std::move(folder),title=std::move(title),metadata=std::move(metadata)] {
         if(entries_.size()>=10000 || !QFileInfo(folder).isDir()) invalid("Select an existing video folder, or remove old history if it is full.");
         QueueEntry e;e.url=url;e.origin=origin(url);e.media=true;e.mediaTitle=title.left(300);
         e.mediaFolder=QFileInfo(folder).canonicalFilePath();e.destination=e.mediaFolder;
         for(const auto& old:entries_)if(old.media && old.status==QueueStatus::Running && old.url==url && old.mediaFolder.compare(e.mediaFolder,Qt::CaseInsensitive)==0)invalid("This video is already downloading into that folder.");
-        e.id=QString::fromStdString(ResumeJournal::newId());e.status=QueueStatus::Running;e.created=QDateTime::currentSecsSinceEpoch();save(e);entries_.push_back(e);return e.id;
+        e.id=QString::fromStdString(ResumeJournal::newId());e.mediaStaged=true;
+        for(const auto& field:QStringList{"title","thumbnail","originalPage","webpage_url","extractor_key","duration","height"})if(metadata.contains(field))e.videoMetadata.insert(field,metadata.value(field));
+        if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>16384)invalid("Video preview metadata exceeds its limit.");
+        const auto stage=ownedMedia::workspace(e.mediaFolder,e.id);ordinaryParents(path(stage));if(!QDir().mkdir(stage))invalid("Cannot create a private video staging folder.");e.mediaIdentity=ownedMedia::identity(stage);
+        e.status=QueueStatus::Running;e.created=QDateTime::currentSecsSinceEpoch();save(e);entries_.push_back(e);return e.id;
     });
 }
 std::future<void> QueueManager::mediaProgress(QString id,DownloadProgress progress) {
     return submit([this,id=std::move(id),progress] {auto& e=entry(id);if(e.media && e.status==QueueStatus::Running)e.progress=progress;});
 }
-std::future<void> QueueManager::finishMedia(QString id,QueueStatus status,QString file,QString error) {
-    return submit([this,id=std::move(id),status,file=std::move(file),error=std::move(error)] {
+std::future<QString> QueueManager::finishMedia(QString id,QueueStatus status,QString file,QString error,QJsonObject metadata) {
+    return submit([this,id=std::move(id),status,file=std::move(file),error=std::move(error),metadata=std::move(metadata)] {
         auto& e=entry(id);if(!e.media || e.status!=QueueStatus::Running)invalid("This video task is no longer active.");
         if(status!=QueueStatus::Completed && status!=QueueStatus::Failed && status!=QueueStatus::Cancelled)invalid("Invalid video result.");
         if(status==QueueStatus::Completed) {
+            for(const auto& field:QStringList{"title","thumbnail","webpage_url","duration","height","ext"})if(metadata.contains(field))e.videoMetadata[field]=metadata.value(field);
+            if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>16384)invalid("Video preview metadata exceeds its limit.");
             // Completion is durable only for a nonempty, ordinary file in the chosen folder.
             // The asynchronous ffprobe stage in MediaDialog verifies playable video first.
             const auto d=destination(file);const QFileInfo info(d);
-            if(!info.isAbsolute() || info.absoluteDir().canonicalPath().compare(e.mediaFolder,Qt::CaseInsensitive)!=0 || info.suffix()=="part")invalid("No final video was saved in the chosen folder.");
+            if(e.mediaStaged&&ownedMedia::identity(ownedMedia::workspace(e.mediaFolder,e.id))!=e.mediaIdentity)invalid("Video staging folder was replaced. Files were retained.");
+            if(!info.isAbsolute() || info.absoluteDir().canonicalPath().compare(e.mediaStaged ? ownedMedia::workspace(e.mediaFolder,e.id):e.mediaFolder,Qt::CaseInsensitive)!=0 || info.suffix()=="part")invalid("No final video was saved in the chosen folder.");
             for(const auto& old:entries_)if(!old.media && old.destination.compare(d,Qt::CaseInsensitive)==0)invalid("Another download owns this video filename.");
             const auto handle=CreateFileW(path(d).c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
             if(handle==INVALID_HANDLE_VALUE)invalid("The final video file is missing or unavailable.");
             BY_HANDLE_FILE_INFORMATION attributes{};LARGE_INTEGER size{};
             const bool valid=GetFileInformationByHandle(handle,&attributes) && !(attributes.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)) && GetFileSizeEx(handle,&size) && size.QuadPart>0;
             CloseHandle(handle);if(!valid)invalid("The final video is empty or is not a regular file.");
-            e.destination=d;e.progress.downloadedBytes=static_cast<std::uint64_t>(size.QuadPart);e.progress.totalBytes=e.progress.downloadedBytes;
+            e.destination=e.mediaStaged ? ownedMedia::publish(d,e.mediaFolder):d;e.progress.downloadedBytes=static_cast<std::uint64_t>(size.QuadPart);e.progress.totalBytes=e.progress.downloadedBytes;
         }
-        e.status=status;e.error=error;e.progress.smoothedBytesPerSecond=0;e.progress.activeRanges=0;e.progress.etaSeconds.reset();save(e);
+        e.status=status;e.error=error;e.progress.smoothedBytesPerSecond=0;e.progress.activeRanges=0;e.progress.etaSeconds.reset();
+        if(status!=QueueStatus::Completed)try{cleanup(e);}catch(const std::exception& cleanupError){e.error+=" Cleanup: "+QString::fromUtf8(cleanupError.what());save(e);throw;}
+        else if(e.mediaStaged)try{ownedMedia::erase(path(ownedMedia::workspace(e.mediaFolder,e.id)),0,true,e.mediaIdentity);}catch(...){e.error="Video completed; empty staging folder cleanup needs retry.";}
+        save(e);return e.destination;
     });
 }
 void QueueManager::tick() {
     for(auto i=workers_.begin();i!=workers_.end();) {
         auto& w=*i->second; auto& e=entry(i->first); bool done;
-        { std::lock_guard lock(w.mutex); e.progress=w.progress; done=w.done; if(done) { e.status=w.cancel ? QueueStatus::Cancelled : w.status; e.error=w.error; } }
-        if(done) {e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();save(e);if(e.status==QueueStatus::Paused)try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());} i=workers_.erase(i); } else ++i;
+        { std::lock_guard lock(w.mutex); e.progress=w.progress; done=w.done; if(done) { e.status=w.cancel && w.status!=QueueStatus::Completed ? QueueStatus::Cancelled : w.status; e.error=w.error; } }
+        if(done) {if(w.thread.joinable())w.thread.join();if(!w.partialIdentity.isEmpty())e.partialIdentity=w.partialIdentity;
+            if(e.status==QueueStatus::Failed || e.status==QueueStatus::Cancelled)try{cleanup(e);if(e.status==QueueStatus::Cancelled)e.error="Cancelled. Incomplete data removed.";else e.error+=" Incomplete data removed.";}catch(const std::exception& error){e.error+=QString(" Cleanup: ")+QString::fromUtf8(error.what());}
+            e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();save(e);if(e.status==QueueStatus::Paused)try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());} i=workers_.erase(i); } else ++i;
     }
 }
 void QueueManager::schedule() {
@@ -284,7 +317,7 @@ void QueueManager::schedule() {
         if(host>=std::min(settings_.perHost,settings_.hostConnections)) continue;
         auto w=std::make_unique<Worker>(); auto* mailbox=w.get();
         if(e->existing==ExistingDownload::Resume){w->progress=e->progress;w->progress.stage=DownloadStage::Probe;w->progress.activeRanges=0;w->progress.smoothedBytesPerSecond=w->progress.instantaneousBytesPerSecond=0;}
-        DownloadOptions options; options.url=e->url.toStdString(); options.destination=path(e->destination); options.existing=e->existing; options.control=&mailbox->control;
+        DownloadOptions options;options.discardIncomplete=true; options.url=e->url.toStdString(); options.destination=path(e->destination); options.existing=e->existing; options.control=&mailbox->control;
         options.requiredEtag=e->requiredEtag.toStdString();options.requiredResolvedUrl=e->requiredResolvedUrl.toStdString();options.requiredTotal=e->requiredTotal;
         options.automaticConnections=settings_.automatic; options.maxConnections=static_cast<std::uint32_t>(std::min(settings_.connections,std::max(1,settings_.hostConnections/settings_.perHost)));
         if(!e->sha256.isEmpty()) options.expectedSha256=e->sha256.toStdString();
@@ -297,7 +330,7 @@ void QueueManager::schedule() {
             QueueStatus status=QueueStatus::Completed; QString error;
             try { const auto result=DownloadEngine().download(options,stop); std::lock_guard lock(mailbox->mutex); mailbox->progress.downloadedBytes=result.bytes; mailbox->progress.verifiedBytes=result.bytes; mailbox->progress.totalBytes=result.bytes; }
             catch(const DownloadError& e) { status=e.code()==DownloadErrorCode::Paused ? QueueStatus::Paused : e.code()==DownloadErrorCode::Cancelled ? QueueStatus::Cancelled : QueueStatus::Failed; error=QString::fromUtf8(e.what()); }
-            catch(...) { status=QueueStatus::Failed; error="The download worker failed. Your partial files have been preserved."; }
+            catch(...) { status=QueueStatus::Failed; error="The download worker failed. Incomplete data cleanup will be attempted."; }
             { std::lock_guard lock(mailbox->mutex); mailbox->status=status; mailbox->error=error; mailbox->done=true; }
         }); } catch(...) { workers_.erase(id); e->status=QueueStatus::Failed; e->error="Unable to create a download worker."; save(*e); }
     }
@@ -360,12 +393,12 @@ std::future<QJsonObject> QueueManager::browserUpdate(QString key,QString file,bo
             i->second->browserReceived=received;
             if(!sourceError.isEmpty()){{std::lock_guard lock(i->second->mutex);i->second->error="Transfer interrupted: "+sourceError;i->second->browserFailed=true;}}
             if(complete){i->second->browserSize=size;i->second->browserComplete=true;}
-        } else if(!sourceError.isEmpty() && e.status!=QueueStatus::Completed && e.status!=QueueStatus::Cancelled){e.status=QueueStatus::Failed;e.error="Transfer interrupted: "+sourceError;save(e);
+        } else if(!sourceError.isEmpty() && e.status!=QueueStatus::Completed && e.status!=QueueStatus::Cancelled){e.status=QueueStatus::Failed;e.error="Transfer interrupted: "+sourceError;try{cleanup(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());}save(e);
         } else if(e.status==QueueStatus::Queued && !e.browserFile.isEmpty() && static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))<static_cast<std::size_t>(settings_.simultaneous)) {
             auto worker=std::make_unique<Worker>();auto* w=worker.get();w->browser=true;w->browserComplete=complete;w->browserSize=size;w->browserReceived=received;w->progress=e.progress;w->progress.resumable=true;
-            const auto source=path(e.browserFile),target=path(e.destination);ordinaryParents(target);
+            const auto source=path(e.browserFile),target=path(e.destination);const auto ownedIdentity=e.partialIdentity;ordinaryParents(target);
             e.status=QueueStatus::Running;e.error.clear();save(e);workers_.emplace(id,std::move(worker));
-            try{w->thread=std::jthread([w,source,target](std::stop_token stop){
+            try{w->thread=std::jthread([w,source,target,ownedIdentity](std::stop_token stop){
                 struct Input {HANDLE handle=INVALID_HANDLE_VALUE;~Input(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}} input;
                 std::unique_ptr<FileWriter> output;
                 QueueStatus result=QueueStatus::Completed;QString error;
@@ -390,7 +423,9 @@ std::future<QJsonObject> QueueManager::browserUpdate(QString key,QString file,bo
                     }
                     BY_HANDLE_FILE_INFORMATION info{};
                     if(!GetFileInformationByHandle(input.handle,&info) || info.nNumberOfLinks!=1 || (info.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)))invalid("The browser source must be an ordinary file without links.");
-                    output=std::make_unique<FileWriter>(target,std::filesystem::exists(target.wstring()+L".part"));
+                    const bool reopening=std::filesystem::exists(target.wstring()+L".part");output=std::make_unique<FileWriter>(target,reopening);
+                    const auto identity=QString::fromStdString(output->identity());if(!reopening||identity==ownedIdentity)w->partialIdentity=identity;
+                    if(reopening&&!ownedIdentity.isEmpty()&&identity!=ownedIdentity)invalid("The browser partial was replaced. It was retained for review.");
                     auto copied=output->size();const auto recovered=copied;
                     QByteArray buffer(1024*1024,Qt::Uninitialized);QCryptographicHash received(QCryptographicHash::Sha256);
                     const auto sourceSize=[&]{LARGE_INTEGER bytes{};if(!GetFileSizeEx(input.handle,&bytes) || bytes.QuadPart<0)invalid("Cannot read the received file size.");return static_cast<std::uint64_t>(bytes.QuadPart);};
@@ -398,7 +433,7 @@ std::future<QJsonObject> QueueManager::browserUpdate(QString key,QString file,bo
                     // Reuse only a byte-for-byte matching prefix, including after app restart.
                     for(std::uint64_t offset=0;offset<copied;){interrupted();const auto n=read(static_cast<DWORD>(std::min<std::uint64_t>(buffer.size(),copied-offset)));if(!n)invalid("The browser source is shorter than the saved partial. Existing bytes are preserved.");received.addData(QByteArrayView(buffer.constData(),n));offset+=n;}
                     if(copied && QString::fromStdString(output->sha256())!=QString::fromLatin1(received.result().toHex()))invalid("The browser source changed. Existing partial bytes are preserved.");
-                    const auto started=std::chrono::steady_clock::now();auto checkpoint=copied;
+                    w->partialIdentity=identity;const auto started=std::chrono::steady_clock::now();auto checkpoint=copied;
                     for(;;){
                         interrupted();
                         if(w->browserPaused){output->flush();while(w->browserPaused){interrupted();std::this_thread::sleep_for(std::chrono::milliseconds(30));}}

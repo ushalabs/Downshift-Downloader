@@ -1,5 +1,13 @@
 # Downshift — complete new-chat handoff
 
+## Current local continuation: pre-T4 GUI/image repair (2026-10-15)
+
+The user's direct GUI/image and incomplete-data repair request is completed locally on T2/T3 commit `67c294a`; Git remains entirely manual. The white theme, global rounded dropdowns, spacing/selection/header fixes, simplified history question, real WebP/local-frame previews and close/collapse detail controls are implemented. Images finish unchanged in Pictures through the repaired handoff, with a new Save image to Downshift menu action. Reload the unpacked extension manually; Chrome's built-in Save image as chooser cannot universally be replaced.
+
+Release has passing coverage of all 25 groups across the full batch and repaired reruns; Debug passes 25/25 in one final batch. Both final isolated Chrome runs pass 26 checks and both actual HTTPS WebP previews pass. See the newest DEVELOPMENT_PROGRESS.md section and evidence/gui2-repair-*.json for actual scope, initial failures and limits. There is no fresh remote CI, packaging or release claim.
+
+The normal Release app is open with 11 records, one paused task and zero active work. Exact encrypted queue/preferences and paused-file/checkpoint evidence survived. Three authenticated failed orphan fragments were removed; both paused fragments and completed destinations were preserved. Preserve the live state, not historical six/seven/ten-record counts. Do not resume or delete the user's paused task for testing. Tests remain hidden/private, with the separate browser test host/pipe and no normal-profile automation. Do not stage, commit, push, branch, publish, delegate or start T4 without the user's new authorization. Stop for review and T4 approval.
+
 ## Current continuation update: Torrent T3 (2026-10-15)
 
 The latest user request authorizes T3 after T2 passes locally, reserves Git commits to the user and asks for build/test at the completed phase, then fixes for actual failures. T2's explicit native flush repair passes both local Release/Debug torrent groups. T3 Qt integration is completed and locally verified; the normal app exposes its Torrents sidebar. Release/Debug each pass all groups across full batches and corrected GUI fixture reruns; evidence qualifies the initial fixture failures. Preserve the current 0.4.4 browser/media repairs and user-selected history; no commit, push or release is authorized. Consult the newest DEVELOPMENT_PROGRESS.md section and evidence for actual final validation. Stop for T4 approval after verified T3. Older phase gates below are historical context.

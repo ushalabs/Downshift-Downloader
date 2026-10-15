@@ -28,7 +28,7 @@
 namespace {
 int checks=0;
 void check(bool value,const char* message) { if(!value)throw std::runtime_error(message);++checks; }
-template<class T> T* widget(QObject& parent,const char* name) { auto* result=parent.findChild<T*>(name); if(!result)throw std::runtime_error("Missing GUI control");return result; }
+template<class T> T* widget(QObject& parent,const char* name) { auto* result=parent.findChild<T*>(name); if(!result)throw std::runtime_error(std::string("Missing GUI control: ")+name);return result; }
 template<class F> void wait(F condition,int timeout=15000) {
     const auto end=std::chrono::steady_clock::now()+std::chrono::milliseconds(timeout);
     while(std::chrono::steady_clock::now()<end) {QApplication::processEvents();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);if(condition())return;QThread::msleep(5);}
@@ -46,12 +46,12 @@ int main(int argc,char** argv) {
         check(!QPixmap(":/branding/chevron.xpm").isNull(),"Quality selector arrow decodes with shipped Qt");
         {
             downshift::QueueManager queue(database);downshift::MainWindow window(queue);check(widget<QLabel>(window,"emptyState")->text().contains("Loading"),"Startup cannot falsely display empty history before loading");window.show();wait([&]{return window.ready();});check(!window.current().settings.dark,"Light must be default");
-            check(window.width()<=1000 && window.height()<=650,"Comfortable default window");check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact columns adapt");window.resize(1200,750);QApplication::processEvents();
+            check(window.width()<=1075 && window.height()<=730,"Comfortable default window");check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact columns adapt");window.resize(1200,750);QApplication::processEvents();
             // A small Windows/CI display can clamp the requested native window size.
             std::cout<<"Responsive initial native size: "<<window.width()<<'x'<<window.height()<<"; connection column hidden="<<window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)<<'\n';
-            wait([&]{return window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)==(window.width()<1100);},3000);
+            wait([&]{return window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)==(window.width()<1180);},3000);
             std::cout<<"Responsive native size: "<<window.width()<<'x'<<window.height()<<"; connection column hidden="<<window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)<<'\n';
-            check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)==(window.width()<1100),"Columns follow actual native window width");
+            check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6)==(window.width()<1180),"Columns follow actual native window width");
             QResizeEvent expanded(QSize(1200,750),window.size());QApplication::sendEvent(&window,&expanded);check(!window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Expanded resize policy shows connection details");
             QResizeEvent compact(QSize(860,570),QSize(1200,750));QApplication::sendEvent(&window,&compact);check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact resize policy hides connection details");window.resize(860,570);
             last=std::chrono::steady_clock::now();measuring=true;

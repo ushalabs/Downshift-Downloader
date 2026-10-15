@@ -1,6 +1,7 @@
 import {HandoffController,safeFilename} from "./handoff.js";
 import {MediaSources,publicUrl} from "./media.js";
 import {BrowserTransfers,NativeConnection} from './browser-transfer.js';
+import {saveImage} from './image-capture.js';
 const mediaSources = new MediaSources();
 const connection=new NativeConnection(()=>chrome.runtime.connectNative('org.ushalabs.downshift'));
 const sourceTags=new Map();
@@ -124,3 +125,14 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   task.then(value=>reply({ok:true,...value,captureProtocol:4})).catch(error=>reply({ok:false,captureProtocol:4,error:String(error?.message || "Downshift is unavailable. Open the app and try again.").slice(0,240)}));return true;
 });
 quiet(controller.reconcile());
+
+// Explicit image capture uses Chrome only as an authenticated response transport.
+// The app chooses the destination and verifies the exact received bytes.
+function installImageAction(){chrome.contextMenus.removeAll(()=>{void chrome.runtime.lastError;chrome.contextMenus.create({id:'downshift-save-image',title:'Save image to Downshift',contexts:['image']});});}
+chrome.runtime.onInstalled.addListener(installImageAction);
+chrome.runtime.onStartup.addListener(installImageAction);
+installImageAction();
+chrome.contextMenus.onClicked.addListener((info,tab)=>{
+  if(info.menuItemId!=='downshift-save-image'||tab?.incognito)return;
+  quiet(saveImage({captureEnabled:async()=>(await chrome.storage.local.get('handoffState')).handoffState?.enabled!==false,ensureApp,download:options=>chrome.downloads.download(options)},info,tab).catch(()=>controller.serial(async()=>{controller.state.notice='The image could not be sent. Check capture and retry from the image’s page.';await controller.save();})));
+});

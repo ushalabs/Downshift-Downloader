@@ -11,10 +11,13 @@ class QComboBox;
 class QPushButton;
 class QSystemTrayIcon;
 class QScrollArea;
+class QTabWidget;
+class QNetworkAccessManager;
+class QNetworkReply;
 namespace downshift {
 class MainWindow final:public QMainWindow {
 public:
-    explicit MainWindow(QueueManager& queue,QWidget* parent=nullptr);
+    explicit MainWindow(QueueManager& queue,QWidget* parent=nullptr,QNetworkAccessManager* previewNetwork=nullptr);
     bool ready() const { return ready_; }
     const QueueSnapshot& current() const { return current_; }
     void openAdd(QString address={},QString filename={});
@@ -29,6 +32,8 @@ public:
 private:
     void resizeEvent(QResizeEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
     template<class T,class F> void watch(std::future<T> future,F success) {
         auto pending=std::make_shared<std::future<T>>(std::move(future)); auto* timer=new QTimer(this); timer->setInterval(30);
         connect(timer,&QTimer::timeout,this,[this,timer,pending,success=std::move(success)]() mutable {
@@ -42,6 +47,8 @@ private:
     void theme(bool dark);
     void filter();
     void details();
+    void preview(const QueueEntry* entry);
+    void localVideoPreview(const QueueEntry& entry);
     void perform(QueueAction action);
     void more();
     void message(const QString& text,bool error=false);
@@ -49,6 +56,7 @@ private:
     const torrent::Snapshot* selectedTorrent() const;
     void torrentMenu();
     void renderTorrentRow(int row,const torrent::Snapshot& snapshot);
+    void watchTorrent(std::future<void> future);
     QueueManager& queue_;
     QueueSnapshot current_;
     std::optional<std::future<QueueSnapshot>> pending_;
@@ -64,10 +72,17 @@ private:
     std::vector<torrent::Snapshot> torrentRows_;
     std::optional<std::future<std::vector<torrent::Snapshot>>> torrentPending_;
     bool torrentClosing_=false,torrentClosed_=false;
+    bool torrentBusy_=false;
     QLabel *summary_=nullptr,*speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
     QLabel *totalMetric_=nullptr,*activeMetric_=nullptr,*dataMetric_=nullptr,*emptyHelp_=nullptr,*identity_=nullptr;
     QWidget *sidebar_=nullptr,*emptyPanel_=nullptr,*detailsContainer_=nullptr;
     QScrollArea* detailScroll_=nullptr;
+    QLabel *thumbnail_=nullptr,*videoInfo_=nullptr,*connectionInfo_=nullptr,*taskLog_=nullptr;
+    QPushButton *sourceLink_=nullptr,*detailFolder_=nullptr,*detailCopy_=nullptr,*detailAction_=nullptr;
+    QTabWidget* detailTabs_=nullptr;
+    QNetworkAccessManager* thumbnails_=nullptr;
+    QString previewKey_;
+    QNetworkReply* thumbnailReply_=nullptr;
     QPushButton *add_=nullptr,*video_=nullptr,*emptyAdd_=nullptr,*detailToggle_=nullptr,*retryHistory_=nullptr;
     std::vector<std::pair<QString,QLabel*>> detailLabels_;
     QPushButton *start_=nullptr,*pause_=nullptr,*cancel_=nullptr,*more_=nullptr;

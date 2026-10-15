@@ -42,24 +42,25 @@ export class BrowserTransfers {
       record.routed=await this.api.route(Number(id),`Downshift Transfers/${record.key}/payload${suffix}`);await controller.save();
       item=await this.api.item(Number(id));if(!item)return;
     }
-    if(record.routed && !String(item.filename || '').includes(record.key))return;
+    const routed= !record.routed || String(item.filename || '').includes(record.key) || item.state==='complete';
     const complete=item.state==='complete';
     const total=complete ? (item.fileSize>=0 ? item.fileSize:item.bytesReceived) : (item.totalBytes ?? -1);
     const sourceError=item.state==='interrupted' && (!item.canResume || (record.retries || 0)>=5) ? String(item.error || 'NETWORK_FAILED').replace(/[^A-Z_0-9]/g,'').slice(0,80):'';
-    const result=await controller.native('browser-update',{key:record.key,file:item.filename || '',complete,total:String(total),received:String(item.bytesReceived || 0),...(sourceError ? {sourceError}:{})});
+    const result=await controller.native('browser-update',{key:record.key,file:routed ? (item.filename || ''):'',complete:complete && routed,total:String(total),received:String(item.bytesReceived || 0),...(sourceError ? {sourceError}:{})});
     if(result.downloadStatus==='Completed'){
       // Native completion includes source/copy SHA-256, size, flush and atomic
       // rename. Only now remove this exact Chrome transport and its history.
       if(item.state!=='complete')throw Error('Waiting for the received file to finish.');
       await this.api.removeFile(Number(id));await this.api.erase(Number(id));await controller.finish(id,'Saved by Downshift.');return;
     }
-    if(['Cancelled','Removed'].includes(result.downloadStatus)){
-      if(item.state==='in_progress')await this.api.cancel(Number(id));
+    if(['Cancelled','Removed','Failed'].includes(result.downloadStatus)){
+      if(item.state==='in_progress' || item.state==='interrupted')try{await this.api.cancel(Number(id));}catch(error){if(item.state==='in_progress')throw error;}
+      // Incomplete Chrome transports are cancelled so Chrome removes its partial.
       // History removal/cancellation is not permission to delete the only full
       // received copy. Keep it when native completion has not been verified.
       await this.api.erase(Number(id));await controller.finish(id,'Download cancelled in Downshift.');return;
     }
-    if(result.downloadStatus==='Downloading'){
+    if(result.downloadStatus==='Downloading' || (result.downloadStatus==='Queued' && (!routed || !item.filename))){
       if(item.state==='in_progress' && item.paused)await this.api.resume(Number(id));
       else if(item.state==='interrupted' && item.canResume && (record.retries || 0)<5){record.retries=(record.retries || 0)+1;await controller.save();await this.api.resume(Number(id));}
     }else if(item.state==='in_progress' && !item.paused)await this.api.pause(Number(id));

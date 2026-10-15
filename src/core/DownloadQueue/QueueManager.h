@@ -30,6 +30,10 @@ struct QueueEntry {
     bool browserComplete = false;
     QString browserFile;
     QString mediaTitle, mediaFolder;
+    bool mediaStaged = false;
+    QString mediaIdentity;
+    QJsonObject videoMetadata;
+    QString partialIdentity;
     std::optional<std::uint64_t> requiredTotal;
     QueueStatus status = QueueStatus::Queued;
     int priority = 0;
@@ -57,9 +61,9 @@ public:
     std::future<void> retryLoading();
     QString databasePath() const {return database_;}
     std::future<QString> categoryFolder(QString filename,QString mime={});
-    std::future<QString> beginMedia(QString url, QString folder, QString title);
+    std::future<QString> beginMedia(QString url, QString folder, QString title, QJsonObject metadata = {});
     std::future<void> mediaProgress(QString id, DownloadProgress progress);
-    std::future<void> finishMedia(QString id, QueueStatus status, QString file, QString error);
+    std::future<QString> finishMedia(QString id, QueueStatus status, QString file, QString error, QJsonObject metadata = {});
     std::future<QJsonObject> prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime={},bool browserTransfer=false);
     std::future<QJsonObject> handoff(QString key,QString command,bool prompt=false);
     std::future<QJsonObject> browserUpdate(QString key,QString file,bool complete,qint64 size,qint64 received=0,QString sourceError={});
@@ -81,6 +85,7 @@ private:
     void schedule();
     QueueEntry& entry(const QString& id);
     void save(QueueEntry&);
+    void cleanup(QueueEntry&);
     QString database_;
     std::mutex mutex_;
     std::condition_variable condition_;

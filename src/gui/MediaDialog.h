@@ -32,6 +32,7 @@ private:
     QStringList baseArguments() const;
     QString url_,tools_,lastError_,folder_,historyId_,savedFile_;
     QueueSettings settings_;
+    QJsonObject metadataInfo_;
     QProcess process_;
     QTimer deadline_;
     QByteArray output_,errors_;

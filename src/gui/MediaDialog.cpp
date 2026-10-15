@@ -82,7 +82,7 @@ void MediaDialog::inspect(){
     // Full info JSON includes every segment URL, subtitles and thumbnails. A
     // normal long video can exceed megabytes even with few quality choices.
     // Request only the fields used by this form, keeping the bounded parser.
-    args << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live})j,\"formats\":%(formats.:.{height,vcodec,protocol,has_drm,url})j}" << "--skip-download" << "--" << url_;launch(args,true);
+    args << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live,thumbnail,webpage_url,duration,extractor_key})j,\"formats\":%(formats.:.{height,vcodec,protocol,has_drm,url})j}" << "--skip-download" << "--" << url_;launch(args,true);
 }
 void MediaDialog::launch(QStringList arguments,bool metadata) {
     output_.clear();errors_.clear();lastError_.clear();metadata_=metadata;cancelled_=false;download_->setEnabled(false);browse_->setEnabled(false);quality_->setEnabled(false);cancel_->setText("Cancel");progress_->setRange(0,0);
@@ -90,7 +90,7 @@ void MediaDialog::launch(QStringList arguments,bool metadata) {
 }
 void MediaDialog::readOutput() {
     output_.append(process_.readAllStandardOutput());
-    if(output_.size()>4*1024*1024){lastError_=metadata_ ? "The site's quality summary is unexpectedly large. No download was started.":"The video helper returned too much output. Saved files are preserved.";output_.clear();if(job_)TerminateJobObject(job_,1);else process_.kill();return;}
+    if(output_.size()>4*1024*1024){lastError_=metadata_ ? "The site's quality summary is unexpectedly large. No download was started.":"The video helper returned too much output. Incomplete data will be removed.";output_.clear();if(job_)TerminateJobObject(job_,1);else process_.kill();return;}
     if(metadata_ || verifying_)return;
     while(output_.contains('\n') || (process_.state()==QProcess::NotRunning && !output_.isEmpty())) {
         const auto index=output_.contains('\n') ? output_.indexOf('\n'):output_.size();const auto line=output_.left(index).trimmed();output_.remove(0,index+1);
@@ -105,6 +105,7 @@ void MediaDialog::readOutput() {
                 p.smoothedBytesPerSecond=std::clamp(value.value("speed").toDouble(),0.0,1e15);p.elapsedSeconds=std::chrono::duration<double>(now-started_).count();p.averageBytesPerSecond=p.elapsedSeconds>0 ? std::clamp(received/p.elapsedSeconds,0.0,1e15):0;
                 if(value.value("eta").isDouble())p.etaSeconds=std::max(0.0,value.value("eta").toDouble());queue_.mediaProgress(historyId_,p);lastProgress_=now;
             }
+        }else if(line.startsWith("DS_VIDEO ")) {const auto metadata=QJsonDocument::fromJson(line.mid(9)).object();for(auto it=metadata.begin();it!=metadata.end();++it)metadataInfo_[it.key()]=it.value();
         }else if(line.startsWith("DS_FILE ")) {
             const auto document=QJsonDocument::fromJson("["+line.mid(8)+"]");
             if(document.isArray() && document.array().size()==1 && document.array()[0].isString())savedFile_=document.array()[0].toString();
@@ -115,7 +116,7 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
     deadline_.stop();readOutput();errors_.append(process_.readAllStandardError());if(job_){CloseHandle(job_);job_=nullptr;}
     progress_->setRange(0,100);cancel_->setText("Close");
     if(cancelled_ || !lastError_.isEmpty() || code!=0 || exitStatus!=QProcess::NormalExit) {
-        settle(cancelled_ ? QueueStatus::Cancelled:QueueStatus::Failed,!lastError_.isEmpty() ? lastError_:cancelled_ ? "Stopped. Partial files are kept; retry to continue where the site permits.":"This video could not be downloaded or verified. "+redacted(QString::fromUtf8(errors_)));return;
+        settle(cancelled_ ? QueueStatus::Cancelled:QueueStatus::Failed,!lastError_.isEmpty() ? lastError_:cancelled_ ? "Stopped. Incomplete video files were removed; Retry starts a fresh download.":"This video could not be downloaded or verified. "+redacted(QString::fromUtf8(errors_)));return;
     }else if(verifying_) {
         const auto info=QJsonDocument::fromJson(output_).object();bool video=false;
         for(const auto& stream:info.value("streams").toArray())if(stream.toObject().value("codec_type")=="video")video=true;
@@ -129,7 +130,7 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
             retryable(info.value("_type")=="playlist" || info.contains("entries") ? "This address is a feed or playlist, not one video. Open the video and use its player button, or paste its watch link.":"No downloadable video formats were found. Try a public recorded video link.");
         }
         else {
-            title_->setText(info.value("title").toString(title_->text()).left(300));quality_->addItem("Best available",0);auto sorted=heights.values();std::sort(sorted.begin(),sorted.end(),std::greater<int>());for(int height:sorted)quality_->addItem(QString::number(height)+"p",height);
+            metadataInfo_=info;title_->setText(info.value("title").toString(title_->text()).left(300));quality_->addItem("Best available",0);auto sorted=heights.values();std::sort(sorted.begin(),sorted.end(),std::greater<int>());for(int height:sorted)quality_->addItem(QString::number(height)+"p",height);
             quality_->setEnabled(true);browse_->setEnabled(true);ready_=true;download_->setText("Download video");download_->setEnabled(true);status_->setText("Choose quality and press Download video. Separate streams are merged automatically.");
         }
     }else {verify();return;}
@@ -144,10 +145,10 @@ void MediaDialog::settle(QueueStatus result,QString error) {
     deadline_.stop();
     if(historyId_.isEmpty()){retryable(error);return;}
     persisting_=true;download_->setEnabled(false);cancel_->setEnabled(false);status_->setText(result==QueueStatus::Completed ? "Saving verified video history…":error);
-    auto pending=std::make_shared<std::future<void>>(queue_.finishMedia(historyId_,result,savedFile_,error));auto* timer=new QTimer(this);timer->setInterval(30);
+    auto pending=std::make_shared<std::future<QString>>(queue_.finishMedia(historyId_,result,savedFile_,error,metadataInfo_));auto* timer=new QTimer(this);timer->setInterval(30);
     connect(timer,&QTimer::timeout,this,[this,timer,pending,result,error]{
         if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();
-        try {pending->get();historyId_.clear();persisting_=false;verifying_=false;
+        try {const auto final=pending->get();if(result==QueueStatus::Completed)savedFile_=final;historyId_.clear();persisting_=false;verifying_=false;
             if(result==QueueStatus::Completed){progress_->setRange(0,100);progress_->setValue(100);rate_->setText("Complete");status_->setText("Saved: "+savedFile_);destination_->setText(savedFile_);openFolder_->show();cancel_->setEnabled(true);cancel_->setText("Close");if(closeAfter_)close();}
             else retryable(error);
         }catch(const std::exception& e){
@@ -173,18 +174,19 @@ void MediaDialog::download() {
     // 403. Prefer its available HLS formats, then checked direct alternatives.
     const auto format=youtubeHost(QUrl(url_).host()) ? "bv*"+cap+"[protocol^=m3u8]+ba[protocol^=m3u8]/b"+cap+"[protocol^=m3u8]/"+regular:regular;
     if(youtubeHost(QUrl(url_).host()))args << "--check-formats";
-    args << "--format" << format << "--abort-on-unavailable-fragments" << "--merge-output-format" << "mkv" << "--no-overwrites" << "--continue" << "--windows-filenames" << "--trim-filenames" << "150" << "--paths" << folder_ << "--output" << "%(title).120B [%(id).40B]%(height& [{}p]|)s.%(ext)s" << "--newline" << "--progress" << "--progress-template" << "download:DS_PROGRESS %(progress)j" << "--print" << "after_move:DS_FILE %(filepath)j" << "--no-simulate" << "--concurrent-fragments" << QString::number(settings_.automatic ? 4:std::min(settings_.connections,8));
+    args << "--format" << format << "--abort-on-unavailable-fragments" << "--merge-output-format" << "mkv" << "--no-overwrites" << "--continue" << "--windows-filenames" << "--trim-filenames" << "150" << "--paths" << folder_ << "--output" << "%(title).120B [%(id).40B]%(height& [{}p]|)s.%(ext)s" << "--newline" << "--progress" << "--progress-template" << "download:DS_PROGRESS %(progress)j" << "--print" << "after_move:DS_VIDEO %(.{title,thumbnail,webpage_url,duration,height,ext})j" << "--print" << "after_move:DS_FILE %(filepath)j" << "--no-simulate" << "--concurrent-fragments" << QString::number(settings_.automatic ? 4:std::min(settings_.connections,8));
     if(settings_.speedLimit)args << "--limit-rate" << QString::number(settings_.speedLimit);
     args << "--" << url_;status_->setText("Saving video to download history…");persisting_=true;download_->setEnabled(false);cancel_->setEnabled(false);browse_->setEnabled(false);quality_->setEnabled(false);savedFile_.clear();openFolder_->hide();destination_->setText(folder_);
-    auto pending=std::make_shared<std::future<QString>>(queue_.beginMedia(url_,folder_,title_->text()));auto* timer=new QTimer(this);timer->setInterval(30);
-    connect(timer,&QTimer::timeout,this,[this,timer,pending,args]{if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();persisting_=false;cancel_->setEnabled(true);
-        try{historyId_=pending->get();started_=std::chrono::steady_clock::now();lastProgress_=started_-std::chrono::seconds(1);status_->setText("Starting video download…");verifying_=false;launch(args,false);}catch(const std::exception& e){retryable(QString::fromUtf8(e.what()));}
+    metadataInfo_["height"]=height;metadataInfo_["originalPage"]=url_;
+    auto pending=std::make_shared<std::future<QString>>(queue_.beginMedia(url_,folder_,title_->text(),metadataInfo_));auto* timer=new QTimer(this);timer->setInterval(30);
+    connect(timer,&QTimer::timeout,this,[this,timer,pending,args]() mutable {if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();persisting_=false;cancel_->setEnabled(true);
+        try{historyId_=pending->get();const auto index=args.indexOf("--paths");if(index>=0)args[index+1]=QDir(folder_).filePath(".downshift-video-"+historyId_);started_=std::chrono::steady_clock::now();lastProgress_=started_-std::chrono::seconds(1);status_->setText("Starting video download…");verifying_=false;launch(args,false);}catch(const std::exception& e){retryable(QString::fromUtf8(e.what()));}
     });timer->start();
 }
 void MediaDialog::cancel(){cancelled_=true;status_->setText("Stopping…");if(job_)TerminateJobObject(job_,1);else process_.kill();}
 void MediaDialog::closeEvent(QCloseEvent* event) {
     if(persisting_){event->ignore();return;}
-    if(process_.state()!=QProcess::NotRunning){event->ignore();if(QMessageBox::question(this,"Stop video download?","Stop this video task and close its window? Partial files will be kept.")==QMessageBox::Yes){closeAfter_=true;cancel();}return;}
+    if(process_.state()!=QProcess::NotRunning){event->ignore();if(QMessageBox::question(this,"Stop video download?","Stop this video task and close its window? Incomplete video files will be removed.")==QMessageBox::Yes){closeAfter_=true;cancel();}return;}
     QDialog::closeEvent(event);
 }
 }

@@ -28,6 +28,10 @@ def main():
         # Use an explicit working directory rather than Windows backslashes in that name.
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-filter_complex','[0:v]split=2[full][small];[small]scale=160:120[scaled]','-map','[full]','-map','[scaled]','-map','0:a','-c:v','mpeg4','-c:a','copy','-f','dash','-remove_at_exit','0','stream.mpd'],cwd=source,check=True,timeout=30,capture_output=True)
         assert (source/'init-stream0.m4s').exists() and (source/'init-stream1.m4s').exists(),'DASH fixture initialization files missing'
+        # A long manifest expands to megabytes of extractor fragment metadata,
+        # even though quality selection needs only a few format fields.
+        segments=''.join(f'<SegmentURL media="chunk-{number:06d}.m4s"/>' for number in range(60000))
+        (source/'large.mpd').write_text('<?xml version="1.0"?><MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT120000S" minBufferTime="PT1S"><Period duration="PT120000S"><AdaptationSet mimeType="video/mp4" contentType="video"><Representation id="large" bandwidth="100000" width="320" height="240" codecs="mp4v.20.9"><SegmentList timescale="1" duration="2"><Initialization sourceURL="init-stream0.m4s"/>'+segments+'</SegmentList></Representation></AdaptationSet></Period></MPD>',encoding='utf-8')
         class Handler(http.server.SimpleHTTPRequestHandler):
             def log_message(self,*args):pass
             def send_error(self,code,message=None,explain=None):
@@ -37,6 +41,9 @@ def main():
         threading.Thread(target=server.serve_forever,daemon=True).start()
         try:
             environment={**os.environ,'NO_PROXY':'localhost,127.0.0.1','no_proxy':'localhost,127.0.0.1'}
+            raw=subprocess.run([str(tools/'yt-dlp.exe'),'--ignore-config','--no-plugin-dirs','--no-playlist','--skip-download','--dump-single-json',f'http://127.0.0.1:{server.server_port}/large.mpd'],capture_output=True,timeout=30,env=environment)
+            assert raw.returncode==0 and len(raw.stdout)>4*1024*1024,'Long-video fixture must reproduce the old metadata limit'
+            print('Long-video raw metadata bytes:',len(raw.stdout),'(exceeds the old 4 MiB guard)')
             completed=subprocess.run([str(exe),str(destination),f'http://127.0.0.1:{server.server_port}',sys.argv[2]],capture_output=True,text=True,encoding='utf-8',timeout=180,env=environment)
             print(completed.stdout,end='');assert completed.returncode==0,completed.stderr
             files=[file for file in (destination/'Videos').iterdir() if file.suffix in ('.mp4','.mkv') and not file.name.startswith('broken')];assert len(files)==2,files

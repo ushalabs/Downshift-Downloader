@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-15",
+  "phase": "Torrent T3 native Qt interface",
+  "status": "Local verified; no new Git commit/push; stop for T4 approval",
+  "environment": "Windows x64, MSVC v143, C++20, Qt 6 Widgets, pinned native Rasterbar 2.1.2.0 ABI 100",
+  "version": "0.4.4 (existing browser/media version retained)",
+  "releaseFullBeforeFixtureRepair": {
+    "tests": 21,
+    "failures": 1,
+    "skipped": 0,
+    "seconds": 404.808,
+    "groups": [
+      {
+        "name": "torrent.gui",
+        "seconds": 14.3756,
+        "passed": false
+      },
+      {
+        "name": "torrent.management",
+        "seconds": 122.728,
+        "passed": true,
+        "assertions": 315
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 17.9926,
+        "passed": true,
+        "assertions": 142
+      },
+      {
+        "name": "browser.extension",
+        "seconds": 0.152314,
+        "passed": true
+      },
+      {
+        "name": "browser.bridge",
+        "seconds": 0.116967,
+        "passed": true
+      },
+      {
+        "name": "browser.media",
+        "seconds": 0.138066,
+        "passed": true
+      },
+      {
+        "name": "engine.transport",
+        "seconds": 25.1578,
+        "passed": true
+      },
+      {
+        "name": "browser.native",
+        "seconds": 8.18582,
+        "passed": true
+      },
+      {
+        "name": "browser.transfer",
+        "seconds": 5.4795,
+        "passed": true
+      },
+      {
+        "name": "gui.media",
+        "seconds": 100.318,
+        "passed": true
+      },
+      {
+        "name": "gui.integration",
+        "seconds": 16.2928,
+        "passed": true
+      },
+      {
+        "name": "queue.location",
+        "seconds": 0.434299,
+        "passed": true
+      },
+      {
+        "name": "queue.integration",
+        "seconds": 21.8531,
+        "passed": true
+      },
+      {
+        "name": "engine.unit",
+        "seconds": 0.653894,
+        "passed": true
+      },
+      {
+        "name": "engine.integration",
+        "seconds": 12.9185,
+        "passed": true
+      },
+      {
+        "name": "engine.adaptive",
+        "seconds": 20.8093,
+        "passed": true
+      },
+      {
+        "name": "engine.buffered",
+        "seconds": 4.98592,
+        "passed": true
+      },
+      {
+        "name": "engine.recovery",
+        "seconds": 29.2413,
+        "passed": true
+      },
+      {
+        "name": "foundation.dependencies",
+        "seconds": 0.149291,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.minimal",
+        "seconds": 1.34743,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.windows",
+        "seconds": 1.47731,
+        "passed": true
+      }
+    ]
+  },
+  "finalReleaseAffectedGui": {
+    "tests": 1,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 17.525,
+    "groups": [
+      {
+        "name": "torrent.gui",
+        "seconds": 17.5247,
+        "passed": true,
+        "assertions": 67,
+        "maximumHeartbeatGapSeconds": 0.0220142,
+        "heartbeatTicks": 678,
+        "unscopedDiagnostic": {
+          "seconds": 0.217591,
+          "stage": "initial window construction"
+        }
+      }
+    ]
+  },
+  "debugFullBeforeHeartbeatFixtureRepair": {
+    "tests": 21,
+    "failures": 1,
+    "skipped": 0,
+    "seconds": 471.001,
+    "groups": [
+      {
+        "name": "torrent.gui",
+        "seconds": 24.5244,
+        "passed": false
+      },
+      {
+        "name": "torrent.management",
+        "seconds": 128.232,
+        "passed": true,
+        "assertions": 315
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 21.9766,
+        "passed": true,
+        "assertions": 142
+      },
+      {
+        "name": "browser.extension",
+        "seconds": 0.19421,
+        "passed": true
+      },
+      {
+        "name": "browser.bridge",
+        "seconds": 0.131797,
+        "passed": true
+      },
+      {
+        "name": "browser.media",
+        "seconds": 0.141336,
+        "passed": true
+      },
+      {
+        "name": "engine.transport",
+        "seconds": 24.8775,
+        "passed": true
+      },
+      {
+        "name": "browser.native",
+        "seconds": 10.8815,
+        "passed": true
+      },
+      {
+        "name": "browser.transfer",
+        "seconds": 9.42089,
+        "passed": true
+      },
+      {
+        "name": "gui.media",
+        "seconds": 100.12,
+        "passed": true
+      },
+      {
+        "name": "gui.integration",
+        "seconds": 57.8938,
+        "passed": true
+      },
+      {
+        "name": "queue.location",
+        "seconds": 0.233186,
+        "passed": true
+      },
+      {
+        "name": "queue.integration",
+        "seconds": 21.7795,
+        "passed": true
+      },
+      {
+        "name": "engine.unit",
+        "seconds": 0.592422,
+        "passed": true
+      },
+      {
+        "name": "engine.integration",
+        "seconds": 12.1709,
+        "passed": true
+      },
+      {
+        "name": "engine.adaptive",
+        "seconds": 20.3764,
+        "passed": true
+      },
+      {
+        "name": "engine.buffered",
+        "seconds": 4.55314,
+        "passed": true
+      },
+      {
+        "name": "engine.recovery",
+        "seconds": 28.2399,
+        "passed": true
+      },
+      {
+        "name": "foundation.dependencies",
+        "seconds": 0.106659,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.minimal",
+        "seconds": 2.25368,
+        "passed": true
+      },
+      {
+        "name": "foundation.gui.windows",
+        "seconds": 2.30136,
+        "passed": true
+      }
+    ]
+  },
+  "finalDebugAffectedGui": {
+    "tests": 1,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 30.21,
+    "groups": [
+      {
+        "name": "torrent.gui",
+        "seconds": 30.2096,
+        "passed": true,
+        "assertions": 67,
+        "maximumHeartbeatGapSeconds": 0.117224,
+        "heartbeatTicks": 476,
+        "unscopedDiagnostic": {
+          "seconds": 4.2905,
+          "stage": "restored window construction"
+        }
+      }
+    ]
+  },
+  "qualification": "The full Release batch passed the other 20 groups. Its GUI fixture could issue a manual peer command before async Add completed; the fixture now waits for the UI metadata stage. Only that affected Release group was rerun. The full Debug batch also passed its other 20 groups. Its GUI flow reached an overly broad heartbeat assertion that included restored-window construction. The final assertion uses the existing project methodology: responsiveness during actual native transfers, with the same one-second limit. Fixture setup precedes measurement and native helper futures process Qt events. The unscoped maximum and its stage are retained separately; no global one-second startup claim is made. Both final affected GUI reruns pass on the frozen source. No fresh Windows CI, package, public swarm or release publication is claimed.",
+  "capabilities": [
+    "Torrents sidebar and typed shared history without HTTP database migration",
+    "File/magnet metadata preview holds payload until explicit file confirmation",
+    "Add paused or explicit Start; native Pause/Resume/Cancel",
+    "Overview/Files/Trackers/Peers/Settings; live selected verification/upload/seeds/peers/ratio",
+    "Per-task/global torrent bandwidth and peer limits plus stop/ratio/time/manual seeding",
+    "Asynchronous removal confirmation defaults to Cancel; keep files or explicit delete payload",
+    "Companion encrypted store; paused restart with rehash; async window close"
+  ],
+  "controlledGuiAcceptance": "Generated hybrid file and magnet, private HTTP queue and torrent store, native loopback seeder, independent final selected-file SHA-256, repeated real confirmations including Cancel/keep/delete, metadata waiting/cancellation, selected-file update, limits, paused restart and Qt heartbeat during actual native transfers.",
+  "developmentFailuresRetained": [
+    {
+      "stage": "Screenshot export",
+      "failure": "Qt image writer did not support PNG. Fixture uses the existing built-in BMP path."
+    },
+    {
+      "stage": "Repeated hidden modal confirmations",
+      "failure": "Show-event hiding reentered native Qt modal registration; subsequent window creation dereferenced a stale entry. The torrent fixture now sets hidden state at Polish, before Show. Production menus/confirmations also use asynchronous ownership."
+    },
+    {
+      "stage": "Debug GUI heartbeat measurement",
+      "failure": "Measurement initially covered the entire test, including a slow Debug restored-window constructor. The final diagnostic identifies that stage separately; live-transfer responsiveness uses the existing one-second GUI acceptance limit. Fixture generation precedes measurement and helper futures process Qt events."
+    },
+    {
+      "stage": "Full Release GUI magnet setup",
+      "failure": "Manual peer connection could run while async Add was pending. The fixture now waits for its UI metadata stage."
+    }
+  ],
+  "normalUserStore": {
+    "counts": {
+      "downloads": 10,
+      "settings": 1,
+      "handoffs": 46
+    },
+    "pausedTasks": 1,
+    "activeTasksAtRebuild": 0,
+    "encryptedDownloadsSettingsReceiptsUnchangedAcrossRebuild": true,
+    "quickCheck": "ok",
+    "normalProcessMatchesBoundPhysicalIdentity": true,
+    "normalAppReopened": true,
+    "normalTorrentCompanionInitialized": true
+  },
+  "protectedSource": {
+    "files": 47,
+    "allMatchBeforeT3": true,
+    "scope": "src/core, src/database, src/browser and extension; existing local 0.4.4 repairs preserved"
+  },
+  "sourceSha256": {
+    "CMakeLists.txt": "03bc260addbb66d8b8260caa757d0affe60ca75888e330443732c8dfe4830a49",
+    "src/main.cpp": "3e0499f31c1a50393927e6fe81372d1f219091cbd75540c31d3e683cd015de08",
+    "src/gui/MainWindow.cpp": "e166feee31a52068e8f18e5c6a5afc8b064eb5005a697c10815117448847288c",
+    "src/gui/MainWindow.h": "41835db3e3398bb252e9fc19d1f336b2c627ac9805a17a6ad2f231047296ca30",
+    "src/gui/MainWindowTorrents.cpp": "e2d759c905a0cd90fefb80868a421570c77ff328f310a6a0f8a22336b6ac0510",
+    "src/gui/TorrentDialogs.cpp": "5b15d3b7042c3dfe82aa73f776ca9e9b29f45950bdb740ce6ca980d91ab02bb7",
+    "src/gui/TorrentDialogs.h": "10c01abe728683a4b9fc636c1c0904c2297b74fa0266af9898266c077b122ab8",
+    "src/gui/Dialogs.cpp": "a5e4a1cbdbc28774814e70535babd814b2ed995f70792b535d226dbafca7f133",
+    "src/gui/Design.cpp": "96972663119256fe59d5a00c5fc83b5df64994494d2cc44c27c273909e9aef03",
+    "src/torrent/TorrentEngine.cpp": "07db16aa23718dc7f92a7f75d095bb1dc52495b3bd40c7114d12e7be0ef15679",
+    "src/torrent/TorrentEngine.h": "9701267474a1366b581b3dc06fbe33a8149e6acbed2ab822ec1690bc8648f7f6",
+    "src/torrent/TorrentStore.cpp": "98f0b22e0cf76f4f64495d9290bf2e969d2c6401b2a320a35341883834e90c14",
+    "src/torrent/TorrentStore.h": "f0dfecb5762a5d1fa2501598155fc38f92cb1c1cf30c6eb76aac406d626b3c87",
+    "tests/TorrentGuiTests.cpp": "d17cef808135182b5da4e2aeb5400a581925a046c1dee35d81b4f6dbb07ee0e4",
+    "tests/TestCrash.h": "cd13c2a4cab7eee2db99d5c5df3009c7227cd2d1872c1ebc1123bfc6da8cd34b",
+    "tests/TorrentTests.cpp": "0e8a3bf1db6df7661ef9e5a4522c614052678ceaa61544a23a510789e11ecbbf",
+    "tests/TorrentManagementTests.cpp": "8da5aad1921a78d929b083820581003894ecabfeda1db068fad814c9164d99fa"
+  },
+  "git": "User reserves all new commits. Existing main/failed T2 CI history predates this instruction; local T3 has no new commit/push.",
+  "notPerformed": [
+    "T4 full multi-peer/load/disk-full/public-swarm acceptance",
+    "Associations or magnet protocol registration",
+    "Browser magnet takeover",
+    "Portable torrent runtime/source/license packaging audit",
+    "New release publication",
+    "Fresh Windows CI or clean VM"
+  ]
+}

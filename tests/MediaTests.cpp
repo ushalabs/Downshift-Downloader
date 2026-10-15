@@ -50,6 +50,11 @@ int main(int argc,char** argv) {
             dialog->close();wait([&]{return window.findChild<QDialog*>("mediaDialog")==nullptr;});
         }
         check(beats>10,"GUI heartbeat runs during media work");
+        // Long recordings must not fail quality lookup because of unused
+        // fragment metadata. Repeat in the same dialog to exercise retry state.
+        window.openVideo(base+"/large.mpd","Large metadata");auto* large=window.findChild<QDialog*>("mediaDialog");auto* largeSubmit=large->findChild<QPushButton*>("mediaDownload");
+        for(int attempt=0;attempt<2;++attempt){wait([&]{return largeSubmit->isEnabled();});check(largeSubmit->text()=="Download video",large->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());check(large->findChild<QComboBox*>("mediaQuality")->findData(240)>=0,"Long-video quality remains selectable");if(attempt==0)dynamic_cast<downshift::MediaDialog*>(large)->inspect();}
+        check(queue.snapshot().get().entries.size()==3,"Quality inspection never creates a download history row");large->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         // Failed site resolution gives a retry, without claiming a successful download.
         window.openVideo(base+"/collection.html","Collection");auto* collection=window.findChild<QDialog*>("mediaDialog");wait([&]{return collection->findChild<QPushButton*>("mediaDownload")->isEnabled();});
         check(collection->findChild<QPushButton*>("mediaDownload")->text()=="Retry check","A playlist cannot masquerade as a best-quality video");

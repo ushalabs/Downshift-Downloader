@@ -33,6 +33,16 @@ QString origin(const QString& text) {
     return url.scheme() + "://" + url.host().toLower() + ":" + QString::number(url.port(url.scheme() == "https" ? 443 : 80));
 }
 QString destination(const QString& text) { return QString::fromStdWString(FileWriter::validatedDestination(path(text)).wstring()); }
+QString browserOrigin(const QString& text) {
+    if(text.isEmpty() || text.size()>32768 || text.contains(QChar(0)) || QUrl(text).scheme().isEmpty())invalid("Invalid browser source.");
+    return "browser:"+QUrl(text).scheme();
+}
+void ordinaryParents(const std::filesystem::path& file) {
+    for(auto p=file.parent_path();!p.empty() && p!=p.root_path();p=p.parent_path()) {
+        const auto attributes=GetFileAttributesW(p.c_str());
+        if(attributes!=INVALID_FILE_ATTRIBUTES && (attributes&FILE_ATTRIBUTE_REPARSE_POINT))invalid("Choose a folder without directory links for this browser transfer.");
+    }
+}
 }
 QString statusText(QueueStatus s) {
     switch (s) { case QueueStatus::Queued: return "Queued"; case QueueStatus::Running: return "Downloading";
@@ -49,12 +59,13 @@ QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
     return s;
 }
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
-    {"media",media},{"mediaTitle",mediaTitle},{"mediaFolder",mediaFolder},
+    {"media",media},{"mediaTitle",mediaTitle},{"mediaFolder",mediaFolder},{"browserTransfer",browserTransfer},{"browserComplete",browserComplete},{"browserFile",browserFile},
     {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"},
     {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)},
     {"handoffKey",handoffKey},{"requiredEtag",requiredEtag},{"requiredResolvedUrl",requiredResolvedUrl},{"requiredTotal",requiredTotal ? QString::number(*requiredTotal):QString()}}; }
 QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
-    QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString(); e.origin=downshift::origin(e.url);
+    QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString();e.browserTransfer=o.value("browserTransfer").toBool();e.browserComplete=o.value("browserComplete").toBool();e.browserFile=o.value("browserFile").toString();e.origin=e.browserTransfer ? browserOrigin(e.url):downshift::origin(e.url);
+    if(e.browserTransfer && (o.value("media").toBool() || (!e.browserFile.isEmpty() && (!QFileInfo(e.browserFile).isAbsolute() || e.browserFile.size()>32768 || e.browserFile.contains(QChar(0))))))invalid("Damaged browser transfer record.");
     e.media=o.value("media").toBool();e.mediaTitle=o.value("mediaTitle").toString();e.mediaFolder=o.value("mediaFolder").toString();
     e.error=o.value("error").toString(); e.sha256=o.value("sha256").toString(); e.status=static_cast<QueueStatus>(o.value("status").toInt(-1)); e.priority=o.value("priority").toInt();
     e.created=o.value("created").toString().toLongLong(); e.updated=o.value("updated").toString().toLongLong(); e.existing=static_cast<ExistingDownload>(o.value("existing").toInt(-1)); e.speedLimit=o.value("speedLimit").toString().toULongLong();
@@ -89,6 +100,11 @@ struct QueueManager::Worker {
     bool done=false, cancel=false;
     QueueStatus status=QueueStatus::Running;
     QString error;
+    bool browser=false;
+    std::atomic_bool browserPaused=false, browserComplete=false;
+    std::atomic<qint64> browserSize=-1;
+    std::atomic<qint64> browserReceived=0;
+    std::atomic_bool browserFailed=false;
     std::jthread thread; // Declared last: joins before control and mailbox destruction.
 };
 QueueManager::QueueManager(QString database):database_(QFileInfo(database).absoluteFilePath()),budget_(std::make_shared<RateBudget>()),service_([this]{run();}) {}
@@ -113,7 +129,7 @@ void QueueManager::initialize() {
         store_=std::move(candidate);settings_=std::move(settings);receipts_=std::move(receipts);entries_=std::move(entries);budget_->configure(settings_.speedLimit);
         try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());}
         for(auto& e:entries_){
-            if(!e.media && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
+            if(!e.media && !e.browserTransfer && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
             if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to continue in a video window.";save(e);}
             else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
             e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();
@@ -164,12 +180,18 @@ std::future<QString> QueueManager::add(QString url,QString dest,int priority,boo
 }
 std::future<void> QueueManager::action(QString id,QueueAction action) { return submit([this,id=std::move(id),action] {
     auto& e=entry(id); const auto worker=workers_.find(id);
-    if(!e.media && !youtubeVideo(e.url).isEmpty() && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("Use Retry video to download the streams, rather than the YouTube webpage.");
+    if(e.browserTransfer && e.status==QueueStatus::Cancelled && !e.browserComplete && (action==QueueAction::Start || action==QueueAction::Restart))invalid("This response was cancelled before it finished. Start the download again from its original page.");
+    if(!e.media && !e.browserTransfer && !youtubeVideo(e.url).isEmpty() && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("Use Retry video to download the streams, rather than the YouTube webpage.");
     if(e.media && (action!=QueueAction::Remove || e.status==QueueStatus::Running)) invalid("Use the video window to stop this task, or Retry video to retry it.");
     if(e.status==QueueStatus::Prepared) invalid("Chrome still owns this handoff. Leave it in Chrome or cancel the pending handoff.");
     if(!e.handoffKey.isEmpty() && receipts_.at(e.handoffKey).value("state")=="aborted" && (action==QueueAction::Start || action==QueueAction::Restart)) invalid("This browser handoff was aborted. Add a fresh download link instead.");
     if(action==QueueAction::HighPriority || action==QueueAction::NormalPriority || action==QueueAction::LowPriority) { e.priority=action==QueueAction::HighPriority ? 1 : action==QueueAction::LowPriority ? -1 : 0; save(e); return; }
     if(worker!=workers_.end()) {
+        if(e.browserTransfer){
+            if(action==QueueAction::Pause || action==QueueAction::Start){worker->second->browserPaused=action==QueueAction::Pause;e.status=action==QueueAction::Pause ? QueueStatus::Paused:QueueStatus::Running;e.error.clear();save(e);return;}
+            if(action==QueueAction::Cancel){worker->second->cancel=true;worker->second->thread.request_stop();return;}
+            invalid("Pause or cancel this browser transfer before changing it.");
+        }
         if(action==QueueAction::Pause) worker->second->control.requestPause();
         else if(action==QueueAction::Cancel) { worker->second->cancel=true; worker->second->thread.request_stop(); }
         else if(action!=QueueAction::Start) invalid("Pause the download before changing or removing it.");
@@ -183,12 +205,12 @@ std::future<void> QueueManager::action(QString id,QueueAction action) { return s
     }
     if(action==QueueAction::Pause) e.status=QueueStatus::Paused;
     else if(action==QueueAction::Cancel) e.status=QueueStatus::Cancelled;
-    else { e.existing=action==QueueAction::Restart ? ExistingDownload::Restart : QFileInfo::exists(e.destination+".part.resume") ? ExistingDownload::Resume : ExistingDownload::New; e.status=QueueStatus::Queued; e.error.clear(); }
+    else {if(e.browserTransfer && action==QueueAction::Restart){ResumeJournal journal(path(e.destination));journal.archivePrevious();e.progress={};} e.existing=action==QueueAction::Restart ? ExistingDownload::Restart : QFileInfo::exists(e.destination+".part.resume") ? ExistingDownload::Resume : ExistingDownload::New; e.status=QueueStatus::Queued; e.error.clear(); }
     save(e);
 }); }
 std::future<void> QueueManager::rename(QString id,QString dest) { return submit([this,id=std::move(id),dest=std::move(dest)] {
     auto& e=entry(id); if(e.media || workers_.contains(id) || e.status==QueueStatus::Completed || QFileInfo::exists(e.destination+".part")) invalid("Only an unstarted file download can be renamed.");
-    const auto d=destination(dest); for(const auto& old:entries_) if(old.id!=id && old.destination.compare(d,Qt::CaseInsensitive)==0) invalid("Another download owns that destination.");
+    const auto d=destination(dest);if(e.browserTransfer && !e.browserFile.isEmpty() && d.compare(e.browserFile,Qt::CaseInsensitive)==0)invalid("Choose a destination separate from the incoming browser file."); for(const auto& old:entries_) if(old.id!=id && old.destination.compare(d,Qt::CaseInsensitive)==0) invalid("Another download owns that destination.");
     if(QFileInfo::exists(d) || QFileInfo::exists(d+".part") || QFileInfo::exists(d+".part.resume")) invalid("The destination already exists.");
     e.destination=d; save(e);
 }); }
@@ -249,11 +271,15 @@ void QueueManager::tick() {
     }
 }
 void QueueManager::schedule() {
-    std::vector<QueueEntry*> pending; for(auto& e:entries_) if(!e.media && e.status==QueueStatus::Queued) pending.push_back(&e);
+    // A fully received response is local and can finish after restart even if
+    // its browser tab/worker is no longer available.
+    for(const auto& e:entries_)if(e.browserTransfer && e.browserComplete && e.status==QueueStatus::Queued && !e.browserFile.isEmpty() && e.requiredTotal)
+        (void)browserUpdate(e.handoffKey,e.browserFile,true,static_cast<qint64>(*e.requiredTotal),static_cast<qint64>(*e.requiredTotal));
+    std::vector<QueueEntry*> pending; for(auto& e:entries_) if(!e.media && !e.browserTransfer && e.status==QueueStatus::Queued) pending.push_back(&e);
     std::stable_sort(pending.begin(),pending.end(),[](auto* a,auto* b){return a->priority>b->priority;});
     for(auto* e:pending) {
         if(!youtubeVideo(e->url).isEmpty()){e->status=QueueStatus::Failed;e->error="This is a YouTube webpage. Choose Retry video to download its streams.";save(*e);continue;}
-        if(workers_.size()>=static_cast<std::size_t>(settings_.simultaneous)) break;
+        if(static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))>=static_cast<std::size_t>(settings_.simultaneous)) break;
         int host=0; for(const auto& [id,w]:workers_) if(entry(id).origin==e->origin) ++host;
         if(host>=std::min(settings_.perHost,settings_.hostConnections)) continue;
         auto w=std::make_unique<Worker>(); auto* mailbox=w.get();
@@ -276,15 +302,15 @@ void QueueManager::schedule() {
         }); } catch(...) { workers_.erase(id); e->status=QueueStatus::Failed; e->error="Unable to create a download worker."; save(*e); }
     }
 }
-std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime) {
-    return submit([this,key=std::move(key),url=std::move(url),filename=std::move(filename),inspection=std::move(inspection),mime=std::move(mime)] {
-        if(youtubeHost(QUrl(url).host()))invalid("Use Download video for YouTube rather than saving its watch page.");
+std::future<QJsonObject> QueueManager::prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime,bool browserTransfer) {
+    return submit([this,key=std::move(key),url=std::move(url),filename=std::move(filename),inspection=std::move(inspection),mime=std::move(mime),browserTransfer] {
+        if(!browserTransfer && youtubeHost(QUrl(url).host()))invalid("Use Download video for YouTube rather than saving its watch page.");
         const auto hash=QString::fromLatin1(QCryptographicHash::hash(url.toUtf8(),QCryptographicHash::Sha256).toHex());
         if(const auto i=receipts_.find(key);i!=receipts_.end()) {if(i->second.value("urlHash")!=hash)invalid("This handoff key belongs to another request.");return QJsonObject{{"state",i->second.value("state")},{"downloadId",i->second.value("downloadId")}};}
         if(entries_.size()>=10000 || receipts_.size()>=10000)invalid("The browser handoff/history limit has been reached.");
         if(key.size()!=32 || std::any_of(key.begin(),key.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))invalid("Invalid handoff key.");
         if(filename.isEmpty() || filename.size()>160 || filename.contains('/') || filename.contains('\\') || filename=="." || filename=="..")invalid("Invalid browser filename.");
-        QueueEntry e;e.id=QString::fromStdString(ResumeJournal::newId());e.url=url;e.origin=origin(url);e.handoffKey=key;e.status=QueueStatus::Prepared;e.created=QDateTime::currentSecsSinceEpoch();e.updated=e.created;
+        QueueEntry e;e.id=QString::fromStdString(ResumeJournal::newId());e.url=url;e.browserTransfer=browserTransfer;e.origin=browserTransfer ? browserOrigin(url):origin(url);e.handoffKey=key;e.status=QueueStatus::Prepared;e.created=QDateTime::currentSecsSinceEpoch();e.updated=e.created;
         e.requiredEtag=QString::fromStdString(inspection.etag);if(!inspection.etag.empty()){e.requiredResolvedUrl=QString::fromStdString(inspection.resolvedUrl);e.requiredTotal=inspection.total;}if(inspection.total)e.progress.totalBytes=inspection.total;e.progress.resumable=!inspection.etag.empty();
         const auto folder=QDir(settings_.directory).filePath(downloadCategory(filename,mime));if(!QDir().mkpath(folder))invalid("The download category folder could not be created.");
         const QFileInfo name(filename); bool assigned=false;
@@ -311,6 +337,96 @@ std::future<QJsonObject> QueueManager::handoff(QString key,QString command,bool 
         entry(id)=e;i->second=receipt;
     }
     QJsonObject result{{"state",receipt.value("state")},{"downloadId",id}};
-    const auto e=std::find_if(entries_.begin(),entries_.end(),[&](const auto& row){return row.id==id;});result["downloadStatus"]=e==entries_.end() ? "Removed":statusText(e->status);return result;
+    const auto e=std::find_if(entries_.begin(),entries_.end(),[&](const auto& row){return row.id==id;});result["downloadStatus"]=e==entries_.end() ? "Removed":statusText(e->status);result["browserTransfer"]=e!=entries_.end() && e->browserTransfer;return result;
 });}
+std::future<QJsonObject> QueueManager::browserUpdate(QString key,QString file,bool complete,qint64 size,qint64 received,QString sourceError) {
+    return submit([this,key=std::move(key),file=std::move(file),complete,size,received,sourceError=std::move(sourceError)] {
+        tick();
+        const auto receipt=receipts_.find(key);if(receipt==receipts_.end())invalid("Unknown browser transfer.");
+        const auto id=receipt->second.value("downloadId").toString();
+        const auto found=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.id==id;});
+        if(found==entries_.end())return QJsonObject{{"downloadStatus","Removed"}};
+        auto& e=*found;if(!e.browserTransfer)invalid("This entry uses the direct download engine.");
+        if(complete && (!e.browserComplete || e.requiredTotal!=static_cast<std::uint64_t>(size))){e.browserComplete=true;e.requiredTotal=static_cast<std::uint64_t>(size);save(e);}
+        if(!file.isEmpty()) {
+            if(!QFileInfo(file).isAbsolute() || file.size()>32768 || file.contains(QChar(0)))invalid("Invalid browser transfer path.");
+            const auto checked=destination(file);ordinaryParents(path(checked));
+            if(checked.compare(e.destination,Qt::CaseInsensitive)==0 || (checked+".crdownload").compare(e.destination+".part",Qt::CaseInsensitive)==0)invalid("Browser source and destination must be separate files.");
+            if(!e.browserFile.isEmpty() && e.browserFile.compare(checked,Qt::CaseInsensitive)!=0)invalid("The browser transfer path changed. Existing bytes are preserved.");
+            if(e.browserFile.isEmpty()){e.browserFile=checked;save(e);}
+        }
+        if(auto i=workers_.find(id);i!=workers_.end()) {
+            if(!i->second->browser)invalid("The transfer worker does not match this entry.");
+            i->second->browserReceived=received;
+            if(!sourceError.isEmpty()){{std::lock_guard lock(i->second->mutex);i->second->error="Transfer interrupted: "+sourceError;i->second->browserFailed=true;}}
+            if(complete){i->second->browserSize=size;i->second->browserComplete=true;}
+        } else if(!sourceError.isEmpty() && e.status!=QueueStatus::Completed && e.status!=QueueStatus::Cancelled){e.status=QueueStatus::Failed;e.error="Transfer interrupted: "+sourceError;save(e);
+        } else if(e.status==QueueStatus::Queued && !e.browserFile.isEmpty() && static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))<static_cast<std::size_t>(settings_.simultaneous)) {
+            auto worker=std::make_unique<Worker>();auto* w=worker.get();w->browser=true;w->browserComplete=complete;w->browserSize=size;w->browserReceived=received;w->progress=e.progress;w->progress.resumable=true;
+            const auto source=path(e.browserFile),target=path(e.destination);ordinaryParents(target);
+            e.status=QueueStatus::Running;e.error.clear();save(e);workers_.emplace(id,std::move(worker));
+            try{w->thread=std::jthread([w,source,target](std::stop_token stop){
+                struct Input {HANDLE handle=INVALID_HANDLE_VALUE;~Input(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}} input;
+                std::unique_ptr<FileWriter> output;
+                QueueStatus result=QueueStatus::Completed;QString error;
+                try {
+                    const auto interrupted=[&]{if(w->browserFailed){std::lock_guard lock(w->mutex);throw DownloadError(DownloadErrorCode::Network,w->error.toStdString());}if(stop.stop_requested() || w->control.pauseRequested())throw DownloadError(DownloadErrorCode::Paused,"Transfer interrupted. Saved bytes are preserved; choose Resume.");};
+                    // Chrome may preallocate or write parallel ranges out of order.
+                    // Never mistake file length/bytesReceived for a verified prefix.
+                    const auto receiving=std::chrono::steady_clock::now();
+                    while(!w->browserComplete){
+                        interrupted();const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-receiving).count();
+                        {std::lock_guard lock(w->mutex);auto& p=w->progress;p.downloadedBytes=static_cast<std::uint64_t>(w->browserReceived.load());p.elapsedSeconds=elapsed;p.smoothedBytesPerSecond=p.averageBytesPerSecond=elapsed>0 ? static_cast<double>(p.downloadedBytes)/elapsed:0;if(w->browserSize>=0)p.totalBytes=static_cast<std::uint64_t>(w->browserSize.load());p.activeRanges=w->browserPaused ? 0:1;}
+                        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                    }
+                    while(input.handle==INVALID_HANDLE_VALUE){
+                        interrupted();ordinaryParents(source);
+                        auto current=source;current+=L".crdownload";
+                        for(const auto& name:{current,source}){
+                            input.handle=CreateFileW(name.c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+                            if(input.handle!=INVALID_HANDLE_VALUE)break;
+                        }
+                        if(input.handle==INVALID_HANDLE_VALUE){if(w->browserComplete)invalid("The received browser file is missing or cannot be read. Check its storage location.");std::this_thread::sleep_for(std::chrono::milliseconds(50));}
+                    }
+                    BY_HANDLE_FILE_INFORMATION info{};
+                    if(!GetFileInformationByHandle(input.handle,&info) || info.nNumberOfLinks!=1 || (info.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)))invalid("The browser source must be an ordinary file without links.");
+                    output=std::make_unique<FileWriter>(target,std::filesystem::exists(target.wstring()+L".part"));
+                    auto copied=output->size();const auto recovered=copied;
+                    QByteArray buffer(1024*1024,Qt::Uninitialized);QCryptographicHash received(QCryptographicHash::Sha256);
+                    const auto sourceSize=[&]{LARGE_INTEGER bytes{};if(!GetFileSizeEx(input.handle,&bytes) || bytes.QuadPart<0)invalid("Cannot read the received file size.");return static_cast<std::uint64_t>(bytes.QuadPart);};
+                    const auto read=[&](DWORD count){DWORD n=0;if(!ReadFile(input.handle,buffer.data(),count,&n,nullptr))invalid("Reading the browser transfer failed.");return n;};
+                    // Reuse only a byte-for-byte matching prefix, including after app restart.
+                    for(std::uint64_t offset=0;offset<copied;){interrupted();const auto n=read(static_cast<DWORD>(std::min<std::uint64_t>(buffer.size(),copied-offset)));if(!n)invalid("The browser source is shorter than the saved partial. Existing bytes are preserved.");received.addData(QByteArrayView(buffer.constData(),n));offset+=n;}
+                    if(copied && QString::fromStdString(output->sha256())!=QString::fromLatin1(received.result().toHex()))invalid("The browser source changed. Existing partial bytes are preserved.");
+                    const auto started=std::chrono::steady_clock::now();auto checkpoint=copied;
+                    for(;;){
+                        interrupted();
+                        if(w->browserPaused){output->flush();while(w->browserPaused){interrupted();std::this_thread::sleep_for(std::chrono::milliseconds(30));}}
+                        const auto available=sourceSize();if(available<copied)invalid("The browser source was replaced or truncated during transfer.");
+                        const auto n=read(static_cast<DWORD>(std::min<std::uint64_t>(buffer.size(),available-copied)));
+                        if(n){output->writeAt(copied,buffer.constData(),n);received.addData(QByteArrayView(buffer.constData(),n));copied+=n;if(copied-checkpoint>=4*1024*1024){output->flush();checkpoint=copied;}}
+                        const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count();
+                        {std::lock_guard lock(w->mutex);auto& p=w->progress;p.stage=DownloadStage::Finalizing;p.downloadedBytes=std::max(copied,static_cast<std::uint64_t>(w->browserReceived.load()));p.recoveredBytes=recovered;p.resumable=true;p.elapsedSeconds=elapsed;p.averageBytesPerSecond=elapsed>0 ? static_cast<double>(copied-recovered)/elapsed:0;p.smoothedBytesPerSecond=p.instantaneousBytesPerSecond=0;p.activeRanges=1;p.targetConnections=1;if(w->browserSize>=0)p.totalBytes=static_cast<std::uint64_t>(w->browserSize.load());}
+                        if(w->browserComplete && copied==available){
+                            if(w->browserSize<0 || copied!=static_cast<std::uint64_t>(w->browserSize.load()))invalid("Received browser bytes do not match the completed file size.");
+                            const auto expected=received.result().toHex();LARGE_INTEGER beginning{};if(!SetFilePointerEx(input.handle,beginning,nullptr,FILE_BEGIN))invalid("Cannot verify the browser source.");
+                            QCryptographicHash finalSource(QCryptographicHash::Sha256);std::uint64_t verified=0;
+                            while(verified<copied){interrupted();const auto count=read(static_cast<DWORD>(std::min<std::uint64_t>(buffer.size(),copied-verified)));if(!count)invalid("The received file changed before verification.");finalSource.addData(QByteArrayView(buffer.constData(),count));verified+=count;}
+                            if(sourceSize()!=copied || finalSource.result().toHex()!=expected)invalid("The received file changed during transfer. Partial bytes are preserved.");
+                            output->commit(copied,expected.toStdString());
+                            {std::lock_guard lock(w->mutex);w->progress.stage=DownloadStage::Completed;w->progress.downloadedBytes=w->progress.verifiedBytes=copied;w->progress.totalBytes=copied;}
+                            break;
+                        }
+                        if(!n)std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                    }
+                }catch(const DownloadError& e){result=e.code()==DownloadErrorCode::Paused ? QueueStatus::Paused:QueueStatus::Failed;error=QString::fromUtf8(e.what());}
+                catch(const std::exception& e){result=QueueStatus::Failed;error=QString::fromUtf8(e.what());}
+                try{if(output && result!=QueueStatus::Completed)output->flush();}catch(...){}
+                output.reset();
+                {std::lock_guard lock(w->mutex);w->status=result;w->error=error;w->done=true;}
+            });}catch(...){workers_.erase(id);e.status=QueueStatus::Failed;e.error="Cannot start the browser transfer worker.";save(e);}
+        }
+        return QJsonObject{{"downloadStatus",statusText(e.status)},{"downloadId",e.id},{"bytes",QString::number(e.progress.downloadedBytes)}};
+    });
+}
 }

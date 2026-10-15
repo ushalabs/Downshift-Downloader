@@ -11,7 +11,7 @@ enum class State { Adding, Metadata, Checking, Downloading, Complete, Failed, Ca
 enum class SeedMode { Stop, Ratio, Time, Manual };
 struct Limits { int download=0, upload=256*1024, connections=64; };
 struct SeedPolicy { SeedMode mode=SeedMode::Stop; double ratio=1.0; int seconds=3600; };
-struct AddOptions { bool paused=false; std::vector<int> priorities; Limits limits; SeedPolicy seeding; };
+struct AddOptions { bool paused=false; std::vector<int> priorities; Limits limits; SeedPolicy seeding; bool metadataOnly=false; };
 struct File { QString path; qint64 bytes=0, verifiedBytes=0; int index=0, priority=4; };
 struct Peer { QString address, client; int download=0, upload=0; bool seed=false; };
 struct Tracker { QString url, error; bool verified=false; int failures=0; };
@@ -20,6 +20,8 @@ struct Snapshot {
     QString id, name, directory, error;
     State state=State::Adding;
     bool metadata=false;
+    bool metadataOnly=false;
+    qint64 created=0;
     qint64 totalBytes=0, verifiedBytes=0;
     int downloadBytesPerSecond=0, uploadBytesPerSecond=0, peers=0;
     int seeds=0;
@@ -52,6 +54,8 @@ public:
     std::future<std::vector<Snapshot>> snapshots();
     std::future<void> pause(QString id);
     std::future<void> resume(QString id);
+    // Finish a metadata-only preview after the user confirms its file selection.
+    std::future<void> startSelected(QString id,bool paused);
     std::future<void> checkpoint(QString id);
     std::future<void> configure(QString id,Limits limits,SeedPolicy seeding);
     // Priorities correspond to ordinary files in Snapshot.files (0 skip, 1..7).

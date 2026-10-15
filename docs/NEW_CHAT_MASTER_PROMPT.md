@@ -1,8 +1,8 @@
 # Downshift — complete new-chat handoff
 
-## Current continuation update: Torrent T2 (2026-10-14)
+## Current continuation update: Torrent T3 (2026-10-15)
 
-The user directly authorized Torrent T2 in the subsequent chat and explicitly excluded changes to the existing HTTP direct downloader. T2 management/persistence now extends the separate native torrent target and developer console: DPAPI-encrypted companion SQLite storage, native checkpoints, paused recovery with rehash, selection/priorities, independent limits, seeding policies, statistics and confirmed removal/deletion. HTTP/media/GUI/browser source remains unchanged; the normal application does not yet expose torrent controls. Consult the newest DEVELOPMENT_PROGRESS.md entry and torrent-t2 evidence for actual validation/commit/push status. T3 Qt torrent integration requires explicit approval; do not automatically start it or publish a release. The older T1 handoff below is historical context.
+The latest user request authorizes T3 after T2 passes locally, reserves Git commits to the user and asks for build/test at the completed phase, then fixes for actual failures. T2's explicit native flush repair passes both local Release/Debug torrent groups. T3 Qt integration is completed and locally verified; the normal app exposes its Torrents sidebar. Release/Debug each pass all groups across full batches and corrected GUI fixture reruns; evidence qualifies the initial fixture failures. Preserve the current 0.4.4 browser/media repairs and user-selected history; no commit, push or release is authorized. Consult the newest DEVELOPMENT_PROGRESS.md section and evidence for actual final validation. Stop for T4 approval after verified T3. Older phase gates below are historical context.
 
 Copy this document into the new chat. This is a factual project handoff as of 14 October 2026, followed by instructions for continuing. Inspect the actual checkout before relying on any recorded status. Do not restart the project or automatically begin an unapproved phase.
 

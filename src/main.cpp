@@ -45,7 +45,9 @@ int main(int argc, char* argv[]) {
             directory=downshift::storageDirectory(QCoreApplication::applicationDirPath(),downshift::browser::userSid());
         }
         downshift::QueueManager queue(QDir(directory).filePath("queue.sqlite"));
+        downshift::torrent::TorrentEngine torrents({!smokeTest,smokeTest,QDir(directory).filePath("torrents.sqlite")});
         downshift::MainWindow window(queue);
+        window.attachTorrents(torrents);
         if(smokeTest)window.setAttribute(Qt::WA_DontShowOnScreen);
         window.show();
         std::unique_ptr<downshift::browser::PipeServer> browser;

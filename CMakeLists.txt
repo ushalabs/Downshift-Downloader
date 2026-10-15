@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Downshift VERSION 0.4.2 LANGUAGES CXX)
+project(Downshift VERSION 0.4.4 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Downshift requires Windows and the MSVC C++ toolchain.")
@@ -78,12 +78,15 @@ add_library(downshift_gui STATIC
     src/gui/Design.cpp
     src/gui/DownloadDelegate.cpp
     src/gui/MainWindow.cpp
+    src/gui/MainWindowTorrents.cpp
     src/gui/MainWindow.h
     src/gui/Dialogs.cpp
     src/gui/MediaDialog.cpp
     src/gui/MediaDialog.h
+    src/gui/TorrentDialogs.cpp
+    src/gui/TorrentDialogs.h
 )
-target_link_libraries(downshift_gui PUBLIC downshift_queue Qt6::Widgets PRIVATE dwmapi)
+target_link_libraries(downshift_gui PUBLIC downshift_queue downshift_torrent Qt6::Widgets PRIVATE dwmapi)
 qt_add_resources(downshift_gui "branding" PREFIX "/branding" BASE "assets"
     FILES assets/downshift.rgba assets/chevron.xpm)
 target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)
@@ -114,6 +117,13 @@ add_custom_command(TARGET downshift POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(downshift_torrent_gui_tests tests/TorrentGuiTests.cpp)
+    target_link_libraries(downshift_torrent_gui_tests PRIVATE downshift_gui LibtorrentRasterbar::torrent-rasterbar dbghelp)
+    target_compile_options(downshift_torrent_gui_tests PRIVATE /W4 /permissive- /utf-8 /Zi)
+    target_link_options(downshift_torrent_gui_tests PRIVATE /DEBUG)
+    target_compile_definitions(downshift_torrent_gui_tests PRIVATE _WIN32_WINNT=0x0A00)
+    add_test(NAME torrent.gui COMMAND downshift_torrent_gui_tests "${CMAKE_CURRENT_BINARY_DIR}/torrent-shots/$<CONFIG>")
+    set_tests_properties(torrent.gui PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
     add_executable(downshift_torrent_management_tests tests/TorrentManagementTests.cpp)
     target_link_libraries(downshift_torrent_management_tests PRIVATE downshift_torrent LibtorrentRasterbar::torrent-rasterbar unofficial::sqlite3::sqlite3)
     target_compile_options(downshift_torrent_management_tests PRIVATE /W4 /permissive- /utf-8)
@@ -130,6 +140,7 @@ if(BUILD_TESTING)
     find_program(NODE_EXECUTABLE NAMES node)
     if(NODE_EXECUTABLE)
         add_test(NAME browser.extension COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/ExtensionTests.mjs")
+        add_test(NAME browser.bridge COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserBridgeTests.mjs")
         add_test(NAME browser.media COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaExtensionTests.mjs")
         add_test(NAME engine.transport COMMAND Python3::Interpreter
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/TransportTests.py" "$<TARGET_FILE:downshift_download>" "${NODE_EXECUTABLE}")
@@ -149,6 +160,9 @@ if(BUILD_TESTING)
     add_test(NAME browser.native COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserTests.py" "$<TARGET_FILE:downshift_test_native_host>" "$<TARGET_FILE:downshift_browser_tests>")
     set_tests_properties(browser.native PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
+    add_test(NAME browser.transfer COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserTransferTests.py" "$<TARGET_FILE:downshift_test_native_host>" "$<TARGET_FILE:downshift_browser_tests>")
+    set_tests_properties(browser.transfer PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
     add_executable(downshift_gui_tests tests/GuiTests.cpp)
     add_executable(downshift_media_tests tests/MediaTests.cpp)
     target_link_libraries(downshift_media_tests PRIVATE downshift_browser downshift_gui)

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "phase": "Torrent T2 management and persistence",
-  "date": "2026-10-14",
+  "date": "2026-10-15",
   "environment": "Local Windows x64, MSVC v143, C++20, Qt 6, pinned Rasterbar 2.1.2.0 ABI 100",
   "scope": "Independent torrent worker/console/store. HTTP/media/GUI/browser source unchanged. No T3 or release publication.",
   "fullReleaseBeforeFinalTorrentGuards": {
@@ -299,7 +299,7 @@
     "finalTorrentRelease": 132.64,
     "finalTorrentDebug": 139.87
   },
-  "qualification": "Initial full Debug passed 17/18: T1 fixture seeder timed out before TorrentEngine construction. Isolated retry and both final frozen torrent suites passed. Final torrent-only reruns supersede earlier torrent groups; unchanged HTTP/media/GUI/browser groups were not repeated. Initial a6aebfa CI exposed a selected-file disk hash failure. Revised selection/seeding barriers and migrated-file native recheck passed both final affected suites. Earlier 246-check results describe the pre-repair source.",
+  "qualification": "Local final torrent groups pass after two failed exact-source CIs. No fresh CI or Git mutation is authorized by the latest user request. Earlier full regression and 313-check passes are historical results, not proof of the corrected explicit flush barrier.",
   "cli": {
     "helpExit": 0,
     "invalidCombinationExit": 2
@@ -324,14 +324,14 @@
     "CI-confirmed selected-file/seeding ordering: native file priority IO acknowledgement, migrated-file rehash and flushed seeding transition"
   ],
   "sourceBlobs": {
-    "CMakeLists.txt": "e4f949213c069aaa9e72ccda3b2ff460c5f3f9ce",
+    "CMakeLists.txt": "625c6c0a3cf884ded2b1588bb7fb8dce888bdf78",
     "src/TorrentCli.cpp": "4a20f82874efb0d54b1c1fc937fcab62a6d21ee3",
-    "src/torrent/TorrentEngine.cpp": "f1a0106de8abce2efc34af5d558aec2243ad3ba9",
+    "src/torrent/TorrentEngine.cpp": "b52c9744fa9645fe6274d01e0c8e5be14a031421",
     "src/torrent/TorrentEngine.h": "81a3fa568b608ec2067aa221237ad656e43fcb9c",
     "src/torrent/TorrentStore.cpp": "b3ccd692474f4a7e78514416a2d94159b08d31f7",
     "src/torrent/TorrentStore.h": "df3eb5293200c9a6f1e7f2dc15c3e267e1597d5c",
-    "tests/TorrentTests.cpp": "b9cc6998d57c297cdf13bf310a90fc4c05919135",
-    "tests/TorrentManagementTests.cpp": "2958726ffc6db1672b69cdb8b4b557c8c1ebe6b7"
+    "tests/TorrentTests.cpp": "b1522c34c277f002df3a5721b9bf66ba908b1d8b",
+    "tests/TorrentManagementTests.cpp": "56cb622c0e06cec6c9ea1154d1aae3c434032dd2"
   },
   "normalUserStore": {
     "encryptedDownloadsSettingsReceiptsUnchanged": true,
@@ -446,7 +446,17 @@
       }
     ]
   },
-  "finalTorrentRelease": {
+  "selectionOrderingRegression": {
+    "oldBackendSource": "a6aebfa2ff61063d72457144d5148f5006a3e3ea",
+    "oldBackend": "Copied original Debug static library, current regression harness, same pinned native runtime; separate private executable/store/payloads",
+    "baselineExit": 1,
+    "baselineFailure": "Changing selection invalidates an earlier seeding snapshot",
+    "repairedFocusedChecks": 92,
+    "repeatCount": 6,
+    "repairedBehavior": "File-priority acknowledgement precedes checkpoint; newly selected files force actual recheck after part-file migration; Seeding and Complete wait for native disk flush/checkpoint."
+  },
+  "seederTimeoutDiagnostic": "Native seeder bind failed on UDP 127.0.0.1:51784 (WSAEACCES); Windows reserved UDP range 51753-51852 includes that randomly chosen TCP port. Native listeners now start at 6881 with library collision retries; machine networking is unchanged.",
+  "beforeExplicitFlushRelease": {
     "tests": 2,
     "failures": 0,
     "skipped": 0,
@@ -465,7 +475,26 @@
       }
     ]
   },
-  "finalTorrentDebug": {
+  "finalTorrentRelease": {
+    "tests": 2,
+    "failures": 0,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.management",
+        "seconds": 120.461,
+        "passed": true,
+        "assertions": 315
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 17.0142,
+        "passed": true,
+        "assertions": 142
+      }
+    ]
+  },
+  "beforeExplicitFlushDebug": {
     "tests": 2,
     "failures": 0,
     "skipped": 0,
@@ -484,14 +513,30 @@
       }
     ]
   },
-  "selectionOrderingRegression": {
-    "oldBackendSource": "a6aebfa2ff61063d72457144d5148f5006a3e3ea",
-    "oldBackend": "Copied original Debug static library, current regression harness, same pinned native runtime; separate private executable/store/payloads",
-    "baselineExit": 1,
-    "baselineFailure": "Changing selection invalidates an earlier seeding snapshot",
-    "repairedFocusedChecks": 92,
-    "repeatCount": 6,
-    "repairedBehavior": "File-priority acknowledgement precedes checkpoint; newly selected files force actual recheck after part-file migration; Seeding and Complete wait for native disk flush/checkpoint."
+  "finalTorrentDebug": {
+    "tests": 2,
+    "failures": 0,
+    "skipped": 0,
+    "groups": [
+      {
+        "name": "torrent.management",
+        "seconds": 124.806,
+        "passed": true,
+        "assertions": 315
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 20.7444,
+        "passed": true,
+        "assertions": 142
+      }
+    ]
   },
-  "seederTimeoutDiagnostic": "A later controlled local timeout showed fully verified source data, seeding state and native listening port 0. No fixture file corruption was observed; exact reason for unavailable listener was not established. Final source and CI logs retain listener diagnostics."
+  "explicitFlushRepair": {
+    "nativeSourceFinding": "Pinned torrent::save_resume_data queues async_release_files and posts resume data immediately. Explicit flush_cache callback now precedes native resume serialization. Storage-category automatic flush notifications are suppressed; explicit responses remain mandatory. Magnets without metadata save without a nonexistent disk object.",
+    "selectionStress": "Six transfers, two each v1/v2/hybrid; independent final-file hashes after changed selection.",
+    "listenerFinding": "Native seeder bind failed on UDP 127.0.0.1:51784 (WSAEACCES); Windows reserved UDP range 51753-51852 includes that randomly chosen TCP port. Native listeners now start at 6881 with library collision retries; machine networking is unchanged.",
+    "supersededTrials": "An intermediate explicit-flush run timed out/asserted for unresolved magnets. Final metadata guard fixes that path. An alternate portable disk-backend trial is not retained."
+  },
+  "assertionEvidence": "CTest JUnit truncated the successful management summary; untruncated LastTest.log confirms 315 final Debug checks. Matching Release source and fixed test paths have the same check count."
 }

@@ -1,5 +1,25 @@
 # Downshift for Chrome
 
+## Capture history guard, 0.4.4
+
+Completed Chrome download history is not a capture source. Unknown completed items from metadata changes or browser restoration are ignored. A tiny already-completed file needs a current filename event or a fresh creation event with a recent start time; saved handoff receipts remain recoverable. Bounded completed-ID receipts prevent delayed duplicate events from recapturing a delivered response across worker restarts. Reload the unpacked extension after updating the app. This fix does not bulk-delete prior cancelled rows or their files.
+
+## Browser response bridge, 0.4.3
+
+This supersedes the narrower 0.4.2 capture repair below. Use the updated app and reload the unpacked extension (capture protocol 4), then refresh existing pages. Blob/data, authenticated GET and POST downloads can now finish in Downshift from the original received response. No cookie/body export or URL-by-URL rules are required. Native destination selection, history and integrity checks apply; the browser is a transport for responses that cannot safely be refetched. Its normal download UI is suppressed while enabled and confirmed transport entries are cleaned after native completion. See [architecture, recovery, disk costs and verification scope](BROWSER_RESPONSE_CAPTURE.md). The previous statements that blob/authenticated downloads merely stay held describe the earlier implementation.
+
+## Historical extension-only capture repair, 0.4.2
+
+The earlier extension-only repair used capture protocol 3 (application/manifest version 0.4.2). The following records that repair's scope and tests; it does not describe current 0.4.3 behavior. The browser bridge above requires both the rebuilt app and reloaded extension.
+
+Enabled capture rechecks downloads after Chrome Resume, relevant metadata changes, worker startup and reconciliation. Blocked rows are paused again before returning; old bypass IDs cannot exempt live downloads while enabled. Failures stay held and transient failures retry with bounded backoff. Explicitly switching capture off permits Chrome again. Chrome-approved verdicts remain required before native handoff; this is not a bypass of browser security checks.
+
+Filename determination remains outstanding until native acceptance/cancellation or explicit capture-off, preventing tiny attachments finishing during preparation. Chrome's proposed filename is kept in bounded transient memory because search() can return an empty name at that stage. Long Windows names retain the extension within native limits. Direct-link detection accepts unlisted file suffixes instead of relying on a small allowlist; web page/handler suffixes and opaque URLs retain download-event capture. See Chrome's [filename event contract](https://developer.chrome.com/docs/extensions/reference/api/downloads#event-onDeterminingFilename).
+
+The supplied public RobloxStudioInstaller resource was fully downloaded through the actual isolated Chrome/native interface and independently hashed, without creating a Chrome download. Complete tiny/redirect/custom-suffix fixtures also pass. Normal-history and torrent code are untouched. This source change is local and uncommitted at the user's request.
+
+Browser-only blob URLs (including generated ChatGPT attachments) are not HTTPS resources and cannot be fetched by the current curl handoff. They are held with an explanation instead of silently completing through Chrome. A browser-to-native byte bridge is still absent. Authenticated resources can also be held when the native public request is refused. Do not interpret a held download as completed or promise all browser resources are transferable. Initial network bytes can arrive before extension events; policy restrictions, disabled extensions, competing interceptors and forced browser/worker termination remain outside a universal interception guarantee.
+
 Phase 7 provides a Manifest V3 extension, a separate Windows Native Messaging host, and a staged handoff to the native queue. For the portable distribution run Setup.cmd and load its extension folder; see [portable setup](PACKAGING.md). The source-development setup is below. Chrome Web Store publication is not provided.
 
 ## Install locally

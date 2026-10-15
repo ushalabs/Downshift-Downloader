@@ -55,7 +55,7 @@ void PipeServer::run(std::stop_token stop) {
 }
 QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) {
     validate(request);const auto command=request.value("command").toString();
-    if(command=="ping"){const auto snapshot=queue_.snapshot().get();int paused=0,running=0;for(const auto& entry:snapshot.entries){if(entry.status==QueueStatus::Paused)++paused;if(entry.status==QueueStatus::Running || entry.status==QueueStatus::Queued)++running;}return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"historyCount",static_cast<int>(snapshot.entries.size())},{"storageIdentity",storageIdentity(queue_.databasePath())},{"pausedCount",paused},{"activeCount",running},{"capabilities",QJsonObject{{"serverFilename",true}}}};}
+    if(command=="ping"){const auto snapshot=queue_.snapshot().get();int paused=0,running=0;for(const auto& entry:snapshot.entries){if(entry.status==QueueStatus::Paused)++paused;if(entry.status==QueueStatus::Running || entry.status==QueueStatus::Queued)++running;}return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"historyCount",static_cast<int>(snapshot.entries.size())},{"storageIdentity",storageIdentity(queue_.databasePath())},{"pausedCount",paused},{"activeCount",running},{"capabilities",QJsonObject{{"serverFilename",true},{"browserTransfer",true}}}};}
     if(command=="open"){open_();return {{"state","ready"}};}
     if(command=="blocked"){open_();if(blocked_)blocked_();return {{"state","blocked"}};}
     if(command=="media"){
@@ -65,10 +65,20 @@ QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) 
         media_(url,request.value("title").toString());return {{"state","video-dialog"}};
     }
     const auto key=request.value("key").toString();
+    if(command=="browser-prepare") {
+        const auto total=request.value("total").toString().toLongLong();DownloadEngine::Inspection metadata;if(total>=0)metadata.total=static_cast<std::uint64_t>(total);
+        return queue_.prepare(key,request.value("url").toString(),request.value("filename").toString(),metadata,request.value("mime").toString(),true).get();
+    }
+    if(command=="browser-update")return queue_.browserUpdate(key,request.value("file").toString(),request.value("complete").toBool(),request.value("total").toString().toLongLong(),request.value("received").toString().toLongLong(),request.value("sourceError").toString()).get();
+    if(command=="commit"){
+        const auto old=queue_.handoff(key,"status").get();
+        if(old.value("state")!="unknown" && old.value("browserTransfer").toBool()!=request.value("browserTransport").toBool())throw std::runtime_error("The browser transfer type does not match this receipt.");
+    }
     if(command=="prepare") {
         if(youtubeHost(QUrl(request.value("url").toString()).host()))throw std::runtime_error("Use the YouTube player's Download this video action; a watch page is not a video file.");
         const auto old=queue_.handoff(key,"status").get();if(old.value("state")!="unknown")return queue_.prepare(key,request.value("url").toString(),request.value("filename").toString(),{}).get();
         const auto url=request.value("url").toString();const auto inspection=DownloadEngine().inspect(url.toStdString(),stop);
+        if(request.contains("sourceEtag") && request.value("sourceEtag").toString().toStdString()!=inspection.etag)throw std::runtime_error("Use the original browser response for this file.");
         const auto expected=request.value("total").toString().toLongLong();
         if(inspection.total && request.contains("total") && expected>=0 && static_cast<std::uint64_t>(expected)!=inspection.total)throw std::runtime_error("The public file size differs from Chrome's download.");
         const auto mime=request.value("mime").toString();

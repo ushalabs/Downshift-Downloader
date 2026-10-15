@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-15",
+  "delivery": "local working tree only; user owns commits and pushes",
+  "scope": "Extension capture repair; no native/database/torrent source changes by this task",
+  "controllerAndFilenameChecks": 64,
+  "mediaExtensionChecks": 27,
+  "focusedCTest": {
+    "release": { "passed": 3, "total": 3, "seconds": 6.84 },
+    "debug": { "passed": 3, "total": 3, "seconds": 8.03 },
+    "groups": ["browser.extension", "browser.media", "browser.native"]
+  },
+  "actualChrome": { "releaseChecks": 21, "debugChecks": 21, "profile": "isolated", "normalRegistrationUntouched": true },
+  "publicRoblox": {
+    "bytes": 13797840,
+    "seconds": 14.315,
+    "sha256": "8b27af84f33c8601dc7cde7433c2577e04063b6a409dd1433676e02984f50af6",
+    "independentReferenceMatched": true,
+    "chromeCreatedDownloads": 0,
+    "executed": false
+  },
+  "normalChromeReloadApplied": false,
+  "uiAutomationStop": "Could not reliably determine the current browser URL; no further UI actions attempted",
+  "activation": "Reload Downshift at chrome://extensions and refresh existing pages",
+  "limits": [
+    "Browser-only blob URLs remain held; no browser-to-native byte bridge is implemented",
+    "Authenticated resources can fail native public preflight and remain held",
+    "No universal zero-initial-byte interception guarantee",
+    "No new CI run, full native suite, portable rebuild or release publication for this JavaScript-only repair"
+  ]
+}

@@ -2,6 +2,10 @@
 from PerformanceServer import ControlledServer, Handler
 import urllib.parse
 class ChromeHandler(Handler):
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get('Content-Length','0')))
+        payload=b'original authorized POST response\0'*8192
+        self.send_response(200);self.send_header('Content-Type','application/octet-stream');self.send_header('Content-Disposition','attachment; filename="posted.rbxmx"');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload)
     def log_message(self,format,*values):
         import sys
         print("Chrome fixture: "+format%values,file=sys.stderr,flush=True)
@@ -11,10 +15,14 @@ class ChromeHandler(Handler):
         if self.path.startswith("/video.mp4") and getattr(self.server,'media_file',None):
             payload=self.server.media_file.read_bytes();self.send_response(200);self.send_header('Content-Type','video/mp4');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith("/page"):
-            html=b'''<!doctype html><html><title>Downshift browser fixture</title><body><h1>Local download checks</h1><a id="public" href="/range?kind=public">Public file</a><a id="auth" href="/range?kind=auth">Authenticated file</a><a id="stream" href="/stream?kind=stream">Streaming file</a><a id="restart" href="/range?kind=restart">Worker restart file</a><a id="direct" href="/range?kind=direct" download="direct.bin">Direct file</a></body></html>'''
+            html=b'''<!doctype html><html><title>Downshift browser fixture</title><body><h1>Local download checks</h1><a id="public" href="/range?kind=public">Public file</a><a id="auth" href="/range?kind=auth">Authenticated file</a><a id="stream" href="/stream?kind=stream">Streaming file</a><a id="restart" href="/range?kind=restart">Worker restart file</a><a id="direct" href="/range?kind=direct" download="direct.bin">Direct file</a><a id="tiny" href="/tiny?kind=tiny">Tiny attachment</a><a id="unusual" href="/asset.rbxmx?kind=unusual">Unlisted extension</a><a id="redirect" href="/redirect?kind=redirect">Redirect attachment</a></body></html>'''
             self.send_response(200);self.send_header("Content-Type","text/html");self.send_header("Content-Length",str(len(html)));self.end_headers();self.wfile.write(html);return
+        if self.path.startswith("/tiny"):
+            payload=b'Downshift tiny attachment\n';self.send_response(200);self.send_header('Content-Type','application/octet-stream');self.send_header('Content-Disposition','attachment; filename="tiny.rbxmx"');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
+        if self.path.startswith("/redirect"):
+            self.send_response(302);self.send_header('Location','/range?kind=redirect');self.send_header('Content-Length','0');self.end_headers();return
         query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-        if query.get("kind")==["auth"] and "fixture_session=authorized" not in self.headers.get("Cookie",""):
+        if query.get("kind",[''])[0] in ('auth','pause') and "fixture_session=authorized" not in self.headers.get("Cookie",""):
             self.send_error(401);return
         # Chrome resumes with open-ended HTTP ranges, which the engine's narrow fixture
         # did not need. Serve those according to the same exact byte representation.
@@ -23,7 +31,7 @@ class ChromeHandler(Handler):
             self.headers.replace_header("Range",raw+str(self.server.size-1))
         super().do_GET()
     def end_headers(self):
-        if self.path.startswith(("/range","/stream")) and getattr(self,"_headers_buffer",[]) and b" 401 " not in self._headers_buffer[0]:
+        if self.path.startswith(("/range","/stream","/asset.rbxmx")) and getattr(self,"_headers_buffer",[]) and b" 401 " not in self._headers_buffer[0]:
             kind=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get("kind",["file"])[0]
             self.send_header("Content-Type","application/octet-stream");self.send_header("Content-Disposition",f'attachment; filename="{kind}.bin"')
         super().end_headers()

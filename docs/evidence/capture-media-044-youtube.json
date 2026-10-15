@@ -1,0 +1,49 @@
+{
+  "url": "https://www.youtube.com/watch?v=vwLAqU1HvQ8",
+  "chromeVersion": "155.0.8059.39",
+  "sameDocumentNavigation": false,
+  "malformedPlayerTitle": true,
+  "extensionVersion": "0.4.4",
+  "qualities": [
+    "Best available",
+    "888p",
+    "592p",
+    "394p",
+    "296p",
+    "198p",
+    "128p"
+  ],
+  "selected": "128p",
+  "bytes": 40204888,
+  "sha256": "769beb06c93fad018b296ad2559517554fcb5a9eeb33542c38b9d2725ff60062",
+  "duration": 1232.352,
+  "streams": [
+    {
+      "codec_type": "video",
+      "codec_name": "vp9",
+      "width": 256,
+      "height": 128
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac"
+    }
+  ],
+  "historyStatus": "Completed",
+  "nativeBridge": "separate test host and pipe; normal registration untouched",
+  "nativeDriverSha256": "7189b78fb67d33119543e85d8eb533df02c50781d770540744457ef16b7c8eaa",
+  "sources": {
+    "extension/media.js": "3f551c6fc597b7945530796f0f417e6ddead756ec4046653e1d8ff141cf67e23",
+    "extension/video-button.js": "01420b206a4b65904117c35c2db1438ef2b2ed69ec5655bbaa201b857b6c8f9c",
+    "src/gui/MediaDialog.cpp": "2cf1a9cdd1fb874b65222cbc3fd5d2e083c70613bb2e885ef20bfa93e6899cb5",
+    "src/gui/MainWindow.cpp": "6c92321cad848fc873e691c6bcf59ef9b12c1c8582b48d6eaa48d33a56a3f1bc",
+    "src/gui/Dialogs.cpp": "8ec183d9ee69d41dde2ef903958857ddacab11ee31c4588df6b3837b3b476553",
+    "src/core/DownloadQueue/QueueManager.cpp": "c679fe7f5cc03502b797cdb374517c8049c103305fda462e72e1e8aa0bc384e9",
+    "src/browser/PipeServer.cpp": "9c108a5a4dd31176114990f45b676f1c1a63edf5cbd2bc17fe02e52fd471064f",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "b24c483d41784528c2e03a457108c97d09f3b7faec18f36202d31437fb4167fd",
+    "src/core/ConnectionManager/AdaptiveController.h": "7b07f83a0b0d6ed034d03875361bdada63c55f158c2caf03fb6c078c540c0929",
+    "tests/IsolatedBrowser.cjs": "39a2c31ba97acbfe7d16c3c883392c5192794dc5a6748e5fdae11002773be7f9",
+    "tests/LiveYouTubeCheck.cjs": "b1a4cff4f8c7b7ab10116f9d2ce8c49416e59895b6aeea629430e0104843759c"
+  },
+  "scope": "Real YouTube page, trusted extension-player click, actual native dialog, full video+audio transfer, merge, verified persisted completion and independent ffprobe/hash"
+}

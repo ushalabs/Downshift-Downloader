@@ -1,10 +1,14 @@
 # Downshift
 
+The current local source is **0.4.4**. It prevents completed Chrome history from opening new save dialogs and reduces video quality inspection to the metadata the form actually needs, fixing long-video results that exceeded the old buffer limit. Reload the unpacked extension and use the updated Desktop app together. This remains local and uncommitted.
+
+The **0.4.3 browser response delivery** foundation receives generated blob/data files and session/POST downloads from their original browser response and finishes them in Downshift with a save dialog, encrypted history and verified native files. Public representations can use the existing segmented engine after validator matching. See [browser response delivery, recovery and limits](docs/BROWSER_RESPONSE_CAPTURE.md). No newer public package is published.
+
 The 0.4.2 development history repair and storage-binding recovery procedure are documented in [HISTORY_RECOVERY.md](docs/HISTORY_RECOVERY.md). Public release artifacts remain at the separately verified v0.3.3 preview.
 
-Native BitTorrent Phases T1–T2 provide a Rasterbar engine, encrypted torrent recovery, selection/limits/seeding controls and a developer console: see [torrent scope and usage](docs/TORRENTS.md). Torrent GUI is the separately approved T3 phase.
+Native BitTorrent T1–T3 adds a Rasterbar engine, encrypted recovery, a Torrents sidebar, shared history, file/magnet previews, file priorities, limits, seeding policies and native details/settings: see [torrent scope and usage](docs/TORRENTS.md). T3 is locally verified; T4 acceptance and packaging require approval.
 
-The working HTTP/GUI version is **0.4.2 — history storage repair, independent range connections and GUI 2.0**: neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the pink arrow icon. Startup distinguishes loading/failure from empty history and checks recovered storage identity. Segmented HTTP/2 downloads use independent reusable connections. See [performance diagnosis](docs/PERFORMANCE.md), [GUI 2.0](docs/GUI_2.md) and [history recovery](docs/HISTORY_RECOVERY.md). The verified published preview remains v0.3.3. The separate torrent subsystem is not yet a GUI feature.
+The earlier **0.4.2 history storage repair, independent range connections and GUI 2.0** introduced neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the pink arrow icon. Startup distinguishes loading/failure from empty history and checks recovered storage identity. Segmented HTTP/2 downloads use independent reusable connections. See [performance diagnosis](docs/PERFORMANCE.md), [GUI 2.0](docs/GUI_2.md) and [history recovery](docs/HISTORY_RECOVERY.md). The verified published preview remains v0.3.3. The current local torrent GUI extends this design.
 
 ![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
 
@@ -45,7 +49,7 @@ Enabled capture promptly pauses Chrome and does not silently fall back when a ha
 
 ## Verification and performance
 
-T2 regression coverage includes 18 groups for HTTP/HTTPS, transport, recovery, queue, GUI, media, browser/protocol, storage and torrents. Release passed its full run; Debug required an isolated retry of the T1 local-seeder fixture. Both final repaired torrent suites passed 313 management checks and 142 foundation checks. Initial T2 CI exposed a selected-file disk-ordering failure that was repaired and is recorded separately. [Recorded evidence](docs/DEVELOPMENT_PROGRESS.md) distinguishes complete runs, final affected-group reruns, Windows CI and release verification. Earlier exact-source T1 CI passed 17 Release/17 Debug groups and 13 existing HTTP/GUI portable checks; actual isolated Chrome runs belong to that earlier verification. No fresh-VM, public-swarm or packaged torrent acceptance is claimed.
+T2's final explicit-flush repair passes 315 management and 142 foundation checks in each local build. Two earlier exact-source CI runs failed and remain recorded as failures. T3 passes its hidden native GUI acceptance group in both configurations after fixture repairs; all existing regression groups pass. Its final build/test results are recorded in [development progress](docs/DEVELOPMENT_PROGRESS.md). Earlier source-specific browser/media checks remain separate evidence. No fresh Windows CI, clean-VM, public-swarm or packaged torrent acceptance is claimed for local T3; no commits or pushes are part of the latest request.
 
 Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
 

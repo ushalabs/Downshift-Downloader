@@ -76,14 +76,21 @@ MediaDialog::~MediaDialog(){process_.disconnect(this);deadline_.stop();if(job_){
 QStringList MediaDialog::baseArguments() const {
     return {"--ignore-config","--no-plugin-dirs","--no-playlist","--no-colors","--socket-timeout","20","--retries","3","--fragment-retries","3","--js-runtimes","deno:"+QDir(tools_).filePath("deno.exe"),"--ffmpeg-location",tools_};
 }
-void MediaDialog::inspect(){verifying_=false;ready_=false;quality_->clear();status_->setText("Checking available qualities…");auto args=baseArguments();args << "--dump-single-json" << "--skip-download" << "--" << url_;launch(args,true);}
+void MediaDialog::inspect(){
+    if(process_.state()!=QProcess::NotRunning || persisting_)return;
+    verifying_=false;ready_=false;quality_->clear();status_->setText("Checking available qualities…");auto args=baseArguments();
+    // Full info JSON includes every segment URL, subtitles and thumbnails. A
+    // normal long video can exceed megabytes even with few quality choices.
+    // Request only the fields used by this form, keeping the bounded parser.
+    args << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live})j,\"formats\":%(formats.:.{height,vcodec,protocol,has_drm,url})j}" << "--skip-download" << "--" << url_;launch(args,true);
+}
 void MediaDialog::launch(QStringList arguments,bool metadata) {
     output_.clear();errors_.clear();lastError_.clear();metadata_=metadata;cancelled_=false;download_->setEnabled(false);browse_->setEnabled(false);quality_->setEnabled(false);cancel_->setText("Cancel");progress_->setRange(0,0);
     process_.setProgram(QDir(tools_).filePath("yt-dlp.exe"));process_.setArguments(arguments);process_.start();if(metadata)deadline_.start(90000);
 }
 void MediaDialog::readOutput() {
     output_.append(process_.readAllStandardOutput());
-    if(output_.size()>4*1024*1024){lastError_="The video's metadata exceeded the supported limit.";cancelled_=true;if(job_)TerminateJobObject(job_,1);else process_.kill();return;}
+    if(output_.size()>4*1024*1024){lastError_=metadata_ ? "The site's quality summary is unexpectedly large. No download was started.":"The video helper returned too much output. Saved files are preserved.";output_.clear();if(job_)TerminateJobObject(job_,1);else process_.kill();return;}
     if(metadata_ || verifying_)return;
     while(output_.contains('\n') || (process_.state()==QProcess::NotRunning && !output_.isEmpty())) {
         const auto index=output_.contains('\n') ? output_.indexOf('\n'):output_.size();const auto line=output_.left(index).trimmed();output_.remove(0,index+1);
@@ -115,8 +122,9 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
         if(!video || info.value("format").toObject().value("duration").toString().toDouble()<=0) {settle(QueueStatus::Failed,"The saved output is not a valid recorded video. Retry the download.");return;}
         settle(QueueStatus::Completed);return;
     }else if(metadata_) {
-        const auto document=QJsonDocument::fromJson(output_);const auto info=document.object();QSet<int> heights;bool playable=false;
-        for(const auto& value:info.value("formats").toArray()) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString();if(format.value("has_drm").toBool() || codec=="none" || codec=="images" || format.value("protocol")=="mhtml" || format.value("url").toString().isEmpty())continue;playable=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
+        QJsonParseError parseError{};const auto document=QJsonDocument::fromJson(output_,&parseError);const auto summary=document.object(),info=summary.value("meta").toObject();QSet<int> heights;bool playable=false;
+        if(parseError.error!=QJsonParseError::NoError || !document.isObject() || info.isEmpty() || !summary.value("formats").isArray()){retryable("The site returned an invalid quality summary. Retry the check.");return;}
+        for(const auto& value:summary.value("formats").toArray()) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString();if(format.value("has_drm").toBool() || codec=="none" || codec=="images" || format.value("protocol")=="mhtml" || format.value("url").toString().isEmpty())continue;playable=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
         if(info.isEmpty() || info.value("_type")=="playlist" || info.value("_type")=="multi_video" || !playable || info.value("has_drm").toBool() || info.value("is_live").toBool()) {
             retryable(info.value("_type")=="playlist" || info.contains("entries") ? "This address is a feed or playlist, not one video. Open the video and use its player button, or paste its watch link.":"No downloadable video formats were found. Try a public recorded video link.");
         }

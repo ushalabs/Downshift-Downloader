@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QLabel>
+#include "torrent/TorrentEngine.h"
 #include <optional>
 class QTableWidget;
 class QLineEdit;
@@ -18,13 +19,16 @@ public:
     const QueueSnapshot& current() const { return current_; }
     void openAdd(QString address={},QString filename={});
     void confirmDownload(const QueueEntry& entry);
-    void captureError(){message("Chrome is paused: this download could not be handed over. Check the extension, retry, or turn it off to download with Chrome.",true);}
+    void captureError(){message("Connecting your browser download to Downshift…",false);}
     void openSettings();
     void openVideo(QString url,QString title,QString folder={});
     void refresh();
+    void attachTorrents(torrent::TorrentEngine& engine);
+    void openTorrent();
     void chromeStatus(QString status){chromeStatus_=std::move(status);if(auto* label=findChild<QLabel*>("chromeStatus"))label->setText("Chrome integration: "+chromeStatus_);}
 private:
     void resizeEvent(QResizeEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
     template<class T,class F> void watch(std::future<T> future,F success) {
         auto pending=std::make_shared<std::future<T>>(std::move(future)); auto* timer=new QTimer(this); timer->setInterval(30);
         connect(timer,&QTimer::timeout,this,[this,timer,pending,success=std::move(success)]() mutable {
@@ -42,6 +46,9 @@ private:
     void more();
     void message(const QString& text,bool error=false);
     const QueueEntry* selected() const;
+    const torrent::Snapshot* selectedTorrent() const;
+    void torrentMenu();
+    void renderTorrentRow(int row,const torrent::Snapshot& snapshot);
     QueueManager& queue_;
     QueueSnapshot current_;
     std::optional<std::future<QueueSnapshot>> pending_;
@@ -51,7 +58,12 @@ private:
     QLineEdit* search_=nullptr;
     QComboBox* view_=nullptr;
     int page_=0;
-    std::vector<std::size_t> displayOrder_;
+    struct DisplayRow { bool torrent=false;std::size_t index=0; };
+    std::vector<DisplayRow> displayOrder_;
+    torrent::TorrentEngine* torrents_=nullptr;
+    std::vector<torrent::Snapshot> torrentRows_;
+    std::optional<std::future<std::vector<torrent::Snapshot>>> torrentPending_;
+    bool torrentClosing_=false,torrentClosed_=false;
     QLabel *summary_=nullptr,*speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
     QLabel *totalMetric_=nullptr,*activeMetric_=nullptr,*dataMetric_=nullptr,*emptyHelp_=nullptr,*identity_=nullptr;
     QWidget *sidebar_=nullptr,*emptyPanel_=nullptr,*detailsContainer_=nullptr;

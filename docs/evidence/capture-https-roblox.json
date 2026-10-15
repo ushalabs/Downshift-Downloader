@@ -1,0 +1,28 @@
+{
+  "url": "https://setup.rbxcdn.com/RobloxStudioInstaller.exe",
+  "extensionVersion": "0.4.2",
+  "chromeVersion": "155.0.8059.39",
+  "seconds": 14.315,
+  "bytes": 13797840,
+  "sha256": "8b27af84f33c8601dc7cde7433c2577e04063b6a409dd1433676e02984f50af6",
+  "referenceSha256": "8b27af84f33c8601dc7cde7433c2577e04063b6a409dd1433676e02984f50af6",
+  "status": "Completed",
+  "nativeBridge": "separate test host and pipe; normal registration untouched",
+  "chromeCreatedDownloads": 0,
+  "queueRecords": 1,
+  "driverSha256": "08a39cdd8501502fc6e68c2910e266e35ed58265762d4d0ed7dc8ed6ff288076",
+  "sources": {
+    "CMakeLists.txt": "e5ecd1d2d76132e7ae5c760eeb88560e26122a1081992e6767d357606feeae51",
+    "extension/background.js": "4c85c27ad9e94f705e29bdee3d9cd65f60b6e7dd60b4ff6efa031fa7b5b9b5d4",
+    "extension/file-links.js": "dc82f9d124f816bf0a6d3a110dcbce5ffc3a5ca264176cd44fd9b34772334ed4",
+    "extension/handoff.js": "df2aa8bee03b91deddc7b7577312a0d876a4895a7a5dab87b0d07ae4f6213a3c",
+    "src/browser/PipeServer.cpp": "e2e143358f2ded937eeca9cc8d013e69d97986a8db502988ba65c1d3279b2fa2",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "b24c483d41784528c2e03a457108c97d09f3b7faec18f36202d31437fb4167fd",
+    "src/core/DownloadQueue/QueueManager.cpp": "1b025d344d4bfdb7b91aa791943e89c5d93b432d64862a08e8c7051e20200b1a",
+    "src/gui/MainWindow.cpp": "3b7d0745e842bc5346e04bf56f1d18ec89a5f3fa99059f55470a21e6e722fbff",
+    "src/gui/Controls.h": "284bbf476102829372c745a1cb4bbb639feeae35dd7173f099787262312008af",
+    "tests/IsolatedBrowser.cjs": "39a2c31ba97acbfe7d16c3c883392c5192794dc5a6748e5fdae11002773be7f9",
+    "tests/LiveFileCheck.cjs": "a034239c7f0731edab454e1b06d56b12b24c7a9b942228662552ed8bf55abe21"
+  },
+  "scope": "Actual trusted Chrome file link, native destination/start window, complete Internet file, persisted completion and independent curl-file hash; no execution or ISP-capacity claim"
+}

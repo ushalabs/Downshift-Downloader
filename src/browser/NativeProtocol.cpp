@@ -27,12 +27,18 @@ void useIsolatedTestPipe(){isolatedTestPipe=true;}
 QJsonObject parse(const QByteArray& data) {if(data.isEmpty() || data.size()>maximumMessage)fail();QJsonParseError error{};const auto doc=QJsonDocument::fromJson(data,&error);if(error.error!=QJsonParseError::NoError || !doc.isObject())fail();return doc.object();}
 void validate(const QJsonObject& request) {
     if(request.value("version")!=QJsonValue(1) || !request.value("command").isString())fail();const auto command=request.value("command").toString();QSet<QString> allowed={"version","command"};
-    if(command=="prepare"){
-        allowed.unite({"key","url","filename","total","mime","serverFilename"});if(!hexadecimal(request.value("key").toString()))fail();
+    if(command=="prepare" || command=="browser-prepare"){
+        allowed.unite({"key","url","filename","total","mime","serverFilename","sourceEtag"});if(!hexadecimal(request.value("key").toString()))fail();
+        if(request.contains("sourceEtag") && (!request.value("sourceEtag").isString() || request.value("sourceEtag").toString().size()>512 || request.value("sourceEtag").toString().contains('\r') || request.value("sourceEtag").toString().contains('\n')))fail();
         if(request.contains("serverFilename") && !request.value("serverFilename").isBool())fail();
         if(request.contains("mime") && (!request.value("mime").isString() || request.value("mime").toString().size()>120 || request.value("mime").toString().contains(QChar(0))))fail();
         const auto url=request.value("url").toString(),name=request.value("filename").toString();if(url.isEmpty() || url.size()>32768 || url.contains(QChar(0)) || name.isEmpty() || name.size()>160 || name.contains(QChar(0)))fail();
         if(request.contains("total")){bool valid=false;const auto n=request.value("total").toString().toLongLong(&valid);if(!valid || n < -1)fail();}
+    }else if(command=="browser-update"){
+        allowed.unite({"key","file","complete","total","received","sourceError"});if(!hexadecimal(request.value("key").toString()) || !request.value("file").isString() || request.value("file").toString().size()>32768 || request.value("file").toString().contains(QChar(0)) || !request.value("complete").isBool())fail();
+        if(request.contains("sourceError")){const auto value=request.value("sourceError").toString();if(!request.value("sourceError").isString() || value.size()>80 || std::any_of(value.begin(),value.end(),[](QChar c){return !QString("ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789").contains(c);}))fail();}
+        bool valid=false;const auto n=request.value("total").toString().toLongLong(&valid);if(!valid || n < -1 || (request.value("complete").toBool() && n<0))fail();
+        if(request.contains("received")){bool ok=false;const auto count=request.value("received").toString().toLongLong(&ok);if(!ok || count<0)fail();}
     }else if(command=="media"){
         allowed.unite({"url","title"});const auto address=request.value("url").toString();const QUrl url(address);
         if(address.isEmpty() || address.size()>32768 || address.contains(QChar(0)) || !url.isValid() || (url.scheme()!="https" && url.scheme()!="http") || url.host().isEmpty() || !url.userInfo().isEmpty())fail();
@@ -40,9 +46,9 @@ void validate(const QJsonObject& request) {
     }else if(command=="commit" || command=="abort" || command=="status"){
         allowed.insert("key");if(!hexadecimal(request.value("key").toString()))fail();
         if(command=="commit"){
-            allowed.unite({"browserCancelled","browserNotStarted","prompt"});
-            const bool cancelled=request.value("browserCancelled")==QJsonValue(true),notStarted=request.value("browserNotStarted")==QJsonValue(true);
-            if(cancelled==notStarted || (request.contains("browserCancelled") && !request.value("browserCancelled").isBool()) || (request.contains("browserNotStarted") && !request.value("browserNotStarted").isBool()) || (request.contains("prompt") && !request.value("prompt").isBool()))fail();
+            allowed.unite({"browserCancelled","browserNotStarted","browserTransport","prompt"});
+            const bool cancelled=request.value("browserCancelled")==QJsonValue(true),notStarted=request.value("browserNotStarted")==QJsonValue(true),transport=request.value("browserTransport")==QJsonValue(true);
+            if(static_cast<int>(cancelled)+static_cast<int>(notStarted)+static_cast<int>(transport)!=1 || (request.contains("browserTransport") && !request.value("browserTransport").isBool()) || (request.contains("browserCancelled") && !request.value("browserCancelled").isBool()) || (request.contains("browserNotStarted") && !request.value("browserNotStarted").isBool()) || (request.contains("prompt") && !request.value("prompt").isBool()))fail();
         }
     }else if(command!="ping" && command!="open" && command!="blocked")fail();
     for(auto i=request.begin();i!=request.end();++i)if(!allowed.contains(i.key()))fail();

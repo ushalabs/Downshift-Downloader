@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-15",
+  "version": "0.4.4",
+  "status": "local verified; normal Chrome extension reload remains manual",
+  "confirmedRootCauses": [
+    "Completed Chrome history accepted as a new capture from metadata/restoration events.",
+    "The supplied video returns full metadata above the GUI output limit; retrying repeats the same overflow."
+  ],
+  "qualityMetadata": {
+    "videoId": "vwLAqU1HvQ8",
+    "originalBytes": 11672480,
+    "oldLimitBytes": 4194304,
+    "projectedBytes": 226299,
+    "formatRecords": 182,
+    "helperUpdated": false,
+    "syntheticFullMetadataBytes": 8463754,
+    "syntheticSegments": 60000
+  },
+  "validation": {
+    "releaseAffectedGroups": {
+      "passed": 7,
+      "failed": 0,
+      "seconds": 134.15
+    },
+    "debugInitial": {
+      "passed": 5,
+      "failed": 2,
+      "failures": "gui.media outer 180s timeout; gui.integration child 60s timeout during concurrent validation; excluded from acceptance"
+    },
+    "debugIsolatedReruns": {
+      "gui.integration": {
+        "passed": true,
+        "seconds": 44.65
+      },
+      "gui.media": {
+        "passed": true,
+        "seconds": 122.85
+      }
+    },
+    "assertions": {
+      "extensionState": 72,
+      "bridgeModel": 12,
+      "mediaExtension": 27,
+      "nativeProtocol": 36,
+      "nativeTransfer": 25,
+      "mediaGui": 68,
+      "gui": 113
+    },
+    "actualChromeChecks": 25,
+    "fullSuppliedYouTube": {
+      "completed": true,
+      "selected": "128p",
+      "bytes": 40204888,
+      "durationSeconds": 1232.352,
+      "hasAudioAndVideo": true,
+      "independentFfprobeAndSha256": true
+    }
+  },
+  "preservation": {
+    "normalHistory": 43,
+    "paused": 1,
+    "active": 0,
+    "encryptedRowsAndSettingsUnchanged": true,
+    "cancelledImportsBulkDeleted": false,
+    "existingFilesDeleted": false,
+    "sqliteImplementationOrSchemaChanged": false,
+    "torrentEditsBuildsOrTestsByThisTask": false,
+    "normalBrowserProfileOrRegistrationChanged": false,
+    "commitsOrPushes": false
+  },
+  "sources": {
+    "CMakeLists.txt": "c71bad69be864de66d211cdb57d0da03be14d1568644f872ce1b9c5f53e33a78",
+    "extension/manifest.json": "c7acd11a9183634b0c7c5756a9c8d44af37d4c2833079bb66d4d6ad760855a6d",
+    "extension/background.js": "37a05babf5acd11c81f201e41d465090a03f7e9529b47c78b479336a73900f6e",
+    "extension/handoff.js": "2f74317b519f8c66195fc025596ee933141abe41277c61c17768e180dd643762",
+    "src/gui/MediaDialog.cpp": "2cf1a9cdd1fb874b65222cbc3fd5d2e083c70613bb2e885ef20bfa93e6899cb5",
+    "tests/MediaIntegration.py": "b1068bbabb033ec893eedd75fb8004b013b217d02e231b2c3c811dd942605bdb",
+    "tests/MediaTests.cpp": "ed8aeb8f92dafb65326bffa60333e17fde7fcfd7c4efe7f683a9eb389261dd5c",
+    "tests/ExtensionTests.mjs": "533cd565819e8343f51b56cc71986e22a6787881673a0f7bbccec39752287a36",
+    "tests/ChromeTests.cjs": "74294340634fc5f961e16b8d5e9fd20e176a2b5c68d52afb714fcd37087d0f55",
+    "tests/LiveYouTubeCheck.cjs": "b1a4cff4f8c7b7ab10116f9d2ce8c49416e59895b6aeea629430e0104843759c"
+  }
+}

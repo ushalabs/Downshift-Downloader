@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "442e7137777c46c18932616ac9c3e166aa840b73",
+  "runId": 38618479248,
+  "url": "https://github.com/ushalabs/Downshift-Download-Manager/actions/runs/38618479248",
+  "conclusion": "failure",
+  "release": {
+    "passed": 16,
+    "total": 18,
+    "seconds": 270.3
+  },
+  "failures": [
+    {
+      "group": "torrent.management",
+      "message": "Newly selected file hash (v2)"
+    },
+    {
+      "group": "browser.extension",
+      "message": "30-second timeout"
+    }
+  ],
+  "debugAndPortable": "Not run after Release failure",
+  "resolution": "Subsequent local torrent repair waits for explicit cache_flushed_alert before checkpoint. No new CI is claimed."
+}

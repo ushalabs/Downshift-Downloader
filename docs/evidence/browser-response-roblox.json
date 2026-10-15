@@ -1,0 +1,30 @@
+{
+  "url": "https://setup.rbxcdn.com/RobloxStudioInstaller.exe",
+  "extensionVersion": "0.4.3",
+  "chromeVersion": "155.0.8059.39",
+  "seconds": 6.215,
+  "bytes": 13797840,
+  "sha256": "8b27af84f33c8601dc7cde7433c2577e04063b6a409dd1433676e02984f50af6",
+  "referenceSha256": "8b27af84f33c8601dc7cde7433c2577e04063b6a409dd1433676e02984f50af6",
+  "status": "Completed",
+  "nativeBridge": "separate test host and pipe; normal registration untouched",
+  "chromeCreatedDownloads": 1,
+  "chromeRetainedDownloads": 0,
+  "queueRecords": 1,
+  "driverSha256": "93b286f05ca98c3a570f62c761ce385096ab38c8ba54fe7bbcf4bbf3934f6f57",
+  "sources": {
+    "CMakeLists.txt": "caf6b127dcffa3f82dfc3cbf8b987e11dccaebaef8e4361f84576b66b68ff8c2",
+    "extension/background.js": "bd496bd056cf014c28b7395afb971e5dfe1a9abaa2fc6b9f83a1d34dd8d12256",
+    "extension/file-links.js": "a59d45f4feddba9aca45f44298363339e9083d18798724cd40711968e35dcf91",
+    "extension/handoff.js": "eb4f1d9b8fcef76819409962e75f8b5edb47df220991259177f60d7c2dfdabb7",
+    "extension/browser-transfer.js": "8d118263986aec5c0cab2e25852a1221856139e07f9fee67a94aba7c577305cf",
+    "src/browser/PipeServer.cpp": "9c108a5a4dd31176114990f45b676f1c1a63edf5cbd2bc17fe02e52fd471064f",
+    "src/core/DownloadEngine/DownloadEngine.cpp": "b24c483d41784528c2e03a457108c97d09f3b7faec18f36202d31437fb4167fd",
+    "src/core/DownloadQueue/QueueManager.cpp": "c679fe7f5cc03502b797cdb374517c8049c103305fda462e72e1e8aa0bc384e9",
+    "src/gui/MainWindow.cpp": "6c92321cad848fc873e691c6bcf59ef9b12c1c8582b48d6eaa48d33a56a3f1bc",
+    "src/gui/Controls.h": "284bbf476102829372c745a1cb4bbb639feeae35dd7173f099787262312008af",
+    "tests/IsolatedBrowser.cjs": "39a2c31ba97acbfe7d16c3c883392c5192794dc5a6748e5fdae11002773be7f9",
+    "tests/LiveFileCheck.cjs": "4697095036ac9f329bb099ffde0af87943b8e5634823a5a39cd8961f821a1731"
+  },
+  "scope": "Actual trusted Chrome file link, native destination/start window, complete Internet file, persisted completion and independent curl-file hash; no execution or ISP-capacity claim"
+}

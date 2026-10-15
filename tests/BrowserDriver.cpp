@@ -42,6 +42,10 @@ int main(int argc,char** argv) {
             }},Qt::BlockingQueuedConnection);std::cout<<QJsonDocument(media).toJson(QJsonDocument::Compact).constData()<<std::endl;continue;
         }
         if(line.starts_with("remove "))queue.action(QString::fromStdString(line.substr(7)),downshift::QueueAction::Remove).get();
+        if(line.starts_with("pause "))queue.action(QString::fromStdString(line.substr(6)),downshift::QueueAction::Pause).get();
+        if(line.starts_with("resume "))queue.action(QString::fromStdString(line.substr(7)),downshift::QueueAction::Start).get();
+        if(line.starts_with("cancel "))queue.action(QString::fromStdString(line.substr(7)),downshift::QueueAction::Cancel).get();
+        if(line.starts_with("restart "))queue.action(QString::fromStdString(line.substr(8)),downshift::QueueAction::Restart).get();
         QJsonArray rows;for(const auto& e:queue.snapshot().get().entries)rows.append(e.json());std::cout<<QJsonDocument(rows).toJson(QJsonDocument::Compact).constData()<<std::endl;
     }QMetaObject::invokeMethod(&app,&QCoreApplication::quit,Qt::QueuedConnection);});
     const int result=app.exec();

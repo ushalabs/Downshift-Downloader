@@ -59,7 +59,7 @@ void MainWindow::confirmDownload(const QueueEntry& row) {
     auto* error=new QLabel;error->setWordWrap(true);error->setTextFormat(Qt::PlainText);layout->addWidget(error);auto* actions=new QDialogButtonBox(QDialogButtonBox::Cancel);auto* start=actions->addButton("Start download",QDialogButtonBox::AcceptRole);start->setObjectName("captureStart");start->setProperty("primary",true);layout->addWidget(actions);connect(actions,&QDialogButtonBox::rejected,dialog,&QDialog::reject);
     connect(start,&QPushButton::clicked,dialog,[this,dialog,path,start,error,row]{start->setEnabled(false);auto pending=std::make_shared<std::future<void>>(queue_.rename(row.id,path->text()));auto* timer=new QTimer(dialog);timer->setInterval(30);
         connect(timer,&QTimer::timeout,dialog,[this,dialog,start,error,pending,timer,row]{if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();try{pending->get();watch(queue_.action(row.id,QueueAction::Start),[guard=QPointer<QDialog>(dialog)]{if(guard)guard->accept();});}catch(const std::exception& e){start->setEnabled(true);error->setText(QString::fromUtf8(e.what()));}});timer->start();
-    });dialog->show();raise();activateWindow();
+    });if(row.browserTransfer)connect(dialog,&QDialog::rejected,this,[this,row]{watch(queue_.action(row.id,QueueAction::Cancel),[]{});});dialog->show();raise();activateWindow();
 }
 void MainWindow::openSettings() {
     if(auto* old=findChild<QDialog*>("settingsDialog")){old->raise();old->activateWindow();return;}
@@ -92,6 +92,7 @@ void MainWindow::openSettings() {
 }
 
 void MainWindow::more() {
+    if(selectedTorrent()){torrentMenu();return;}
     const auto* e=selected();if(!e)return;const auto row=*e;QMenu menu(this);
     const auto removeHistory=[this,row]{if(QMessageBox::question(this,"Remove download history","Remove this history entry? The file and any partial download will be kept.",QMessageBox::Yes|QMessageBox::No,QMessageBox::No)==QMessageBox::Yes)watch(queue_.action(row.id,QueueAction::Remove),[this]{message("History removed. Files were preserved.");});};
     for(const auto& pair:std::vector<std::pair<QPushButton*,QueueAction>>{{start_,QueueAction::Start},{pause_,QueueAction::Pause},{cancel_,QueueAction::Cancel}}){auto* action=menu.addAction(pair.first->icon(),pair.first->text(),[this,kind=pair.second]{perform(kind);});action->setEnabled(pair.first->isEnabled());}menu.addSeparator();

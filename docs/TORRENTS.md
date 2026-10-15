@@ -1,6 +1,6 @@
-# Torrent engine and management: Phases T1–T2
+# Torrent engine, management and Qt interface: Phases T1–T3
 
-T1 is the native engine foundation. The current direct request authorizes T2 management/persistence. Qt torrent pages/dialogs (T3) and full torrent packaging acceptance (T4) still require separate approval. The existing HTTP GUI/browser remain on libcurl and SQLite. No torrent file association or magnet browser takeover is registered.
+T1 supplies the native foundation and T2 management/persistence. The current direct request authorizes T3 Qt integration after passing T2. T4 full acceptance and packaging require subsequent approval. The existing HTTP GUI/browser remain on libcurl and SQLite. No torrent file association or magnet browser takeover is registered.
 
 ## Dependency and architecture
 
@@ -63,7 +63,7 @@ An encrypted acceptance marker changes atomically with Add/Remove. Unexpected di
 
 ### Recovery and selected-file correctness
 
-Add first commits recoverable native metadata/magnet state. Subsequent save_resume_data(flush_disk_cache | save_info_dict) alerts provide native checkpoints, including metadata and counters. Explicit pause/configuration/selection/checkpoint futures settle after encryption and SQLite commit. Overlapping saves are serialized/coalesced; later commands wait for a later native save. Periodic checkpoints run every 15 seconds. Shutdown pauses handles, drains saves/removals with a bounded 20-second alert wait, then joins native workers. Failure reports an error while retaining previous checkpoints.
+Add first commits recoverable native metadata/magnet state. For metadata-backed torrents, explicit flush_cache/cache_flushed_alert completes before save_resume_data(save_info_dict) serializes checkpoints. The pinned implementation queues flush_disk_cache without waiting before posting resume data; that flag alone is insufficient. Metadata-free magnets save directly because no payload storage exists. Explicit pause/configuration/selection/checkpoint futures settle after encryption and SQLite commit. Overlapping saves are serialized/coalesced; later commands wait for a later native save. Periodic checkpoints run every 15 seconds. Shutdown pauses handles, drains saves/removals with a bounded 20-second alert wait, then joins native workers. Failure reports an error while retaining previous checkpoints.
 
 Selection changes wait for the native file-priority disk operation before checkpointing. Newly selected files are rehashed after part-file migration; their earlier in-memory piece map cannot establish correctness of moved bytes. Both Complete and Seeding transitions wait for the native flush/checkpoint, and an earlier seeding snapshot is invalidated when selection changes. The repeated selection regression fails against the previous backend and passes with this ordering repair.
 
@@ -99,10 +99,20 @@ Upstream references: [resume serialization and trust](https://libtorrent.org/ref
 
 ### T2 verification
 
-Final repaired local Release/Debug torrent groups each pass 313 T2 management checks and 142 T1 foundation checks. Full regression coverage, initial local seeder timeouts, the first CI selected-file hash failure and subsequent repair are recorded in DEVELOPMENT_PROGRESS.md and evidence/torrent-t2-*. Exact-source Windows CI delivery is recorded separately after the main push. Fixtures use private stores/destinations and hidden process children. Public swarms, disk-full, multi-peer stress and packaged torrent acceptance remain T4. No new release is published; T3 is not started automatically.
+The final T2 explicit-flush repair passes 315 management and 142 foundation checks per local build. Earlier 313-check results and both failed CI runs remain historical. Full regression coverage, initial local seeder timeouts, the first CI selected-file hash failure and subsequent repair are recorded in DEVELOPMENT_PROGRESS.md and evidence/torrent-t2-*. Exact-source Windows CI delivery is recorded separately after the main push. Fixtures use private stores/destinations and hidden process children. Public swarms, disk-full, multi-peer stress and packaged torrent acceptance remain T4. No new release is published; T3 is not started automatically.
 
 ## T1 historical verification status
 
 Exact-source Windows CI run 38570946997 passed 17/17 Release groups, 17/17 Debug groups and 13 existing HTTP/GUI portable checks, without skipped test groups. See evidence/torrent-t1-ci.json. This does not constitute a public torrent release or future torrent GUI/persistence acceptance.
 
 The normal MSVC Release and Debug builds passed all 17 local test groups. Each torrent group passed 142 assertions, including six complete local-peer transfers across piece boundaries, all twelve final-file SHA-256 comparisons, runtime/header version match (2.1.2.0, ABI 100), invalid/oversized input, symlink/file-count rejection, duplicates, unavailable metadata/cancellation, destination errors, queued Qt delivery and startup/shutdown races. Release CLI help and invalid invocation exit behavior also passed. Complete HTTP, encrypted queue/recovery, browser and GUI regressions remain included. See DEVELOPMENT_PROGRESS.md and evidence/torrent-t1-local.json for final results and scopes. Public swarm/DHT/tracker reachability, multi-peer load, disk-full and full torrent recovery/seeding policy acceptance remain unverified/deferred; this is T1, not T4.
+
+## T3 Qt integration
+
+Choose Torrents in the sidebar, then Add torrent. Paste a magnet link or browse for a .torrent file, choose a separate destination and Read metadata. Parsing and peer lookup run on the native torrent worker. The preview does not request payload pieces; magnets pause after metadata arrives. Choose file priorities (Skip or 1–7) and confirm Add paused, or explicitly enable Start downloading. Cancel removes the preview record while retaining any existing files. Unknown peers/metadata can remain waiting; cancel is available. A preview interrupted by app shutdown restores paused and remains subject to file confirmation.
+
+All downloads shows typed HTTP/video/torrent rows together; filters, search and sorting use stable identifiers. Torrents has its own filter. Resume, Pause and Cancel route to the selected row's native adapter. Seeding, verified selected progress, upload rate, seeds, peers and ratio remain torrent-specific. Details opens Overview, Files, Trackers, Peers and Settings. Apply files and settings commits native selection, per-task limits and stop/ratio/time/manual seeding policy. Torrent limits in the sidebar controls the aggregate native session, not HTTP scheduling. Tracker hosts are displayed without URL tokens; peer addresses are visible only in the explicit details window.
+
+Normal startup uses a companion torrents.sqlite in the already resolved HTTP data directory. The HTTP database/schema/settings are not migrated or copied into it. Qt merges copied snapshots for display only. Optional encrypted torrent-record fields add creation time and metadata-only preview status within schema version 1; older T2 records default to non-preview. Startup restores paused and rechecks before payload reuse. Main-window close keeps the event loop responsive while checkpointing; the worker retains native ownership and joins at teardown.
+
+No .torrent association, magnet protocol registration, browser magnet interception or automatic file execution is added. The existing 0.4.4 browser/media code stays in place. New commits and pushes are reserved for the user. T3 is locally verified: all 21 groups pass per configuration across the full batches and affected GUI reruns, including 67 GUI checks in Release and 67 in Debug. Exact full-run failures and corrected fixture reruns are distinguished in evidence/torrent-t3-local.json. No new CI, package or release is claimed. Public-swarm/load/disk-full and packaged acceptance remain T4.

@@ -1,10 +1,10 @@
-param([Parameter(Mandatory=$true)][string]$PackagePath,[string]$ReportPath='')
+param([Parameter(Mandatory=$true)][string]$PackagePath,[string]$ReportPath='', [string]$TorrentTestDriver='', [string]$PythonExecutable='')
 $ErrorActionPreference='Stop'
 $package=(Resolve-Path -LiteralPath $PackagePath).Path
 $tempRoot=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $testRoot=Join-Path $tempRoot ('Downshift portable test '+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
-$registryPath='Software\Google\Chrome\NativeMessagingHosts\org.ushalabs.downshift'
+$registryPath='Software\Google\Chrome\NativeMessagingHosts\org.ushalabs.downshift.packaging-test'
 $registry=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,[Microsoft.Win32.RegistryView]::Registry64)
 function Read-Registration {
     $key=$registry.OpenSubKey($registryPath)
@@ -26,17 +26,30 @@ try {
         if(!$path.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Manifest path escaped app folder.'}
         if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "Package integrity failure: $($file.path)"}
     };$checks++
-    foreach($required in @('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','libcurl.dll','sqlite3.dll','platforms/qwindows.dll','licenses/qtbase/copyright')){if(!(Test-Path -LiteralPath (Join-Path $root $required))){throw "Missing runtime or license: $required"}};$checks++
+    $sourceArchive=Join-Path (Split-Path $package -Parent) ("Downshift-"+$manifest.version+"-application-source.zip")
+    if((Get-FileHash -LiteralPath $sourceArchive -Algorithm SHA256).Hash.ToLower() -ne $manifest.sourceArchiveSha256){throw 'Application source archive does not match binary manifest.'}
+    $snapshot=Get-Content -LiteralPath (Join-Path $root 'source-snapshot.json') -Raw -Encoding utf8|ConvertFrom-Json
+    $compiled=Get-Content -LiteralPath (Join-Path $root 'build-source.json') -Raw -Encoding utf8|ConvertFrom-Json
+    foreach($item in $compiled.files.PSObject.Properties){if($snapshot.sourceSnapshot.($item.Name) -ne $item.Value){throw 'Compiled source fingerprint differs from source archive inventory.'}}
+    $sourceZip=[IO.Compression.ZipFile]::OpenRead($sourceArchive)
+    try {
+        foreach($item in $snapshot.sourceSnapshot.PSObject.Properties){
+            $entry=$sourceZip.GetEntry($item.Name);if(!$entry){throw 'Application source file missing.'}
+            $input=$entry.Open();$hash=[Security.Cryptography.SHA256]::Create()
+            try {$actual=([BitConverter]::ToString($hash.ComputeHash($input))).Replace('-','').ToLower();if($actual -ne $item.Value){throw 'Application source content differs.'}}finally{$hash.Dispose();$input.Dispose()}
+        }
+    }finally{$sourceZip.Dispose()};$checks++
+    foreach($required in @('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','libcurl.dll','sqlite3.dll','platforms/qwindows.dll','licenses/qtbase/copyright','Qt6Network.dll','torrent-rasterbar.dll','libcrypto-3-x64.dll','imageformats/qwebp.dll','imageformats/qjpeg.dll','tls/qschannelbackend.dll','jpeg62.dll','libwebp.dll','libwebpdemux.dll','libwebpmux.dll','libsharpyuv.dll','licenses/libtorrent/copyright','licenses/openssl/copyright','licenses/boost-asio/copyright','licenses/qtimageformats/copyright','licenses/libwebp/copyright','source-snapshot.json','build-source.json','TORRENTS.md')){if(!(Test-Path -LiteralPath (Join-Path $root $required))){throw "Missing runtime or license: $required"}};$checks++
     if(Test-Path -LiteralPath (Join-Path $root 'media-tools')){throw 'Optional upstream media executables must not be redistributed in this package.'};$checks++
     $extension=Get-Content -LiteralPath (Join-Path $root 'extension/manifest.json') -Raw|ConvertFrom-Json
     if($extension.version -ne $manifest.version){throw 'Extension/product version mismatch.'};$checks++
     $shortcut=Join-Path $testRoot 'Downshift.lnk';$shell=New-Object -ComObject WScript.Shell
     $oldLink=$shell.CreateShortcut($shortcut);$oldLink.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$oldLink.Save()
     $oldBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($shortcut))
-    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut
-    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut
+    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -IsolatedTest
+    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -IsolatedTest
     $registered=Read-Registration
-    if($registered -ne (Join-Path $root 'org.ushalabs.downshift.json')){throw 'Native host registration failed.'};$checks++
+    if($registered -ne (Join-Path $root 'org.ushalabs.downshift.packaging-test.json')){throw 'Native host registration failed.'};$checks++
     $hostManifest=Get-Content -LiteralPath $registered -Raw|ConvertFrom-Json
     if($hostManifest.path -ne (Join-Path $root 'DownshiftNativeHost.exe') -or $hostManifest.allowed_origins.Count -ne 1 -or $hostManifest.allowed_origins[0] -ne 'chrome-extension://empnpdkfnffpcgnfgdndkbielplcoioe/'){throw 'Invalid native host manifest.'};$checks++
     $link=$shell.CreateShortcut($shortcut)
@@ -46,7 +59,7 @@ try {
     $env:PATH="$env:WINDIR\System32;$env:WINDIR";$env:QT_PLUGIN_PATH='';$env:QT_QPA_PLATFORM='windows'
     $process=Start-Process -FilePath (Join-Path $root 'Downshift.exe') -ArgumentList '--smoke-test' -WorkingDirectory $testRoot -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $testRoot 'startup-error.txt')
     $null=$process.Handle
-    $requiredModules=@('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','libcurl.dll','sqlite3.dll','msvcp140.dll','vcruntime140.dll')
+    $requiredModules=@('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','libcurl.dll','sqlite3.dll','torrent-rasterbar.dll','libcrypto-3-x64.dll','Qt6Network.dll','msvcp140.dll','vcruntime140.dll')
     $seen=@{};$deadline=[DateTime]::UtcNow.AddSeconds(8)
     do {
         $process.Refresh();if($process.HasExited){break}
@@ -61,17 +74,26 @@ try {
     $process.Refresh()
     if($process.ExitCode -ne 0){throw "Packaged startup failed ($($process.ExitCode)): $(Get-Content (Join-Path $testRoot 'startup-error.txt') -Raw)"};$checks++
     $env:PATH=$savedPath;$env:QT_PLUGIN_PATH=$savedPlugin;$env:QT_QPA_PLATFORM=$savedPlatform
-    & (Join-Path $root 'scripts/Uninstall-Portable.ps1')
+    & (Join-Path $root 'scripts/Uninstall-Portable.ps1') -IsolatedTest
     if((Read-Registration) -ne $previous){throw 'Uninstall failed to restore previous registration.'};$checks++
     if([Convert]::ToBase64String([IO.File]::ReadAllBytes($shortcut)) -ne $oldBytes){throw 'Uninstall failed to restore previous shortcut.'};$checks++
     if(!(Test-Path -LiteralPath (Join-Path $root 'Downshift.exe'))){throw 'Uninstall removed portable binaries unexpectedly.'};$checks++
     # A later installation must not be clobbered by this one's uninstall.
-    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut
+    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -IsolatedTest
     $key=$registry.CreateSubKey($registryPath);try{$key.SetValue('','other-installation.json')}finally{$key.Dispose()}
     $other=$shell.CreateShortcut($shortcut);$other.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$other.Save()
-    & (Join-Path $root 'scripts/Uninstall-Portable.ps1')
+    & (Join-Path $root 'scripts/Uninstall-Portable.ps1') -IsolatedTest
     if((Read-Registration) -ne 'other-installation.json' -or $shell.CreateShortcut($shortcut).TargetPath -ne (Join-Path $env:WINDIR 'notepad.exe')){throw 'Uninstall changed another installation.'};$checks++
-    $report=@{checks=$checks;version=$manifest.version;packageSha256=(Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLower();os=[Environment]::OSVersion.VersionString;sourceCommit=$manifest.sourceCommit;runtimePath='Windows system directories only';scope='ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership';limitations='same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests'}
+    if(!$TorrentTestDriver -or !$PythonExecutable){throw 'T4 package acceptance requires -TorrentTestDriver and -PythonExecutable.'}
+    $testDriver=Join-Path $root 'downshift_torrent_acceptance_tests.exe'
+    Copy-Item -LiteralPath $TorrentTestDriver -Destination $testDriver
+    $env:PATH="$env:WINDIR\System32;$env:WINDIR";$env:QT_PLUGIN_PATH='';$env:QT_QPA_PLATFORM='windows'
+    $acceptance=Join-Path $testRoot 'torrent-acceptance.json'
+    & $PythonExecutable (Join-Path (Split-Path $PSScriptRoot -Parent) 'tests/TorrentAcceptance.py') $testDriver $acceptance
+    if($LASTEXITCODE -ne 0){throw 'Extracted package HTTP/torrent acceptance failed.'}
+    $torrentReport=Get-Content -LiteralPath $acceptance -Raw -Encoding utf8|ConvertFrom-Json;$checks++
+    $env:PATH=$savedPath;$env:QT_PLUGIN_PATH=$savedPlugin;$env:QT_QPA_PLATFORM=$savedPlatform
+    $report=@{sourceSnapshotVerified=$true;testDriverSha256=(Get-FileHash -LiteralPath $testDriver -Algorithm SHA256).Hash.ToLower();nativeApplicationSha256=(Get-FileHash -LiteralPath (Join-Path $root 'Downshift.exe') -Algorithm SHA256).Hash.ToLower();torrentAcceptance=$torrentReport;localPreview=$manifest.localPreview;sourceDirty=$manifest.sourceDirty;normalRegistrationWritten=$false;checks=$checks;version=$manifest.version;packageSha256=(Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLower();os=[Environment]::OSVersion.VersionString;sourceCommit=$manifest.sourceCommit;runtimePath='Windows system directories only';scope='ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership';limitations='same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests'}
     if($ReportPath){$report|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $ReportPath -Encoding utf8}
     Write-Host "Portable checks passed: $checks"
 }finally{

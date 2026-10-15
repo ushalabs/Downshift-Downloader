@@ -1,10 +1,12 @@
+param([switch]$IsolatedTest)
 $ErrorActionPreference='Stop'
 $root=[System.IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
-$statePath=Join-Path $root 'portable-registration.json'
+$integrationName=if($IsolatedTest){'org.ushalabs.downshift.packaging-test'}else{'org.ushalabs.downshift'}
+$statePath=Join-Path $root $(if($IsolatedTest){'portable-registration.test.json'}else{'portable-registration.json'})
 if(!(Test-Path -LiteralPath $statePath)){Write-Host 'No portable setup registration to remove.';return}
 $state=Get-Content -LiteralPath $statePath -Raw -Encoding utf8 | ConvertFrom-Json
-if($state.root -ne $root -or $state.manifest -ne (Join-Path $root 'org.ushalabs.downshift.json')){throw 'Setup location changed. Return this folder to its original location before uninstalling.'}
-$registryPath='Software\Google\Chrome\NativeMessagingHosts\org.ushalabs.downshift'
+if($state.root -ne $root -or $state.manifest -ne (Join-Path $root ($integrationName+'.json'))){throw 'Setup location changed. Return this folder to its original location before uninstalling.'}
+$registryPath='Software\Google\Chrome\NativeMessagingHosts\'+$integrationName
 $registry=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,[Microsoft.Win32.RegistryView]::Registry64)
 try{
     $key=$registry.OpenSubKey($registryPath)

@@ -1,5 +1,13 @@
 # Downshift — complete new-chat handoff
 
+## Latest continuation: Torrent T4 complete locally (2026-10-15)
+
+The user approved final T4. T1–T4 now have local implementation/acceptance coverage. T4 adds eight-torrent mixed HTTP/HTTPS/resource checks, native ENOSPC failure/restart/retry coverage and verified portable runtimes/sources. A real failed-torrent Retry defect was repaired. Both builds cover all 27 groups across full batches and targeted reruns; the initial Release Retry failure and repeated Debug GUI timing failures remain documented. Do not claim clean first full runs or an established cause for those GUI timing failures. See the newest DEVELOPMENT_PROGRESS.md section and evidence/torrent-t4-*.json.
+
+The extracted local 0.4.4 preview passes 15 checks, including the actual packaged app startup and a separate mixed acceptance driver. All four ZIP checksums and 82 dependency-source records pass independent verification. The public Debian probe verified 39 pieces (10,223,616 bytes), not a completed ISO. No fresh Windows CI, clean-VM, signing or release is claimed. Packaging/publication guards reject uncommitted release source; `-LocalPreview` explicitly produces a nondistributable local artifact at build/t4-local-preview. Final journal/evidence was added after that source snapshot; compiled inputs are unchanged.
+
+Git remains entirely manual: no agent stage/commit/push/branch/tag/publish. The user's current HEAD is `a4aace6` (GUI Overhaul), following `67c294a` (T2/T3); T4 is uncommitted. The normal Release app is open with 14 records, one paused and zero active. Exact encrypted state, physical storage binding and paused files are preserved; both stores pass integrity checks. All 49 protected HTTP/core/database/browser/extension source hashes match the T4 baseline. Preserve current live user state rather than older historical counts. Tests remain hidden/private and normal Chrome registration/profile is untouched. There is no automatic next phase or publication authorized. Earlier stop-for-T4 instructions below are historical and superseded by the direct T4 approval.
+
 ## Current local continuation: pre-T4 GUI/image repair (2026-10-15)
 
 The user's direct GUI/image and incomplete-data repair request is completed locally on T2/T3 commit `67c294a`; Git remains entirely manual. The white theme, global rounded dropdowns, spacing/selection/header fixes, simplified history question, real WebP/local-frame previews and close/collapse detail controls are implemented. Images finish unchanged in Pictures through the repaired handoff, with a new Save image to Downshift menu action. Reload the unpacked extension manually; Chrome's built-in Save image as chooser cannot universally be replaced.

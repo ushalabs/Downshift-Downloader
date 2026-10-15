@@ -1,8 +1,12 @@
-param([string]$OutputDirectory='', [switch]$RequireClean)
+param([string]$OutputDirectory='', [switch]$RequireClean, [switch]$LocalPreview)
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
 $sourceDirty=!!(& git -C $root status --porcelain)
 if($RequireClean -and $sourceDirty){throw 'Release packaging requires a clean source checkout.'}
+if($sourceDirty -and !$LocalPreview){throw 'Uncommitted packaging requires explicit -LocalPreview; release packaging still requires -RequireClean.'}
+$fingerprint=Get-Content -LiteralPath (Join-Path $root 'build/windows-msvc/Release/build-source.json') -Raw -Encoding utf8|ConvertFrom-Json
+if($fingerprint.configuration -ne 'Release'){throw 'Package requires a Release build fingerprint.'}
+foreach($entry in $fingerprint.files.PSObject.Properties){if((Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash.ToLower() -ne $entry.Value){throw "Stale binary: rebuild before packaging ($($entry.Name))."}}
 if(!$OutputDirectory){$OutputDirectory=Join-Path $root 'build\releases'}
 $OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
 $build=Join-Path $root 'build\windows-msvc\Release'
@@ -30,7 +34,7 @@ Copy-Item -LiteralPath (Join-Path $root 'extension') -Destination $portable -Rec
 Copy-Item -Path (Join-Path $root 'packaging\*.cmd'),(Join-Path $root 'packaging\Read-me.txt') -Destination $portable
 $scripts=Join-Path $portable 'scripts';New-Item -ItemType Directory -Path $scripts | Out-Null
 foreach($script in @('Install-Portable.ps1','Uninstall-Portable.ps1','Install-MediaTools.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $scripts}
-Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $portable
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE'),(Join-Path $build 'build-source.json'),(Join-Path $root 'docs/TORRENTS.md') -Destination $portable
 Copy-Item -LiteralPath (Join-Path $root 'docs\THIRD_PARTY_NOTICES.md') -Destination $portable
 $licenses=Join-Path $portable 'licenses';New-Item -ItemType Directory -Path $licenses | Out-Null
 $share=Join-Path $root 'vcpkg_installed\x64-windows\share'
@@ -40,10 +44,32 @@ foreach($port in $ports){
     Copy-Item -LiteralPath (Join-Path $port.FullName 'copyright') -Destination $notice
     Get-ChildItem -LiteralPath $port.FullName -Filter '*spdx*.json' -File | Copy-Item -Destination $notice
 }
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$applicationZip=Join-Path $OutputDirectory "Downshift-$version-application-source.zip"
+if(Test-Path -LiteralPath $applicationZip){Remove-Item -LiteralPath $applicationZip}
+$stream=[IO.File]::Open($applicationZip,[IO.FileMode]::CreateNew)
+$archive=[IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Create)
+$sourceFiles=@{}
+try {
+    $names=@(& git -C $root -c core.quotepath=false ls-files --cached --others --exclude-standard)|Sort-Object -Unique
+    foreach($relative in $names){
+        if($relative -match '^(build|vcpkg_installed|\.tools|\.downshift-data)/'){throw 'Private directory in source inventory.'}
+        $path=[IO.Path]::GetFullPath((Join-Path $root $relative))
+        if(!$path.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe source path.'}
+        if(!(Test-Path -LiteralPath $path -PathType Leaf)){continue}
+        $file=Get-Item -LiteralPath $path;if($file.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked source file refused.'}
+        $sourceFiles[$relative]=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLower()
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$path,$relative,[IO.Compression.CompressionLevel]::Optimal)|Out-Null
+    }
+} finally {$archive.Dispose();$stream.Dispose()}
+$sourceSha=(Get-FileHash -LiteralPath $applicationZip -Algorithm SHA256).Hash.ToLower()
+@{localPreview=[bool]$LocalPreview;distributable=(!$sourceDirty -and !$LocalPreview);sourceSnapshot=$sourceFiles;sourceArchiveSha256=$sourceSha}|ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $portable 'source-snapshot.json') -Encoding utf8
 $commit=(& git -C $root rev-parse HEAD).Trim()
 if($LASTEXITCODE -ne 0){throw 'Cannot resolve source commit.'}
+if($LocalPreview){'LOCAL VALIDATION PREVIEW — uncommitted source snapshot. Not a published or clean-source release. Do not distribute as a verified release.'|Set-Content -LiteralPath (Join-Path $portable 'LOCAL-PREVIEW.txt') -Encoding utf8}
 $inventory=Get-ChildItem -LiteralPath $portable -File -Recurse | ForEach-Object {@{path=$_.FullName.Substring($portable.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower();bytes=$_.Length}}
-@{version=$version;sourceCommit=$commit;sourceDirty=$sourceDirty;architecture='x64';configuration='Release';runtime='app-local VC143; dynamic Qt';optionalVideoHelpers='downloaded directly from upstream; not redistributed';files=@($inventory)}|ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $portable 'package-manifest.json') -Encoding utf8
+@{version=$version;sourceCommit=$commit;sourceDirty=$sourceDirty;localPreview=[bool]$LocalPreview;distributable=(!$sourceDirty -and !$LocalPreview);sourceArchiveSha256=$sourceSha;architecture='x64';configuration='Release';runtime='app-local VC143; dynamic Qt';optionalVideoHelpers='downloaded directly from upstream; not redistributed';files=@($inventory)}|ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $portable 'package-manifest.json') -Encoding utf8
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip=Join-Path $OutputDirectory "$name.zip"
 if(Test-Path -LiteralPath $zip){Remove-Item -LiteralPath $zip}
@@ -51,11 +77,6 @@ if(Test-Path -LiteralPath $zip){Remove-Item -LiteralPath $zip}
 $extensionZip=Join-Path $OutputDirectory "Downshift-$version-chrome-extension.zip"
 if(Test-Path -LiteralPath $extensionZip){Remove-Item -LiteralPath $extensionZip}
 [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $root 'extension'),$extensionZip,[IO.Compression.CompressionLevel]::Optimal,$false)
-if(!$sourceDirty){
-    $applicationZip=Join-Path $OutputDirectory "Downshift-$version-application-source.zip"
-    & git -C $root archive --format=zip "--output=$applicationZip" $commit
-    if($LASTEXITCODE -ne 0){throw 'Application source archive failed.'}
-}
     $vcpkg=Join-Path $root '.tools\windows\vcpkg'
     $source=Join-Path $stage 'dependency-sources';New-Item -ItemType Directory -Path $source | Out-Null
     $baseline=(Get-Content (Join-Path $root 'vcpkg.json') -Raw|ConvertFrom-Json).'builtin-baseline'

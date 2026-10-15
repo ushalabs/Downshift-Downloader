@@ -1,0 +1,594 @@
+{
+  "date": "2026-10-15",
+  "phase": "Torrent T4",
+  "version": "0.4.4",
+  "producer": "Local Windows MSVC x64; hidden/private fixtures; no remote CI or clean VM",
+  "checkoutHeadAtVerification": "a4aace67ec84a1f0fed509460e16324e1a861faf",
+  "workingTreeUncommitted": true,
+  "agentGitMutations": false,
+  "published": false,
+  "release": {
+    "passingCoverage": 27,
+    "batches": [
+      {
+        "seconds": 430.79,
+        "groups": 27,
+        "passed": 26,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "torrent.failure",
+            "seconds": 1.98629,
+            "passed": false
+          },
+          {
+            "name": "queue.cleanup",
+            "seconds": 0.17229,
+            "passed": true
+          },
+          {
+            "name": "gui.overhaul.1",
+            "seconds": 15.464,
+            "passed": true
+          },
+          {
+            "name": "gui.overhaul.1.25",
+            "seconds": 17.9414,
+            "passed": true
+          },
+          {
+            "name": "gui.overhaul.1.5",
+            "seconds": 16.0669,
+            "passed": true
+          },
+          {
+            "name": "torrent.gui",
+            "seconds": 19.62,
+            "passed": true
+          },
+          {
+            "name": "torrent.management",
+            "seconds": 122.648,
+            "passed": true
+          },
+          {
+            "name": "torrent.foundation",
+            "seconds": 17.8168,
+            "passed": true
+          },
+          {
+            "name": "torrent.acceptance",
+            "seconds": 20.7193,
+            "passed": true
+          },
+          {
+            "name": "browser.extension",
+            "seconds": 0.144853,
+            "passed": true
+          },
+          {
+            "name": "browser.bridge",
+            "seconds": 0.0920741,
+            "passed": true
+          },
+          {
+            "name": "browser.media",
+            "seconds": 0.108089,
+            "passed": true
+          },
+          {
+            "name": "engine.transport",
+            "seconds": 24.3995,
+            "passed": true
+          },
+          {
+            "name": "browser.native",
+            "seconds": 7.73366,
+            "passed": true
+          },
+          {
+            "name": "browser.transfer",
+            "seconds": 3.79443,
+            "passed": true
+          },
+          {
+            "name": "gui.media",
+            "seconds": 62.512,
+            "passed": true
+          },
+          {
+            "name": "gui.integration",
+            "seconds": 16.7099,
+            "passed": true
+          },
+          {
+            "name": "queue.location",
+            "seconds": 0.152901,
+            "passed": true
+          },
+          {
+            "name": "queue.integration",
+            "seconds": 19.7586,
+            "passed": true
+          },
+          {
+            "name": "engine.unit",
+            "seconds": 0.524324,
+            "passed": true
+          },
+          {
+            "name": "engine.integration",
+            "seconds": 10.183,
+            "passed": true
+          },
+          {
+            "name": "engine.adaptive",
+            "seconds": 19.6925,
+            "passed": true
+          },
+          {
+            "name": "engine.buffered",
+            "seconds": 3.83687,
+            "passed": true
+          },
+          {
+            "name": "engine.recovery",
+            "seconds": 25.9292,
+            "passed": true
+          },
+          {
+            "name": "foundation.dependencies",
+            "seconds": 0.0405612,
+            "passed": true
+          },
+          {
+            "name": "foundation.gui.minimal",
+            "seconds": 1.28145,
+            "passed": true
+          },
+          {
+            "name": "foundation.gui.windows",
+            "seconds": 1.35908,
+            "passed": true
+          }
+        ]
+      },
+      {
+        "seconds": 188.59,
+        "groups": 5,
+        "passed": 5,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "torrent.failure",
+            "seconds": 3.81844,
+            "passed": true
+          },
+          {
+            "name": "torrent.gui",
+            "seconds": 19.098,
+            "passed": true
+          },
+          {
+            "name": "torrent.management",
+            "seconds": 126.303,
+            "passed": true
+          },
+          {
+            "name": "torrent.foundation",
+            "seconds": 17.8333,
+            "passed": true
+          },
+          {
+            "name": "torrent.acceptance",
+            "seconds": 21.4958,
+            "passed": true
+          }
+        ]
+      },
+      {
+        "seconds": 37.65,
+        "groups": 2,
+        "passed": 2,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "torrent.acceptance",
+            "seconds": 22.2912,
+            "passed": true
+          },
+          {
+            "name": "gui.integration",
+            "seconds": 15.3242,
+            "passed": true
+          }
+        ]
+      }
+    ]
+  },
+  "debug": {
+    "passingCoverage": 27,
+    "batches": [
+      {
+        "seconds": 662.3,
+        "groups": 27,
+        "passed": 26,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "torrent.failure",
+            "seconds": 4.32532,
+            "passed": true
+          },
+          {
+            "name": "queue.cleanup",
+            "seconds": 0.173929,
+            "passed": true
+          },
+          {
+            "name": "gui.overhaul.1",
+            "seconds": 26.557,
+            "passed": true
+          },
+          {
+            "name": "gui.overhaul.1.25",
+            "seconds": 27.8653,
+            "passed": true
+          },
+          {
+            "name": "gui.overhaul.1.5",
+            "seconds": 33.8373,
+            "passed": true
+          },
+          {
+            "name": "torrent.gui",
+            "seconds": 24.8573,
+            "passed": true
+          },
+          {
+            "name": "torrent.management",
+            "seconds": 127.278,
+            "passed": true
+          },
+          {
+            "name": "torrent.foundation",
+            "seconds": 18.5024,
+            "passed": true
+          },
+          {
+            "name": "torrent.acceptance",
+            "seconds": 23.2385,
+            "passed": true
+          },
+          {
+            "name": "browser.extension",
+            "seconds": 0.132618,
+            "passed": true
+          },
+          {
+            "name": "browser.bridge",
+            "seconds": 0.12036,
+            "passed": true
+          },
+          {
+            "name": "browser.media",
+            "seconds": 0.101909,
+            "passed": true
+          },
+          {
+            "name": "engine.transport",
+            "seconds": 25.0019,
+            "passed": true
+          },
+          {
+            "name": "browser.native",
+            "seconds": 15.0233,
+            "passed": true
+          },
+          {
+            "name": "browser.transfer",
+            "seconds": 19.1703,
+            "passed": true
+          },
+          {
+            "name": "gui.media",
+            "seconds": 162.176,
+            "passed": true
+          },
+          {
+            "name": "gui.integration",
+            "seconds": 40.6336,
+            "passed": false
+          },
+          {
+            "name": "queue.location",
+            "seconds": 0.227876,
+            "passed": true
+          },
+          {
+            "name": "queue.integration",
+            "seconds": 23.8595,
+            "passed": true
+          },
+          {
+            "name": "engine.unit",
+            "seconds": 0.609209,
+            "passed": true
+          },
+          {
+            "name": "engine.integration",
+            "seconds": 16.3769,
+            "passed": true
+          },
+          {
+            "name": "engine.adaptive",
+            "seconds": 21.5622,
+            "passed": true
+          },
+          {
+            "name": "engine.buffered",
+            "seconds": 5.40453,
+            "passed": true
+          },
+          {
+            "name": "engine.recovery",
+            "seconds": 32.4159,
+            "passed": true
+          },
+          {
+            "name": "foundation.dependencies",
+            "seconds": 0.076602,
+            "passed": true
+          },
+          {
+            "name": "foundation.gui.minimal",
+            "seconds": 6.02986,
+            "passed": true
+          },
+          {
+            "name": "foundation.gui.windows",
+            "seconds": 6.63812,
+            "passed": true
+          }
+        ]
+      },
+      {
+        "seconds": 41.77,
+        "groups": 1,
+        "passed": 0,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "gui.integration",
+            "seconds": 41.732,
+            "passed": false
+          }
+        ]
+      },
+      {
+        "seconds": 37.17,
+        "groups": 1,
+        "passed": 1,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "gui.integration",
+            "seconds": 37.1467,
+            "passed": true
+          }
+        ]
+      },
+      {
+        "seconds": 23.31,
+        "groups": 1,
+        "passed": 1,
+        "skipped": 0,
+        "cases": [
+          {
+            "name": "torrent.acceptance",
+            "seconds": 23.2908,
+            "passed": true
+          }
+        ]
+      }
+    ]
+  },
+  "initialFailures": [
+    {
+      "case": "Release torrent.failure",
+      "cause": "Failed cleanup detached native handle; explicit Retry could not attach storage",
+      "repair": "Reattach validated paused state; reserve fresh file identities; force recheck",
+      "final": "22 ENOSPC/restart/retry checks pass in both configurations"
+    },
+    {
+      "case": "Debug gui.integration, full batch and isolated rerun",
+      "cause": "Existing responsiveness assertion; exact cause not established",
+      "change": "Diagnostic output added; original threshold unchanged",
+      "final": "113 checks pass; 344 heartbeat ticks; maximum measured gap 0.215288 seconds"
+    }
+  ],
+  "mixedAcceptance": {
+    "assertionsPerConfiguration": 191,
+    "jsonSampleChecksBeforeRestart": 181,
+    "Release": {
+      "allSelectedPayloadHashes": true,
+      "checks": 181,
+      "concurrentHttpSha256": true,
+      "donorSessions": 2,
+      "handleGrowth": 254,
+      "maximumQtGapSeconds": 0.0555028,
+      "peakActive": 8,
+      "peakPeers": 12,
+      "privateGrowthBytes": 23158784,
+      "torrentCount": 8,
+      "verifiedHttpsSha256": true
+    },
+    "Debug": {
+      "allSelectedPayloadHashes": true,
+      "checks": 181,
+      "concurrentHttpSha256": true,
+      "donorSessions": 2,
+      "handleGrowth": 245,
+      "maximumQtGapSeconds": 0.2471939,
+      "peakActive": 8,
+      "peakPeers": 12,
+      "privateGrowthBytes": 22716416,
+      "torrentCount": 8,
+      "verifiedHttpsSha256": true
+    },
+    "scope": "Eight generated torrents, two native donors, selected hashes, caps, concurrent durable pause, outage/reconnect, restart paused, actual HTTP queue and explicitly trusted HTTPS; short same-machine workload",
+    "duplicateCheckLimit": "Duplicate rejection with eight retained records; not a separate ninth unique-torrent boundary test"
+  },
+  "diskFailure": {
+    "nativeEnospcInjected": true,
+    "productionInjectorIncluded": false,
+    "physicalVolumeFilled": false,
+    "finalChecksPerConfiguration": 22
+  },
+  "publicProbe": {
+    "source": {
+      "sha256": "690700ed8de8d0987fcf8c136507471b1588b996696ca34f9cf972ee09b849e0",
+      "listing": "https://www.debian.org/CD/torrent-cd/",
+      "metadata": "https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/debian-13.7.0-amd64-netinst.iso.torrent"
+    },
+    "durationLimitSeconds": 60,
+    "exitCode": 3,
+    "completeFile": false,
+    "publicPeersPeak": 16,
+    "publicSeedsPeak": 15,
+    "independentlyVerifiedPieces": 39,
+    "independentlyVerifiedBytes": 10223616,
+    "method": "Independent SHA-1 reread of every checkpointed have-piece against original HTTPS torrent metadata; not a full ISO hash",
+    "normalQueueUsed": false,
+    "privateTestPayloadRemovedThroughConfirmedNativeAction": true
+  },
+  "portable": {
+    "version": "0.4.4",
+    "nativeApplicationSha256": "e07f229ae5d8631f57032eeec579f1b000b83a6582701325bb28e28504c4d3ca",
+    "torrentAcceptance": {
+      "allSelectedPayloadHashes": true,
+      "checks": 181,
+      "concurrentHttpSha256": true,
+      "donorSessions": 2,
+      "handleGrowth": 245,
+      "maximumQtGapSeconds": 0.1159691,
+      "peakActive": 8,
+      "peakPeers": 12,
+      "privateGrowthBytes": 21573632,
+      "torrentCount": 8,
+      "verifiedHttpsSha256": true
+    },
+    "sourceDirty": true,
+    "sourceSnapshotVerified": true,
+    "localPreview": true,
+    "normalRegistrationWritten": false,
+    "testDriverSha256": "74069fea9fbbbf6dd6b0f0605fb1b0b006c806da700c775c772a5b4e95fefaf7",
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "sourceCommit": "a4aace67ec84a1f0fed509460e16324e1a861faf",
+    "packageSha256": "c3b673ccbdf20e176fa13c7b881b65cc4bf155492869967fc03a5171cba8cb01",
+    "scope": "ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership",
+    "limitations": "same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests",
+    "runtimePath": "Windows system directories only",
+    "checks": 15
+  },
+  "sourceBundleProof": {
+    "allFourArchiveSha256AndCrc": true,
+    "matchingInstalledSpdxResourceCount": 82,
+    "allDependencySha512": true,
+    "pinnedVcpkgRecipesAndPatches": true,
+    "qtLicenseTexts": true,
+    "noPrivateStoresMediaHelpersOrTestExecutables": true,
+    "archives": {
+      "Downshift-0.4.4-application-source.zip": "38ca25b806d64b98944b5a8650a6ae16ebbaeaf364963e345406cfcd7a83cb04",
+      "Downshift-0.4.4-chrome-extension.zip": "b0f8aa521a9a2312a095aa3d2875a4ffa887cdf972b3dd17c77bd4c30493aa60",
+      "Downshift-0.4.4-dependency-sources.zip": "6d808d638b39d0cb228af6aafdb685deb34a356ec499e76de338544ecb5b552b",
+      "Downshift-0.4.4-windows-x64.zip": "c3b673ccbdf20e176fa13c7b881b65cc4bf155492869967fc03a5171cba8cb01"
+    }
+  },
+  "packagingGuards": {
+    "dirtyRequireCleanRefused": true,
+    "localPreviewPublishValidateOnlyRefused": true,
+    "staleCompiledInputsRefusedByBuilder": true
+  },
+  "preservation": {
+    "normalHistoryRecords": 14,
+    "pausedTasks": 1,
+    "activeTasks": 0,
+    "exactEncryptedStateUnchanged": true,
+    "physicalStorageBindingUnchanged": true,
+    "pausedFilesUnchanged": true,
+    "queueIntegrity": "ok",
+    "torrentIntegrity": "ok",
+    "normalChromeRegistrationUnchanged": true,
+    "protectedSourceCount": 49,
+    "protectedSources": {
+      "src/core/Runtime.cpp": "9ad1dd47c0ea0517f30e674fc49cdf95cdd395ec1feff9dc5ab8dd348121d4a6",
+      "src/core/Runtime.h": "b920aa34f8f6902ddb2d999f680deb4f472edffbf9d2c529f7ca5f26a42a605f",
+      "src/core/ConnectionManager/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/core/ConnectionManager/AdaptiveController.h": "7b07f83a0b0d6ed034d03875361bdada63c55f158c2caf03fb6c078c540c0929",
+      "src/core/ConnectionManager/RetryPolicy.h": "2f34e02456963dfb90784b58d40cb1cbea9c48f89e5bd2645a4639437e7d8735",
+      "src/core/ConnectionManager/SpeedTracker.h": "1a538de6e43820a70ef129b3fe713b49c3dcc8b75cb2e435a7391e626fad0923",
+      "src/core/DownloadEngine/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/core/DownloadEngine/DownloadEngine.cpp": "3c35f0c1c47741dd4ea7f4d92a1a9bbf27c961c8be36fe904490b138548d8b70",
+      "src/core/DownloadEngine/DownloadEngine.h": "cefcbbcf2a30f2fa9feb0c59c2132aada5e79ed39f820cac12efa3b65322a2f8",
+      "src/core/DownloadEngine/HttpResponse.cpp": "18d4ad3eb927520bf39123de13eed4f5cc470ca89997c05c2a8212187308f10e",
+      "src/core/DownloadEngine/HttpResponse.h": "2fddfdd2e3a4e6474069a96e6028470a1ed8cd55861e05358a27d0c96d3d5ade",
+      "src/core/DownloadQueue/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/core/DownloadQueue/Categories.h": "d202f03e12099284047631ec8820ed8ba47dc6f51198398057669924c6fb4dae",
+      "src/core/DownloadQueue/OwnedMedia.h": "a30b95a7a336fc4b107b72e897f742ddf54f2ffaf8f06c3cf6702a013df8de19",
+      "src/core/DownloadQueue/QueueManager.cpp": "ef8e629b7f153d092af9593bbfedd4818decf0d693157ea9e6758c94dafb29af",
+      "src/core/DownloadQueue/QueueManager.h": "5b9d6e513b2f941d4b0a47c22357504d04140f877f48b525a4c9edbcdc2e3932",
+      "src/core/DownloadQueue/StorageLocation.cpp": "a520cc111df0c85aacc5e0b4b75832aeedcaf344fe1805898f3a74f2e8505ed5",
+      "src/core/DownloadQueue/StorageLocation.h": "c61473df3a0b11ed86e0def98893e79cefb053fd474e2c168a727d5743b0cb58",
+      "src/core/DownloadQueue/VideoUrl.h": "b22174392965069547a7edbbdae730d716f3032f653498f87c553200f6b7e77b",
+      "src/core/FileWriter/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/core/FileWriter/FileWriter.cpp": "dc775e412fbc0b2630bc9c7a5bffee42f8f7f49a2f9c946d4d11c4a18e4a87d4",
+      "src/core/FileWriter/FileWriter.h": "6d23430f8a778229684120424a8f76e2800c9902e6f5dfe023b368d9188e9e7e",
+      "src/core/ResumeManager/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/core/ResumeManager/ResumeJournal.cpp": "361230c74147fb4eeb8c8a70c585e918f2598f77f4623448e3bee2529e60f8a1",
+      "src/core/ResumeManager/ResumeJournal.h": "3334c3e7a278de1067f6a7cd881c4e057903c70c8c8951b92ffd1a018a7e53f6",
+      "src/core/SegmentScheduler/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/core/SegmentScheduler/SegmentScheduler.h": "139fc9e4a0a3647a7c93eac2f8728d2bdcad2809570c211c7bb59d892f4b826b",
+      "src/database/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/database/QueueStore.cpp": "4d88eada7112515d7552f5507e3e1cb17982ef8c407a3c0575a616e8f27921b0",
+      "src/database/QueueStore.h": "531bf63bd74f3b38d031f3fefe381514da4881c0ca2d594a4d39f315c8782aa6",
+      "src/browser/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/browser/NativeHost.cpp": "d920bd23bb457f2f38b3172acbe013138542b3942b3f8f28ff6405ae2472803b",
+      "src/browser/NativeProtocol.cpp": "4c942848bb58e84f6e5520437d924a3aef235fbeaf842d6cab8d6a39272444f0",
+      "src/browser/NativeProtocol.h": "36178731a971ed3492ff26c6edc53ed460632f167996d300363429f2f55447de",
+      "src/browser/PipeServer.cpp": "9c108a5a4dd31176114990f45b676f1c1a63edf5cbd2bc17fe02e52fd471064f",
+      "src/browser/PipeServer.h": "abf17c42ce1a5f73944ae2f8f1070f09ddff5202868ade9871b3d4fc21bbbe84",
+      "extension/background.js": "bfa87b45935ff5caab90fee48fcaffb5c7a2914befa0c7bc7fa80bc7f31d9a2c",
+      "extension/browser-transfer.js": "d4aa95d6ba5389e9a69174f155a04dd94192f81a24fbd3ebdfac77a156ec7290",
+      "extension/file-links.js": "a59d45f4feddba9aca45f44298363339e9083d18798724cd40711968e35dcf91",
+      "extension/handoff.js": "2f74317b519f8c66195fc025596ee933141abe41277c61c17768e180dd643762",
+      "extension/image-capture.js": "a66e0d7db3051f43d88a7968ceb945f4d7f345730cefe6af8bcb8757963120fb",
+      "extension/manifest.json": "9ec3b5881c91fbe020c4ae8a771c347725064f3339f6a3ed22df777b11c525c1",
+      "extension/media.js": "3f551c6fc597b7945530796f0f417e6ddead756ec4046653e1d8ff141cf67e23",
+      "extension/package.json": "a90fc33418afa2b9cbf4768524b021135b965ecdf993457505bfae3ac44a8428",
+      "extension/popup.css": "5b4495527bafd1d399879a7fd62fd3aa56c76d813c5aa3234bcd88eb3a4eacf2",
+      "extension/popup.html": "ba14b7a24483cdace8b6dd64ef9c19a48060ccca9bfcc3605ffa1428b60a4fa2",
+      "extension/popup.js": "fd70a99e9ddb15d547e5234f6a76112da622d7ba21122a3a0e9ca3fd5dd79d50",
+      "extension/video-button.js": "01420b206a4b65904117c35c2db1438ef2b2ed69ec5655bbaa201b857b6c8f9c",
+      "extension/icons/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binaries": {
+    "Release": {
+      "Downshift.exe": "e07f229ae5d8631f57032eeec579f1b000b83a6582701325bb28e28504c4d3ca",
+      "build-source.json": "a0ee27a26b54a090e28f38cb5703bcbcff7bf106f3608e230b932cc3fdd954e4"
+    },
+    "Debug": {
+      "Downshift.exe": "d7c7932d73706c60cc2d9435c473a7600d3f4cdf7665567b2fc92b982f66b7a2",
+      "build-source.json": "90841d11149f19837beb3d5ffafd3a91e8df3789f171c70c44d9ed5873ca8db5"
+    }
+  },
+  "limitations": [
+    "All 27 groups have final passing coverage across batches; neither initial full batch passed cleanly.",
+    "No fresh exact-source remote CI, clean VM, signed installer, store or release.",
+    "Public probe was partial, not full ISO completion; tracker and DHT reachability were not isolated.",
+    "No new actual Chrome or public YouTube full-transfer acceptance claimed in T4.",
+    "Preview working-source snapshot predates final documentation/evidence journal only; compiled inputs match.",
+    "No proprietary IDM parity, universal performance or long-duration resource guarantee."
+  ]
+}

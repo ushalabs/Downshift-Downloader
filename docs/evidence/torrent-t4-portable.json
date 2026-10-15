@@ -1,0 +1,29 @@
+{
+  "version": "0.4.4",
+  "nativeApplicationSha256": "e07f229ae5d8631f57032eeec579f1b000b83a6582701325bb28e28504c4d3ca",
+  "torrentAcceptance": {
+    "allSelectedPayloadHashes": true,
+    "checks": 181,
+    "concurrentHttpSha256": true,
+    "donorSessions": 2,
+    "handleGrowth": 245,
+    "maximumQtGapSeconds": 0.1159691,
+    "peakActive": 8,
+    "peakPeers": 12,
+    "privateGrowthBytes": 21573632,
+    "torrentCount": 8,
+    "verifiedHttpsSha256": true
+  },
+  "sourceDirty": true,
+  "sourceSnapshotVerified": true,
+  "localPreview": true,
+  "normalRegistrationWritten": false,
+  "testDriverSha256": "74069fea9fbbbf6dd6b0f0605fb1b0b006c806da700c775c772a5b4e95fefaf7",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "sourceCommit": "a4aace67ec84a1f0fed509460e16324e1a861faf",
+  "packageSha256": "c3b673ccbdf20e176fa13c7b881b65cc4bf155492869967fc03a5171cba8cb01",
+  "scope": "ZIP integrity; app-local runtime; version; idempotent per-user setup; host origin/path; shortcut; actual GUI startup without developer PATH; uninstall restores previous registration/shortcut and preserves later ownership",
+  "limitations": "same development machine with sanitized PATH, not a clean Windows VM; optional media helpers separately verified by source media tests",
+  "runtimePath": "Windows system directories only",
+  "checks": 15
+}

@@ -13,7 +13,12 @@ import zipfile
 
 def validate(directory, source):
     report = json.loads((directory / 'portable-test-report.json').read_text(encoding='utf-8-sig'))
-    if report['sourceCommit'] != source or report['checks'] != 13:
+    if report.get('localPreview') or report.get('sourceDirty'):
+        raise ValueError('Local/uncommitted previews cannot be published.')
+    acceptance = report.get('torrentAcceptance', {})
+    if (report['sourceCommit'] != source or report['checks'] < 15 or not report.get('sourceSnapshotVerified')
+            or acceptance.get('torrentCount') != 8 or not acceptance.get('allSelectedPayloadHashes')
+            or not acceptance.get('concurrentHttpSha256') or not acceptance.get('verifiedHttpsSha256')):
         raise ValueError('Portable verification report does not match the release source.')
     version = report['version']
     names = [f'Downshift-{version}-{suffix}.zip' for suffix in
@@ -35,9 +40,10 @@ def validate(directory, source):
             if archive.testzip() is not None:
                 raise ValueError(f'Archive CRC failure: {name}')
     prefix = f'Downshift-{version}-windows-x64/'
+    expected_resources = set()
     with zipfile.ZipFile(directory / names[0]) as archive:
         manifest = json.loads(archive.read(prefix + 'package-manifest.json').decode('utf-8-sig'))
-        if manifest['sourceCommit'] != source or manifest['sourceDirty'] or manifest['version'] != version:
+        if manifest['sourceCommit'] != source or manifest['sourceDirty'] or manifest.get('localPreview') or manifest.get('distributable') is not True or manifest['version'] != version:
             raise ValueError('Package must identify the exact clean release source.')
         declared = {prefix + 'package-manifest.json'}
         for file in manifest['files']:
@@ -51,15 +57,38 @@ def validate(directory, source):
         actual = {name for name in archive.namelist() if not name.endswith('/')}
         if declared != actual or any('/media-tools/' in name for name in actual):
             raise ValueError('Unexpected binary package contents.')
+        snapshot = json.loads(archive.read(prefix + 'source-snapshot.json').decode('utf-8-sig'))
+        compiled = json.loads(archive.read(prefix + 'build-source.json').decode('utf-8-sig'))
+        if snapshot.get('localPreview') or snapshot.get('distributable') is not True:
+            raise ValueError('Source snapshot is not a release snapshot.')
+        if manifest.get('sourceArchiveSha256') != checksums[names[3]] or snapshot['sourceArchiveSha256'] != checksums[names[3]]:
+            raise ValueError('Application source archive differs from binary manifest.')
+        for name, digest in compiled['files'].items():
+            if snapshot['sourceSnapshot'].get(name) != digest:
+                raise ValueError('Compiled source differs from application source snapshot.')
+        for name in actual:
+            relative = name[len(prefix):]
+            if relative.startswith('licenses/') and relative.endswith('/vcpkg-spdx-resources.json'):
+                port = relative.split('/')[1]
+                for package in json.loads(archive.read(name).decode('utf-8-sig'))['packages']:
+                    for checksum in package.get('checksums', []):
+                        if checksum['algorithm'] == 'SHA512':
+                            expected_resources.add((port, checksum['checksumValue'].lower()))
     if checksums[names[0]] != report['packageSha256']:
         raise ValueError('Portable startup was not tested against this exact archive.')
     with zipfile.ZipFile(directory / names[3]) as archive:
-        if archive.comment.decode() != source:
-            raise ValueError('Git source archive does not match the release commit.')
+        if set(archive.namelist()) != set(snapshot['sourceSnapshot']):
+            raise ValueError('Source archive inventory differs.')
+        for name, digest in snapshot['sourceSnapshot'].items():
+            if hashlib.sha256(archive.read(name)).hexdigest() != digest:
+                raise ValueError('Application source bytes differ.')
     with zipfile.ZipFile(directory / names[2]) as archive:
         resources = json.loads(archive.read('dependency-sources/sources.json').decode('utf-8-sig'))
-        if len(resources) != 11:
-            raise ValueError('Expected the complete corresponding library resource inventory.')
+        actual_resources = {(item['port'], item['sha512']) for item in resources}
+        if not expected_resources or actual_resources != expected_resources:
+            raise ValueError('Corresponding library sources differ from installed SPDX inventories.')
+        if not {'qtbase', 'libtorrent', 'openssl', 'boost-asio', 'qtimageformats', 'libwebp'} <= {item['port'] for item in resources}:
+            raise ValueError('Torrent/Qt runtime corresponding sources are missing.')
         for item in resources:
             if Path(item['file']).name != item['file']:
                 raise ValueError('Unsafe source resource path.')
@@ -84,7 +113,7 @@ def main():
     if not re.fullmatch('[a-f0-9]{40}', args.source):
         raise ValueError('An exact source commit is required.')
     version, names, digests, report = validate(args.directory, args.source)
-    print(f'Validated {version}: archive hashes, all package files, tested clean source and 11 library sources.')
+    print(f'Validated {version}: archive hashes, all package files, tested clean source and recorded library sources.')
     if args.validate_only:
         return
     repository = os.environ['GITHUB_REPOSITORY']
@@ -146,22 +175,15 @@ def main():
 
 Extract the entire **windows-x64 ZIP**, run **Setup.cmd**, and open the Desktop shortcut. In Chrome, choose **Developer mode → Load unpacked** and select the extracted **extension** folder. Run **Enable-video.cmd** once for optional pinned upstream video tools. Developer tools are not required to run the app.
 
-- Compact responsive pink/plum window and persistent encrypted file/video history.
-- Downloads/Videos, Audios, Zip and Programs defaults; choose a destination for every download.
-- Chrome opens Downshift and a save window. Enabled handoff failures stay paused until retry or explicit disable.
-- Public streaming/verified segmented transfers, supported player actions, quality selection and video merging.
-- YouTube watch-page routing, current-player URL resolution, checked HLS video/audio selection and separate exact-resolution files.
-- Modern rounded controls and an original pink globe/download icon in Windows and Qt.
-- App-local runtimes, ownership-aware per-user setup/uninstall, complete source/license bundles.
-- Consistent eleven-character YouTube IDs, malformed player-link fallback and explicit native media errors.
-- Trusted direct file-link capture before Chrome starts; owned fallback cancellation rows removed after native commit confirmation.
-- Hash-verified partial-range Pause/Resume, callback progress, small-file initial pool tuning and bounded fresh HTTP/1.1 transport retries.
-- Shared server-capability negotiation: validate a real range, then use segmented transfer or a fresh complete response for unreliable range servers.
-- Complete-response content decoding, range-probe refusal handling and server-suggested filenames without URL-specific rules.
-- Latest-first history with Latest, Oldest and Size views on every sidebar page; shared rounded pink form and dropdown styling.
-- Extension/app version checks and an explicit extension update action; browser acceptance uses a separate test bridge.
+- Native HTTP/HTTPS downloads and a responsive white/dark pink Qt desktop.
+- Integrated Rasterbar torrents: files/magnets, selection/priorities, limits, seeding policies and paused encrypted recovery.
+- Pictures, Videos, Audios, Zip and Programs categories with per-download overrides.
+- Original browser-response delivery for supported generated/authenticated/POST downloads, without exporting cookies.
+- Optional video extraction/quality selection and verified local output; metadata/local-frame previews.
+- Owned incomplete-data cleanup preserves paused data, completed destinations and unrelated files.
+- App-local runtime libraries, source/notice bundles and ownership-aware setup/uninstall.
 
-**Verified release producer:** [Windows CI]({run['html_url']}) built Release/Debug, passed all 14 groups in both with video tools installed, verified 13 extracted-package checks and preserved these exact artifacts. Separate local actual Chrome checks passed in both configurations. This publication independently verified archive/per-file hashes and the corresponding library source inventory.
+**Verified release producer:** [Windows CI]({run['html_url']}) built Release/Debug, ran the complete source regression suites, verified {report['checks']} extracted-package checks including mixed HTTP/HTTPS/eight-torrent acceptance, and preserved these exact artifacts. This publication independently verified archive/per-file hashes and the corresponding library source inventory.
 
 The prior 0.3.1 repair completed a real public 713-second YouTube video with video/audio at 144p through the extension and native dialog. Its available quality list included 144p through 1080p. Current local acceptance is recorded separately in DEVELOPMENT_PROGRESS.md; Windows CI uses controlled media fixtures. This does not claim that every advertised quality/site was tested.
 

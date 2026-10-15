@@ -52,7 +52,7 @@ Enabled capture promptly pauses Chrome and does not silently fall back when a ha
 
 ## Verification and performance
 
-T2's final explicit-flush repair passes 315 management and 142 foundation checks in each local build. Two earlier exact-source CI runs failed and remain recorded as failures. T3 passes its hidden native GUI acceptance group in both configurations after fixture repairs; all existing regression groups pass. Its final build/test results are recorded in [development progress](docs/DEVELOPMENT_PROGRESS.md). Earlier source-specific browser/media checks remain separate evidence. No fresh Windows CI, clean-VM, public-swarm or packaged torrent acceptance is claimed for local T3; no commits or pushes are part of the latest request.
+Torrent T4 adds eight-torrent mixed HTTP/HTTPS acceptance, resource measurements, restart/recovery checks and native disk-full failure injection. Failed torrents can retry after their incomplete payload has been safely cleaned. Packaging verifies app-local torrent, TLS and image runtimes and matching application/library sources. Final results and limits are recorded in [development progress](docs/DEVELOPMENT_PROGRESS.md) and [torrent documentation](docs/TORRENTS.md). Local uncommitted previews use `Build-Portable.ps1 -LocalPreview`; they cannot be published by the release validator. No commits or pushes are part of this phase.
 
 Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
 

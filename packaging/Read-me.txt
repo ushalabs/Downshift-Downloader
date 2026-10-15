@@ -1,4 +1,4 @@
-Downshift 0.3.0 - Windows 10/11 x64 portable
+Downshift - Windows 10/11 x64 portable (version in package-manifest.json)
 
 1. Extract the entire ZIP to a permanent folder you can write to.
 2. Double-click Setup.cmd (no administrator rights needed).
@@ -13,7 +13,7 @@ After moving the package, uninstall its integration from the original
 location first, then set up the new location. Never just copy the EXE.
 
 Default locations: Downloads\Videos, Downloads\Audios, Downloads\Zip,
-Downloads\Programs. Choose another location in any download window.
+Downloads\Programs and Downloads\Pictures. Choose another location in any download window.
 Existing history is kept locally under your Windows user account.
 
 With capture enabled, unsupported or unavailable Chrome handoffs stay
@@ -35,3 +35,13 @@ Source and documentation:
 https://github.com/ushalabs/Downshift-Download-Manager
 
 This unsigned preview has no Windows installer or automatic updater.
+
+Torrents: choose Torrents in Downshift, Add torrent, paste a magnet or select
+a .torrent file, choose a separate folder and confirm the files. Restart
+restores torrents paused; Resume rechecks local data. Stop after completion
+is the default seeding policy. No external torrent client is needed.
+See TORRENTS.md for selection, limits, seeding, privacy and removal behavior.
+
+If LOCAL-PREVIEW.txt is present this is an uncommitted local validation
+preview, not a published clean-source release. Retain the matching
+application-source and dependency-source ZIP files and notices.

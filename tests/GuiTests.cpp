@@ -72,6 +72,7 @@ int main(int argc,char** argv) {
             wait([&]{return window.current().settings.dark;});check(window.current().settings.simultaneous==2,"Settings connected");check(window.grab().save(QDir(shots).filePath("dark.bmp"),"BMP"),"Dark render");
             widget<QPushButton>(window,"settingsButton")->click();settings=widget<QDialog>(window,"settingsDialog");widget<QComboBox>(*settings,"settingsTheme")->setCurrentIndex(0);settings->reject();check(window.current().settings.dark,"Cancel preserves settings");
             window.openAdd();add=widget<QDialog>(window,"addDialog");widget<QLineEdit>(*add,"addUrl")->setText("file:///C:/private");widget<QLineEdit>(*add,"addDestination")->setText(QDir(root).filePath("invalid.bin"));widget<QPushButton>(*add,"addSubmit")->click();wait([&]{return widget<QLabel>(window,"banner")->isVisible() && widget<QLabel>(window,"banner")->property("error").toBool();});check(window.current().entries.size()==1,"Invalid input creates no download");add->reject();
+            std::cout<<"Transfer heartbeat ticks="<<beats<<"; longest event gap="<<maximumGap<<" seconds\n";
             check(beats>200 && maximumGap<1.0,"Event loop responsiveness during actual transfer");
             std::filesystem::copy_file(std::filesystem::path(file.toStdWString()),std::filesystem::path(QDir(root).filePath("proof.bin").toStdWString()));
         }

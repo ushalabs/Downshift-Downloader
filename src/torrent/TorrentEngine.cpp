@@ -1,5 +1,8 @@
 #include "TorrentEngine.h"
 #include "TorrentStore.h"
+#ifdef DOWNSHIFT_TORRENT_FAULT_TEST
+#include "TorrentFaultDisk.h"
+#endif
 #include "core/DownloadQueue/OwnedMedia.h"
 #include <libtorrent/read_resume_data.hpp>
 #include <libtorrent/write_resume_data.hpp>
@@ -325,9 +328,20 @@ struct TorrentEngine::Impl {
         row.saving=false;row.flushing=false;row.saveAgain=false;row.completionPending=false;row.seedingPending=false;resolve(row.waiters,error);resolve(row.nextWaiters,error);row.view.error="Torrent checkpoint failed. Previous recovery data was retained.";
         row.paused=true;row.handle.pause();if(row.removing){row.removing->set_exception(error);row.removing.reset();row.removal=Removal::None;}emit owner.updated(row.view);shutdownError=error;
     }
-    template<class F> std::future<void> durable(QString id,F action){
+    void retryFailed(Row& row){
+        if(row.view.state!=State::Failed||row.blocked||row.removal!=Removal::None||row.adding||row.native.isEmpty())reject("Torrent is not ready for retry.");
+        auto params=lt::read_resume_data(lt::span<char const>(row.native.constData(),row.native.size()));
+        prepare(row,params,true);
+        // Cleanup may have removed files since the previous native handle.
+        // Newly reserved files need fresh physical identities, never old proofs.
+        for(const auto& file:row.view.files)if(!QFileInfo::exists(QDir(row.view.directory).filePath(file.path)))row.fileProofs.remove(file.path);
+        reserveFiles(row);params.flags|=lt::torrent_flags::paused;
+        lt::error_code error;auto handle=session->add_torrent(params,error);if(error)reject("Torrent retry could not attach native storage.");
+        row.handle=handle;row.restored=true;row.paused=true;
+    }
+    template<class F> std::future<void> durable(QString id,F action,bool retry=false){
         auto p=std::make_shared<std::promise<void>>();auto future=p->get_future();
-        if(!enqueue([this,id=std::move(id),action=std::move(action),p]{try{healthy();auto& row=ready(id);action(row);persist(row);save(row,p);emit owner.updated(row.view);}catch(...){p->set_exception(std::current_exception());}}))p->set_exception(failure("Torrent engine is shutting down."));return future;
+        if(!enqueue([this,id=std::move(id),action=std::move(action),p,retry]{try{healthy();auto found=rows.find(id);if(retry&&found!=rows.end()&&!found->second.handle.is_valid())retryFailed(found->second);auto& row=ready(id);action(row);persist(row);save(row,p);emit owner.updated(row.view);}catch(...){p->set_exception(std::current_exception());}}))p->set_exception(failure("Torrent engine is shutting down."));return future;
     }
     void fail(Row& row,const char* message){
         row.view.state=State::Failed;row.view.error=QString::fromUtf8(message);row.paused=true;
@@ -443,7 +457,11 @@ struct TorrentEngine::Impl {
             // notifications so only our one outstanding flush can acknowledge
             // its checkpoint; priorities are polled after native disk migration.
             settings.set_int(lt::settings_pack::alert_queue_size,2048);settings.set_int(lt::settings_pack::alert_mask,lt::alert_category::error|lt::alert_category::status);settings.set_int(lt::settings_pack::stop_tracker_timeout,1);
-            session=std::make_unique<lt::session>(lt::session_params(settings));session->set_alert_notify([this]{wake=true;condition.notify_one();});
+            lt::session_params parameters(settings);
+#ifdef DOWNSHIFT_TORRENT_FAULT_TEST
+            parameters.disk_io_constructor=testing::faultDisk();
+#endif
+            session=std::make_unique<lt::session>(std::move(parameters));session->set_alert_notify([this]{wake=true;condition.notify_one();});
             // Put LAN/loopback peers in the global class too, so saved caps apply
             // to every peer instead of being bypassed by native local defaults.
             lt::ip_filter classes;
@@ -496,7 +514,7 @@ std::future<QString> TorrentEngine::addMagnet(QString uri,QString directory,AddO
 std::future<std::vector<Snapshot>> TorrentEngine::snapshots(){return impl_->submit([this]{std::vector<Snapshot> result;for(const auto& [id,row]:impl_->rows)result.push_back(row.view);return result;});}
 std::future<void> TorrentEngine::checkpoint(QString id){return impl_->durable(std::move(id),[](auto&){});}
 std::future<void> TorrentEngine::pause(QString id){return impl_->durable(std::move(id),[](auto& row){row.paused=true;row.completionPending=false;row.seedingPending=false;row.view.state=State::Paused;row.handle.pause();row.view.downloadBytesPerSecond=row.view.uploadBytesPerSecond=0;});}
-std::future<void> TorrentEngine::resume(QString id){return impl_->durable(std::move(id),[this](auto& row){impl_->reserveFiles(row);if(row.view.metadataOnly&&row.view.metadata)reject("Confirm the torrent file selection before starting.");row.paused=false;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=row.view.metadata?State::Checking:State::Metadata;row.handle.clear_error();if(row.restored){row.handle.force_recheck();row.restored=false;}row.handle.resume();});}
+std::future<void> TorrentEngine::resume(QString id){return impl_->durable(std::move(id),[this](auto& row){impl_->reserveFiles(row);if(row.view.metadataOnly&&row.view.metadata)reject("Confirm the torrent file selection before starting.");row.paused=false;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=row.view.metadata?State::Checking:State::Metadata;row.handle.clear_error();if(row.restored){row.handle.force_recheck();row.restored=false;}row.handle.resume();},true);}
 std::future<void> TorrentEngine::startSelected(QString id,bool paused){return impl_->durable(std::move(id),[this,paused](auto& row){if(!row.view.metadata)reject("Wait for torrent metadata before confirming files.");row.view.metadataOnly=false;impl_->reserveFiles(row);row.paused=paused;row.completionPending=false;row.seedingPending=false;row.view.error.clear();row.view.state=paused?State::Paused:State::Checking;row.handle.clear_error();row.handle.unset_flags(lt::torrent_flags::upload_mode);if(row.restored){row.handle.force_recheck();row.restored=false;}if(paused)row.handle.pause();else row.handle.resume();});}
 std::future<void> TorrentEngine::configure(QString id,Limits limits,SeedPolicy policy){return impl_->durable(std::move(id),[limits,policy](auto& row){validate(limits);validate(policy);row.view.limits=limits;row.view.seeding=policy;row.handle.set_download_limit(limits.download);row.handle.set_upload_limit(limits.upload);row.handle.set_max_connections(limits.connections);});}
 std::future<void> TorrentEngine::selectFiles(QString id,std::vector<int> priorities){return impl_->durable(std::move(id),[this,priorities=std::move(priorities)](auto& row){validate(priorities);if(row.priorityPending)reject("A torrent file selection update is still pending.");if(!row.view.metadata)reject("Wait for metadata before choosing files.");if(priorities.size()!=row.view.files.size())reject("File priorities do not match the torrent file list.");for(std::size_t n=0;n<priorities.size();++n)if(row.priorities[n]==0&&priorities[n]>0)row.recheckAfterPriorities=true;row.priorities=priorities;row.completionPending=false;row.seedingPending=false;row.view.state=row.paused?State::Paused:State::Checking;for(std::size_t n=0;n<row.view.files.size();++n)row.view.files[n].priority=row.priorities[n];impl_->reserveFiles(row);impl_->applyPriorities(row);});}

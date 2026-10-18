@@ -1,8 +1,20 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import {saveImage} from '../extension/image-capture.js';
 import {BrowserTransfers,browserSource,NativeConnection} from '../extension/browser-transfer.js';
 let checks=0;
 const check=(value,message)=>{assert(value,message);checks++;};
+{
+ let listener,storage;const requests=[];class Anchor{href='magnet:?xt=urn:btih:'+'a'.repeat(40);}
+ const context={HTMLAnchorElement:Anchor,setTimeout:()=>1,window:{addEventListener:(type,fn)=>{listener=fn;}},document:{querySelector:()=>null,createElement:()=>({dataset:{},setAttribute(){},style:{},remove(){}}),body:{append(){}}},chrome:{storage:{local:{get:async()=>({handoffState:{enabled:true}})},onChanged:{addListener:fn=>{storage=fn;}}},runtime:{sendMessage:async value=>{requests.push(value);return {ok:true};}}}};
+ vm.runInNewContext(fs.readFileSync(new URL('../extension/magnet-links.js',import.meta.url),'utf8'),context);await Promise.resolve();
+ function click(trusted=true,link=new Anchor()){let prevented=false;listener({isTrusted:trusted,button:0,composedPath:()=>[{},link],preventDefault(){prevented=true;},stopImmediatePropagation(){}});return prevented;}
+ check(click()&&requests.length===1&&requests[0].type==='magnet','Trusted nested magnet click reaches native handoff route');
+ check(!click(false)&&requests.length===1,'Synthetic page events cannot open native dialogs');
+ storage({handoffState:{newValue:{enabled:false}}},'local');check(!click()&&requests.length===1,'Disabled capture leaves browser magnet activation alone');
+ storage({handoffState:{newValue:{enabled:true}}},'local');const http=new Anchor;http.href='https://example.com/file';check(!click(true,http)&&requests.length===1,'HTTP link behavior is unchanged');
+}
 function fixture(){
  const f={item:{id:7,state:'in_progress',paused:true,url:'blob:https://example.com/generated',filename:'',mime:'application/octet-stream',bytesReceived:17,totalBytes:17,danger:'safe'},log:[],nativeStatus:'Paused',record:{key:'a'.repeat(32),phase:'browser-preparing',transport:'browser'}};
  f.controller={filenameHints:new Map([[7,'report.rbxmx']]),save:async()=>{},finish:async(id,notice)=>{f.finished=notice;},native:async(command,values)=>{f.log.push(command);f.last=values;if(command==='browser-prepare')return {state:'prepared'};if(command==='commit'){check(values.browserTransport===true && !values.browserCancelled,'Browser transport does not falsely attest browser cancellation');return {state:'committed'};}return {downloadStatus:f.nativeStatus};}};

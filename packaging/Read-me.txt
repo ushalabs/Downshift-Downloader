@@ -1,11 +1,38 @@
-Downshift - Windows 10/11 x64 portable (version in package-manifest.json)
+Downshift - Windows 10/11 x64 (version in package-manifest.json)
+Developed by UshaLabs
+
+WINDOWS SETUP
+Run Downshift-1.0.0-Setup-x64.exe. It installs the application, required native
+runtime files and video support for all Windows users. Keep internet on:
+setup automatically downloads about 136 MiB of pinned, verified video tools.
+No separate Enable-video step is needed with the EXE setup. If a download
+fails, setup reports failure; reconnect and run setup again to retry.
+Video tools already installed at the expected hashes are reused offline.
+Successful setup removes its downloaded archives to avoid duplicate storage.
+
+Leave "Open Chrome setup instructions" selected on the finish page. It opens
+Chrome-setup.txt with simple steps and the exact installed extension folder.
+Enable Developer mode, click Load unpacked and select that folder once.
+Chrome does not permit automatic installation of this unpublished local
+extension on ordinary Windows PCs; a Chrome Web Store listing is required.
+Start > Downshift > Chrome setup reopens the text. Refresh existing video tabs.
+Default installation: C:\Program Files\Downshift (Windows x64).
+Approve the Windows administrator prompt. Setup installs for all users and
+creates a Downshift Desktop icon and Start menu shortcuts. Download history,
+preferences and downloads remain in each user's own writable folders.
+If upgrading an older per-user AppData setup, uninstall that old copy first
+so its per-user Chrome registration does not override the new machine setup.
+Windows Apps uninstall preserves real downloads/history and unknown files.
+Quit an installed copy before upgrading it. Setup does not launch Downshift.
+
+PORTABLE ZIP
 
 1. Extract the entire ZIP to a permanent folder you can write to.
 2. Double-click Setup.cmd (no administrator rights needed).
 3. Open Downshift using the Desktop shortcut or Downshift.exe here.
 4. Chrome: chrome://extensions > Developer mode > Load unpacked > choose
    this package's extension folder. Reload existing video tabs.
-5. Optional videos: double-click Enable-video.cmd. It downloads pinned,
+5. For videos in a ZIP-only installation, double-click Enable-video.cmd. It downloads pinned,
    checksum-verified upstream video tools. Internet is needed for this step.
 
 Keep the executable beside its DLLs, platforms and scripts folders.
@@ -29,12 +56,12 @@ Original Downshift source: MIT. Qt and other dependencies have separate
 licenses; see THIRD_PARTY_NOTICES.md and licenses. Qt DLL replacement and
 reverse engineering to debug library modifications are permitted. The
 matching dependency-source ZIP is provided beside the release binary.
-Optional video helpers are downloaded directly from upstream, not bundled.
+Video helpers are downloaded directly from upstream, not bundled in the EXE/ZIP.
 
 Source and documentation:
 https://github.com/ushalabs/Downshift-Download-Manager
 
-This unsigned preview has no Windows installer or automatic updater.
+This local preview is unsigned and has no automatic updater.
 
 Torrents: choose Torrents in Downshift, Add torrent, paste a magnet or select
 a .torrent file, choose a separate folder and confirm the files. Restart

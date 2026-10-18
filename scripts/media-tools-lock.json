@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "assets": [
+    {
+      "name": "yt-dlp.exe",
+      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+      "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
+    },
+    {
+      "name": "deno.zip",
+      "url": "https://github.com/denoland/deno/releases/download/v2.9.7/deno-x86_64-pc-windows-msvc.zip",
+      "sha256": "a0c3101b4158d1dfb7d6a78a7bf0f3de80c96bb423c152beec8beb22786f2238"
+    },
+    {
+      "name": "ffmpeg.zip",
+      "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-12-13-12/ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1.zip",
+      "sha256": "fa628b9de20254fe7c80605a4c6af54d0bffdda0807363ee7557131c2b78e051"
+    }
+  ],
+  "files": [
+    {
+      "name": "yt-dlp.exe",
+      "asset": "yt-dlp.exe",
+      "entry": null,
+      "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
+    },
+    {
+      "name": "deno.exe",
+      "asset": "deno.zip",
+      "entry": "deno.exe",
+      "sha256": "e020f3e232bd16e33768dee528e5983349c962952051ced0a5d58ad42f5d9b33"
+    },
+    {
+      "name": "FFMPEG-LICENSE.txt",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/LICENSE.txt",
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    },
+    {
+      "name": "swscale-9.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/swscale-9.dll",
+      "sha256": "8f3e5076491669528f2444fc82db99d51e1b9bd9e4234d0ee3581ba9c35f0c55"
+    },
+    {
+      "name": "avdevice-62.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/avdevice-62.dll",
+      "sha256": "9d2004b247fc6ac6f1ce903aed758b58ff08312953314d6e2c212a069feab954"
+    },
+    {
+      "name": "ffmpeg.exe",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/ffmpeg.exe",
+      "sha256": "4b7264e5ac33ea34b02d280a0fe5c19e88d48d27195908fae8394358d907fad0"
+    },
+    {
+      "name": "ffprobe.exe",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/ffprobe.exe",
+      "sha256": "92309742b67c7af463f232a6f2839f84c46ea63be5544f2883997b9e182cc1b2"
+    },
+    {
+      "name": "avcodec-62.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/avcodec-62.dll",
+      "sha256": "2fc53b1ea501d90aaad0872e23cec64a066cdb0bf236cdb44c8d41e96fe5dc16"
+    },
+    {
+      "name": "avutil-60.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/avutil-60.dll",
+      "sha256": "a1f6f0ca10461f34dcdb2c0b38d807e98cda3c5932a9688ce81bc1e4e4a4b659"
+    },
+    {
+      "name": "swresample-6.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/swresample-6.dll",
+      "sha256": "a922f2a7a65a51fa5c309300bac1daa253fb4a411e3824cce090796396ebb684"
+    },
+    {
+      "name": "avfilter-11.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/avfilter-11.dll",
+      "sha256": "dcad6d222369d6f8cee2b68d2d54e25f9a8087a3fff0577cb3341e4bea589170"
+    },
+    {
+      "name": "avformat-62.dll",
+      "asset": "ffmpeg.zip",
+      "entry": "ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1/bin/avformat-62.dll",
+      "sha256": "2f9a01304a6e7e4fae621c04a3d45052e1f826729edb64dcff2c048c139644f8"
+    }
+  ]
+}

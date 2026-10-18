@@ -2,6 +2,20 @@
   if (globalThis.__downshiftVideoButtons) return;
   globalThis.__downshiftVideoButtons = true;
   const players = new Map();
+  const pendingYouTube=new Map();
+  addEventListener("message",event=>{
+    const value=event.data;
+    if(event.source===window && event.origin===location.origin && value?.type==='downshift-youtube-prepared'){
+      const complete=pendingYouTube.get(value.nonce);if(!complete)return;pendingYouTube.delete(value.nonce);
+      if(value.video&&/^[\w-]{11}$/.test(value.video.id))chrome.runtime.sendMessage({type:'youtube-observed',page:'https://www.youtube.com/watch?v='+value.video.id,video:value.video}).catch(()=>{}).finally(()=>complete(value.video));else complete(null);return;
+    }
+    if(event.source===window && event.origin===location.origin && value?.type==='downshift-youtube-observed'){
+      chrome.runtime.sendMessage({type:'youtube-observed',page:location.href,video:value.video}).catch(()=>{});return;
+    }
+    if(event.source!==window || (event.origin!==location.origin&&location.origin!=="null") || value?.type!=="downshift-manifest-observed" || typeof value.url!=="string" || value.url.length>32768 || !["hls","dash"].includes(value.format))return;
+    chrome.runtime.sendMessage({type:"media-observed",page:location.href,url:value.url,format:value.format,master:value.master===true}).catch(()=>{});
+  });
+  postMessage({type:"downshift-manifest-replay"},location.origin==="null"?"*":location.origin);
   let scheduled = false;
   function requestLayout() { if (!scheduled) { scheduled = true; requestAnimationFrame(layout); } }
   function attach(video) {
@@ -23,10 +37,21 @@
       try {
         const card = video.closest("ytd-rich-item-renderer,ytd-video-renderer,ytd-reel-item-renderer,ytd-compact-video-renderer");
         const player = video.closest(".html5-video-player");
-        const videoPage = card?.querySelector('a[href*="/watch?v="],a[href^="/shorts/"]')?.href || player?.querySelector("a.ytp-title-link[href]")?.href || "";
-        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, source:video.currentSrc || video.src || video.querySelector("source")?.src || "", title:document.title.slice(0,200)});
+        let videoPage = card?.querySelector('a[href*="/watch?v="],a[href^="/shorts/"]')?.href || player?.querySelector("a.ytp-title-link[href]")?.href || "";
+        let browserPrepared=false;
+        if(window===top && /(^|\.)youtube\.com$/.test(location.hostname) && !video.mediaKeys){
+          notice.textContent='Reading the playing video…';
+          let videoId;try{const u=new URL(videoPage||location.href);videoId=u.searchParams.get('v')||u.pathname.match(/^\/(?:shorts|live)\/([\w-]{11})/)?.[1];}catch{}
+          const prepared=await new Promise(resolve=>{const nonce=crypto.randomUUID(),timer=setTimeout(()=>{pendingYouTube.delete(nonce);resolve(undefined);},12000);video.setAttribute('data-downshift-request',nonce);pendingYouTube.set(nonce,value=>{clearTimeout(timer);resolve(value);});postMessage({type:'downshift-youtube-prepare',nonce,videoId},location.origin);});
+          video.removeAttribute('data-downshift-request');
+          // Browser playback metadata is optional. A canonical watch URL can
+          // still be resolved by the normal native extractor when Chrome uses
+          // SABR, has no standard stream, or the page bridge did not respond.
+          if(prepared){videoPage='https://www.youtube.com/watch?v='+prepared.id;browserPrepared=true;}
+        }
+        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, browserPrepared, source:video.currentSrc || video.src || video.querySelector("source")?.src || "", userAgent:navigator.userAgent, playerCount:players.size, protected:!!video.mediaKeys, title:document.title.slice(0,200)});
         notice.textContent = answer?.ok ? "Choose quality in Downshift." : answer?.error || "Open Downshift and try again.";
-      } catch { notice.textContent = "Reload this page after reloading the Downshift extension."; }
+      } catch(error) { notice.textContent = error?.message || "Reload this page after reloading the Downshift extension."; }
       button.disabled = false;
     });
     video.addEventListener("loadedmetadata",requestLayout); video.addEventListener("emptied",requestLayout);

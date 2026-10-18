@@ -1,17 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Downshift",
-  "version": "0.4.4",
+  "version": "1.0.0",
   "minimum_chrome_version": "123",
   "description": "Download files and videos with Downshift.",
+  "icons": {"16":"icons/downshift-16.png","32":"icons/downshift-32.png","48":"icons/downshift-48.png","128":"icons/downshift-128.png"},
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy/r3t/ukMCHfxgbwqUKk+r85bsf8DgF9CTsARypAyUB6kgwHrAQ1pEU/45Z3yklkFtKL6wR35gLd9hfnsBwet6HbIq/UdWfyr96MMzgaR2jaf2Wz73pFydNbDYaWt80NUftqnUwSzfEIYmXOMTS6Dyr1MxJL3lqwsXpaeNM+zyzPFqQGUBpvZFNt59bIEBkKaHF/kGfIY/h3e+1NLvMBT1xWbNk3r/DHp57bC6N2AWOTAgqGQ8PL2U5CIrL6FQEtDicvPDL/bLmzs8CMrtGNmvqErcwwssXMfNnqho0PcwPNIgqkQX4g35LVxTzbRG2hd/NmsocLIrR+ssdXrFo1xwIDAQAB",
   "permissions": ["downloads", "downloads.ui", "nativeMessaging", "storage", "alarms", "webRequest", "contextMenus"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
+    {"matches": ["https://*.youtube.com/*", "https://youtube.com/*"], "js": ["youtube-player.js"], "all_frames": false, "world": "MAIN", "run_at": "document_start"},
+    {"matches": ["http://*/*", "https://*/*"], "js": ["media-probe.js"], "all_frames": true, "match_origin_as_fallback": true, "world": "MAIN", "run_at": "document_start"},
+    {"matches": ["http://*/*", "https://*/*"], "js": ["magnet-links.js"], "all_frames": true, "run_at": "document_start"},
     {"matches": ["http://*/*", "https://*/*"], "js": ["file-links.js"], "all_frames": true, "run_at": "document_start"},
     {"matches": ["http://*/*", "https://*/*"], "js": ["video-button.js"], "all_frames": true, "match_origin_as_fallback": true, "run_at": "document_idle"}
   ],
   "background": {"service_worker": "background.js", "type": "module"},
-  "action": {"default_title": "Downshift", "default_popup": "popup.html"},
+  "action": {"default_title": "Downshift", "default_popup": "popup.html", "default_icon": {"16":"icons/downshift-16.png","32":"icons/downshift-32.png","48":"icons/downshift-48.png","128":"icons/downshift-128.png"}},
   "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'"}
 }

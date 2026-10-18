@@ -1,7 +1,6 @@
 #include "TorrentDialogs.h"
 #include "MainWindow.h"
 #include "Controls.h"
-#include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
 #include <QDoubleSpinBox>
@@ -13,12 +12,13 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QScrollArea>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QDir>
-#include <QUuid>
+#include <QDateTime>
 #include <QUrl>
 #include <algorithm>
 #include <cmath>
@@ -28,7 +28,7 @@ namespace downshift {
 using namespace torrent;
 QString torrentStateText(const Snapshot& s){
     if(s.metadataOnly&&s.metadata&&s.state!=State::Cancelled&&s.state!=State::Failed)return "Choose files";
-    switch(s.state){case State::Adding:return "Adding";case State::Metadata:return "Finding metadata";case State::Checking:return "Verifying";case State::Downloading:return "Downloading";case State::Complete:return "Completed";case State::Failed:return "Failed";case State::Cancelled:return "Cancelled";case State::Paused:return "Paused";case State::Seeding:return "Seeding";}return "Unknown";
+    switch(s.state){case State::Adding:return "Adding";case State::Metadata:return "Finding metadata";case State::Checking:return "Verifying";case State::Downloading:if(s.nativePaused)return "Paused by engine";if(s.uploadOnly)return "Waiting to download";if(!s.peers)return s.connectingPeers?"Connecting to peers":"Finding peers";return s.downloadBytesPerSecond?"Downloading":"Waiting for pieces";case State::Complete:return "Completed";case State::Failed:return "Failed";case State::Cancelled:return "Cancelled";case State::Paused:return "Paused";case State::Seeding:return "Seeding";}return "Unknown";
 }
 bool torrentActive(const Snapshot& s){return s.state==State::Adding||s.state==State::Metadata||s.state==State::Checking||s.state==State::Downloading||s.state==State::Seeding;}
 namespace {
@@ -86,45 +86,73 @@ struct SeedForm {
     SeedPolicy get()const{bool ok=false;const auto value=ratio->text().toDouble(&ok);if(!ok||!std::isfinite(value)||value<=0||value>1000)throw std::runtime_error("Enter a seeding ratio above zero and no greater than 1000.");return {static_cast<SeedMode>(mode->currentIndex()),value,seconds->value()};}
 };
 class AddDialog final:public Dialog {
-    TorrentEngine& engine_;QString id_;QLineEdit *source_,*folder_;FileTable* files_;QLabel* status_;QPushButton *inspect_,*confirm_;QCheckBox* start_;
+    TorrentEngine& engine_;QString id_;QLineEdit *source_,*folder_;FileTable* files_;QLabel* status_;QPushButton *inspect_,*confirm_,*rediscover_;
+    qint64 retryAt_=0;
     std::optional<std::future<std::vector<Snapshot>>> polling_;
+    void readMetadata(){
+        if(busy_||!id_.isEmpty())return;
+        const auto value=source_->text().trimmed();if(value.isEmpty())return;
+        busy_=true;error_->clear();inspect_->setEnabled(false);source_->setEnabled(false);folder_->setEnabled(false);
+        const bool magnet=value.startsWith("magnet:",Qt::CaseInsensitive);AddOptions options;options.metadataOnly=true;options.paused=!magnet;
+        await(magnet?engine_.addMagnet(value,folder_->text().trimmed(),options):engine_.addFile(value,folder_->text().trimmed(),options),[this](QString id){id_=std::move(id);inspect_->hide();poll();});
+    }
+    void sourceChanged(){
+        const bool magnet=source_->text().trimmed().startsWith("magnet:",Qt::CaseInsensitive);
+        inspect_->setVisible(id_.isEmpty()&&magnet);inspect_->setDefault(id_.isEmpty()&&magnet);
+    }
     void poll(){
         if(id_.isEmpty())return;
-        if(polling_&&polling_->wait_for(std::chrono::seconds(0))==std::future_status::ready){try{for(const auto& row:polling_->get())if(row.id==id_){files_->updateFiles(row.files);status_->setText(row.metadata?"Choose files and priorities. No payload downloads until you confirm.":"Finding metadata from peers… You can cancel while waiting.");confirm_->setEnabled(row.metadata&&!busy_);if(!row.error.isEmpty())error_->setText(row.error);}}catch(const std::exception& e){error_->setText(QString::fromUtf8(e.what()));}polling_.reset();}
+        if(polling_&&polling_->wait_for(std::chrono::seconds(0))==std::future_status::ready){try{for(const auto& row:polling_->get())if(row.id==id_){files_->updateFiles(row.files);if(row.metadata)status_->setText(row.selectionPending?"Preparing file selection…":"Choose files and priorities. No payload downloads until you confirm.");else{const auto seconds=row.metadataWaitSeconds;status_->setText(QString("Finding metadata · %1m %2s · %3 peers · %4 connecting · %5 candidates\nTrackers: %6/%7 responding, %8 failed · DHT: %9 nodes%10").arg(seconds/60).arg(seconds%60).arg(row.peers).arg(row.connectingPeers).arg(row.candidatePeers).arg(row.respondingTrackers).arg(row.trackerCount).arg(row.failedTrackers).arg(row.dhtNodes).arg(seconds>=30?"\nMetadata needs a reachable peer. A .torrent file can supply the file list directly.":""));}rediscover_->setVisible(!row.metadata);rediscover_->setEnabled(!busy_&&!row.metadata&&QDateTime::currentSecsSinceEpoch()>=retryAt_);confirm_->setEnabled(row.metadata&&!row.selectionPending&&!busy_);confirm_->setDefault(row.metadata);if(!row.error.isEmpty())error_->setText(row.error);}}catch(const std::exception& e){error_->setText(QString::fromUtf8(e.what()));}polling_.reset();}
         if(!polling_)polling_.emplace(engine_.snapshots());
     }
 public:
     AddDialog(TorrentEngine& engine,QString folder,QWidget* parent):Dialog(parent),engine_(engine){
         setObjectName("addTorrentDialog");setWindowTitle("Add torrent");auto* layout=new QVBoxLayout(this);auto* form=new QFormLayout;layout->addLayout(form);
         source_=new QLineEdit;source_->setObjectName("torrentSource");source_->setPlaceholderText("Magnet link or .torrent file");auto* sourceLine=new QHBoxLayout;sourceLine->addWidget(source_);auto* browse=makeButton("Browse…","torrentBrowse");sourceLine->addWidget(browse);form->addRow("Torrent",sourceLine);
-        folder_=new QLineEdit(QDir(folder).filePath("Torrents/"+QUuid::createUuid().toString(QUuid::Id128).left(8)));folder_->setObjectName("torrentFolder");auto* folderLine=new QHBoxLayout;folderLine->addWidget(folder_);auto* choose=makeButton("Choose…","torrentChooseFolder");folderLine->addWidget(choose);form->addRow("Save in",folderLine);
-        connect(browse,&QPushButton::clicked,this,[this]{if(!id_.isEmpty()||busy_)return;const auto path=QFileDialog::getOpenFileName(this,"Choose torrent",{},"Torrents (*.torrent)");if(!path.isEmpty())source_->setText(path);});
-        connect(choose,&QPushButton::clicked,this,[this]{if(!id_.isEmpty()||busy_)return;const auto path=QFileDialog::getExistingDirectory(this,"Torrent destination",folder_->text());if(!path.isEmpty())folder_->setText(path);});
-        status_=plain("Read the metadata to choose files before downloading.");status_->setObjectName("torrentMetadataStatus");layout->addWidget(status_);files_=new FileTable;layout->addWidget(files_,1);error(layout);
-        start_=new QCheckBox("Start downloading after adding");start_->setObjectName("torrentStart");start_->setChecked(false);layout->addWidget(start_);
-        auto* footer=new QHBoxLayout;inspect_=makeButton("Read metadata","torrentInspect");confirm_=makeButton("Add paused","torrentConfirm");confirm_->setProperty("primary",true);confirm_->setEnabled(false);auto* cancel=makeButton("Cancel","torrentAddCancel");footer->addWidget(inspect_);footer->addStretch();footer->addWidget(cancel);footer->addWidget(confirm_);layout->addLayout(footer);
-        connect(start_,&QCheckBox::toggled,this,[this](bool start){confirm_->setText(start?"Start download":"Add paused");});connect(cancel,&QPushButton::clicked,this,&AddDialog::reject);
-        connect(inspect_,&QPushButton::clicked,this,[this]{if(busy_||!id_.isEmpty())return;busy_=true;error_->clear();inspect_->setEnabled(false);source_->setEnabled(false);folder_->setEnabled(false);const auto value=source_->text().trimmed();const bool magnet=value.startsWith("magnet:",Qt::CaseInsensitive);AddOptions options;options.metadataOnly=true;options.paused=!magnet;await(magnet?engine_.addMagnet(value,folder_->text().trimmed(),options):engine_.addFile(value,folder_->text().trimmed(),options),[this](QString id){id_=std::move(id);poll();});});
-        connect(confirm_,&QPushButton::clicked,this,[this]{if(busy_||id_.isEmpty())return;busy_=true;confirm_->setEnabled(false);error_->clear();await(engine_.selectFiles(id_,files_->priorities()),[this]{busy_=true;await(engine_.startSelected(id_,!start_->isChecked()),[this]{id_.clear();accept();});});});
-        auto* timer=new QTimer(this);timer->setInterval(250);connect(timer,&QTimer::timeout,this,[this]{if(id_.isEmpty()&&!busy_){inspect_->setEnabled(true);source_->setEnabled(true);folder_->setEnabled(true);}poll();});timer->start();
+        folder_=new QLineEdit(QDir(folder).filePath("Torrents"));folder_->setObjectName("torrentFolder");auto* folderLine=new QHBoxLayout;folderLine->addWidget(folder_);auto* choose=makeButton("Choose…","torrentChooseFolder");folderLine->addWidget(choose);form->addRow("Save in",folderLine);
+        connect(browse,&QPushButton::clicked,this,[this]{if(!id_.isEmpty()||busy_)return;const auto path=QFileDialog::getOpenFileName(this,"Choose torrent",{},"Torrents (*.torrent)");if(!path.isEmpty()){source_->setText(path);readMetadata();}});
+        connect(choose,&QPushButton::clicked,this,[this]{if(busy_)return;const auto path=QFileDialog::getExistingDirectory(this,"Torrent destination",folder_->text());if(!path.isEmpty())folder_->setText(path);});
+        status_=plain("Choose a .torrent file or fetch a magnet link, then select files and start the download.");status_->setObjectName("torrentMetadataStatus");layout->addWidget(status_);files_=new FileTable;layout->addWidget(files_,1);error(layout);
+        auto* footer=new QHBoxLayout;rediscover_=makeButton("Retry discovery","torrentRediscover");rediscover_->hide();inspect_=makeButton("Read metadata","torrentInspect");confirm_=makeButton("Start download","torrentConfirm");confirm_->setProperty("primary",true);confirm_->setEnabled(false);auto* cancel=makeButton("Cancel","torrentAddCancel");footer->addWidget(inspect_);footer->addWidget(rediscover_);footer->addStretch();footer->addWidget(cancel);footer->addWidget(confirm_);layout->addLayout(footer);
+        for(auto* button:findChildren<QPushButton*>()){button->setAutoDefault(false);button->setDefault(false);}inspect_->hide();
+        connect(source_,&QLineEdit::returnPressed,this,[this]{readMetadata();});connect(folder_,&QLineEdit::returnPressed,this,[this]{readMetadata();});connect(source_,&QLineEdit::textChanged,this,[this]{sourceChanged();});source_->setFocus();
+        connect(cancel,&QPushButton::clicked,this,&AddDialog::reject);
+        connect(inspect_,&QPushButton::clicked,this,[this]{readMetadata();});
+        connect(rediscover_,&QPushButton::clicked,this,[this]{if(busy_||id_.isEmpty())return;busy_=true;rediscover_->setEnabled(false);retryAt_=QDateTime::currentSecsSinceEpoch()+30;await(engine_.rediscover(id_),[this]{error_->setText("Discovery requested. Tracker retry intervals still apply; peers must be reachable.");});});
+        connect(confirm_,&QPushButton::clicked,this,[this]{if(busy_||id_.isEmpty())return;busy_=true;confirm_->setEnabled(false);error_->clear();await(engine_.setPreviewDirectory(id_,folder_->text().trimmed()),[this]{busy_=true;await(engine_.selectFiles(id_,files_->priorities()),[this]{busy_=true;await(engine_.startSelected(id_,false),[this]{id_.clear();accept();});});});});
+        auto* timer=new QTimer(this);timer->setInterval(250);connect(timer,&QTimer::timeout,this,[this,choose]{folder_->setEnabled(!busy_);choose->setEnabled(!busy_);if(id_.isEmpty()&&!busy_){inspect_->setEnabled(true);source_->setEnabled(true);sourceChanged();}poll();});timer->start();
     }
     void reject()override{if(busy_)return;if(id_.isEmpty()){QDialog::reject();return;}busy_=true;confirm_->setEnabled(false);await(engine_.remove(id_),[this]{id_.clear();QDialog::reject();});}
 };
-class DetailsDialog final:public Dialog {
-    TorrentEngine& engine_;QString id_;Snapshot snapshot_;FileTable* files_;QLabel* overview_;QTableWidget *trackers_,*peers_;QPushButton *apply_,*confirm_;QCheckBox* start_;QFormLayout* settingsForm_=new QFormLayout;RateForm rates_;SeedForm seeds_;
+class DetailsPanel final:public QWidget {
+    bool busy_=false;
+    QLabel* error_=nullptr;
+    template<class T,class F>void await(std::future<T> future,F success){
+        auto pending=std::make_shared<std::future<T>>(std::move(future));auto* timer=new QTimer(this);timer->setInterval(25);
+        connect(timer,&QTimer::timeout,this,[this,timer,pending,success=std::move(success)]()mutable{
+            if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;
+            timer->stop();timer->deleteLater();busy_=false;
+            try{if constexpr(std::is_void_v<T>){pending->get();success();}else success(pending->get());}
+            catch(const std::exception& e){error_->setText(QString::fromUtf8(e.what()));}
+        });timer->start();
+    }
+    QLabel* error(QVBoxLayout* layout){error_=plain({});error_->setObjectName("torrentError");layout->addWidget(error_);return error_;}
+
+    TorrentEngine& engine_;QString id_;Snapshot snapshot_;QWidget* actions_;QTabWidget* tabs_;FileTable* files_;QLabel* overview_;QTableWidget *trackers_,*peers_;QPushButton *apply_,*confirm_,*rediscover_;qint64 retryAt_=0;QFormLayout* settingsForm_=new QFormLayout;RateForm rates_;SeedForm seeds_;
     std::optional<std::future<std::vector<Snapshot>>> polling_;std::optional<std::future<Details>> details_;
     void poll(){
-        if(polling_&&polling_->wait_for(std::chrono::seconds(0))==std::future_status::ready){try{bool found=false;for(const auto& row:polling_->get())if(row.id==id_){found=true;const bool first=snapshot_.id.isEmpty();snapshot_=row;if(first){rates_.set(row.limits);seeds_.set(row.seeding);}files_->updateFiles(row.files);overview_->setText(QString("%1\n%2\n%3\nVerified %4 / %5 selected\nDownload %6/s · Upload %7/s\nSeeds %8 · Peers %9 · Ratio %10\nAvailability %11 · Seeding %12 s\n%13").arg(row.name,torrentStateText(row),row.directory,amount(row.verifiedBytes),amount(row.selectedBytes),amount(row.downloadBytesPerSecond),amount(row.uploadBytesPerSecond)).arg(row.seeds).arg(row.peers).arg(row.ratio,0,'f',3).arg(row.availability,0,'f',2).arg(row.seedingSeconds).arg(row.error));confirm_->setVisible(row.metadataOnly);start_->setVisible(row.metadataOnly);confirm_->setEnabled(row.metadata&&!busy_);apply_->setEnabled(row.metadata&&row.state!=State::Cancelled&&!busy_);}if(!found){error_->setText("This torrent was removed.");apply_->setEnabled(false);confirm_->setEnabled(false);}}catch(const std::exception& e){error_->setText(QString::fromUtf8(e.what()));}polling_.reset();}
+        if(polling_&&polling_->wait_for(std::chrono::seconds(0))==std::future_status::ready){try{bool found=false;for(const auto& row:polling_->get())if(row.id==id_){found=true;const bool first=snapshot_.id.isEmpty();snapshot_=row;actions_->setVisible(row.metadataOnly||tabs_->currentIndex()==1||tabs_->currentIndex()==2||tabs_->currentIndex()==4);rediscover_->setEnabled(torrentActive(row)&&!row.nativePaused&&!busy_&&QDateTime::currentSecsSinceEpoch()>=retryAt_);if(first){rates_.set(row.limits);seeds_.set(row.seeding);}files_->updateFiles(row.files);overview_->setText(QString("Destination: %1\n%2 · Verified %3 / %4 selected\nDownload %5/s · Upload %6/s · Ratio %7\n%8 peers · %9 seeds · Availability %10\nTrackers %11/%12 responding (%13 failed) · DHT %14 nodes\n%15 candidates · %16 connecting · Seeding %17 s%18")
+                    .arg(row.directory,torrentStateText(row),amount(row.verifiedBytes),amount(row.selectedBytes),amount(row.downloadBytesPerSecond),amount(row.uploadBytesPerSecond)).arg(row.ratio,0,'f',3).arg(row.peers).arg(row.seeds).arg(row.availability,0,'f',2).arg(row.respondingTrackers).arg(row.trackerCount).arg(row.failedTrackers).arg(row.dhtNodes).arg(row.candidatePeers).arg(row.connectingPeers).arg(row.seedingSeconds).arg(row.error.isEmpty()?QString():"\n"+row.error));apply_->setVisible(!row.metadataOnly);confirm_->setText(row.metadataOnly?"Start download":"Start seeding");confirm_->setVisible(row.metadataOnly||(row.state==State::Complete&&row.seeding.mode!=SeedMode::Stop));confirm_->setEnabled(row.metadata&&!row.verifyingCompletion&&!row.selectionPending&&!busy_);apply_->setEnabled(row.metadata&&!row.verifyingCompletion&&!row.selectionPending&&row.state!=State::Cancelled&&!busy_);}if(!found){error_->setText("This torrent was removed.");apply_->setEnabled(false);confirm_->setEnabled(false);}}catch(const std::exception& e){error_->setText(QString::fromUtf8(e.what()));}polling_.reset();}
         if(details_&&details_->wait_for(std::chrono::seconds(0))==std::future_status::ready){try{const auto d=details_->get();trackers_->setRowCount(static_cast<int>(d.trackers.size()));for(int n=0;n<static_cast<int>(d.trackers.size());++n){const auto& t=d.trackers[static_cast<std::size_t>(n)];const auto url=QUrl(t.url);const QStringList values={url.host().isEmpty()?QString("Tracker"):url.host(),t.verified?"Verified":"Waiting",QString::number(t.failures),t.error};for(int c=0;c<4;++c)trackers_->setItem(n,c,new QTableWidgetItem(values[c]));}peers_->setRowCount(static_cast<int>(d.peers.size()));for(int n=0;n<static_cast<int>(d.peers.size());++n){const auto& p=d.peers[static_cast<std::size_t>(n)];const QStringList values={p.address,p.client,amount(p.download)+"/s",amount(p.upload)+"/s",p.seed?"Seed":"Peer"};for(int c=0;c<5;++c)peers_->setItem(n,c,new QTableWidgetItem(values[c]));}}catch(const std::exception& e){error_->setText(QString::fromUtf8(e.what()));}details_.reset();}
         if(!polling_)polling_.emplace(engine_.snapshots());if(!details_)details_.emplace(engine_.details(id_));
     }
-    void save(bool finish){if(busy_||snapshot_.id.isEmpty())return;try{const auto limits=rates_.get();const auto policy=seeds_.get();busy_=true;error_->clear();apply_->setEnabled(false);confirm_->setEnabled(false);await(engine_.selectFiles(id_,files_->priorities()),[this,finish,limits,policy]{busy_=true;await(engine_.configure(id_,limits,policy),[this,finish]{if(finish){busy_=true;await(engine_.startSelected(id_,!start_->isChecked()),[this]{error_->setText("Torrent added.");});}else error_->setText("Torrent settings saved.");});});}catch(const std::exception& e){busy_=false;error_->setText(QString::fromUtf8(e.what()));}}
+    void save(bool finish){if(busy_||snapshot_.id.isEmpty())return;try{const auto limits=rates_.get();const auto policy=seeds_.get();busy_=true;error_->clear();apply_->setEnabled(false);confirm_->setEnabled(false);await(engine_.selectFiles(id_,files_->priorities()),[this,finish,limits,policy]{busy_=true;await(engine_.configure(id_,limits,policy),[this,finish]{if(finish){busy_=true;await(engine_.startSelected(id_,false),[this]{error_->setText("Torrent added.");});}else error_->setText("Torrent settings saved.");});});}catch(const std::exception& e){busy_=false;error_->setText(QString::fromUtf8(e.what()));}}
     static QTableWidget* table(const QStringList& labels){auto* t=new QTableWidget(0,labels.size());t->setHorizontalHeaderLabels(labels);t->setEditTriggers(QAbstractItemView::NoEditTriggers);t->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);t->verticalHeader()->hide();return t;}
 public:
-    DetailsDialog(TorrentEngine& engine,QString id,QWidget* parent):Dialog(parent),engine_(engine),id_(std::move(id)),rates_(settingsForm_,"torrentTask"),seeds_(settingsForm_){
-        setObjectName("torrentDetailsDialog");setProperty("torrentId",id_);setWindowTitle("Torrent details");auto* layout=new QVBoxLayout(this);auto* tabs=new QTabWidget;tabs->setObjectName("torrentTabs");layout->addWidget(tabs,1);
-        auto* summary=new QWidget;auto* summaryLayout=new QVBoxLayout(summary);overview_=plain("Loading torrent…");overview_->setObjectName("torrentOverview");summaryLayout->addWidget(overview_);summaryLayout->addStretch();tabs->addTab(summary,"Overview");files_=new FileTable;tabs->addTab(files_,"Files");trackers_=table({"Tracker host","Status","Failures","Last error"});trackers_->setObjectName("torrentTrackers");tabs->addTab(trackers_,"Trackers");peers_=table({"Address","Client","Download","Upload","Role"});peers_->setObjectName("torrentPeers");tabs->addTab(peers_,"Peers");auto* settings=new QWidget;settings->setLayout(settingsForm_);tabs->addTab(settings,"Settings");error(layout);
-        start_=new QCheckBox("Start downloading after confirming files");start_->setObjectName("torrentPreviewStart");start_->hide();layout->addWidget(start_);auto* footer=new QHBoxLayout;apply_=makeButton("Apply files and settings","torrentApply");apply_->setEnabled(false);confirm_=makeButton("Confirm files","torrentPreviewConfirm");confirm_->hide();auto* close=makeButton("Close","torrentDetailsClose");footer->addWidget(apply_);footer->addWidget(confirm_);footer->addStretch();footer->addWidget(close);layout->addLayout(footer);connect(apply_,&QPushButton::clicked,this,[this]{save(false);});connect(confirm_,&QPushButton::clicked,this,[this]{save(true);});connect(close,&QPushButton::clicked,this,&QDialog::reject);auto* timer=new QTimer(this);timer->setInterval(750);connect(timer,&QTimer::timeout,this,[this]{poll();});timer->start();poll();
+    DetailsPanel(TorrentEngine& engine,QString id,QWidget* parent):QWidget(parent),engine_(engine),id_(std::move(id)),rates_(settingsForm_,"torrentTask"),seeds_(settingsForm_){
+        setObjectName("torrentDetailsPanel");setProperty("torrentId",id_);auto* layout=new QVBoxLayout(this);auto* tabs=tabs_=new QTabWidget;tabs->setObjectName("torrentTabs");layout->addWidget(tabs,1);
+        auto* summary=new QWidget;auto* summaryLayout=new QVBoxLayout(summary);overview_=plain("Loading torrent…");overview_->setObjectName("torrentOverview");summaryLayout->addWidget(overview_);summaryLayout->addStretch();tabs->addTab(summary,"Overview");files_=new FileTable;tabs->addTab(files_,"Files");trackers_=table({"Tracker host","Status","Failures","Last error"});trackers_->setObjectName("torrentTrackers");tabs->addTab(trackers_,"Trackers");peers_=table({"Address","Client","Download","Upload","Role"});peers_->setObjectName("torrentPeers");tabs->addTab(peers_,"Peers");auto* settings=new QWidget;settings->setLayout(settingsForm_);auto* settingsScroll=new QScrollArea;settingsScroll->setWidgetResizable(true);settingsScroll->setFrameShape(QFrame::NoFrame);settingsScroll->setWidget(settings);tabs->addTab(settingsScroll,"Settings");tabs->setMinimumSize(0,0);tabs->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Ignored);error(layout);
+        actions_=new QWidget;auto* footer=new QHBoxLayout(actions_);footer->setContentsMargins(0,0,0,0);actions_->hide();connect(tabs_,&QTabWidget::currentChanged,this,[this](int index){actions_->setVisible(snapshot_.metadataOnly||index==1||index==2||index==4);});auto* footerLayout=footer;apply_=makeButton("Apply files and settings","torrentApply");apply_->setEnabled(false);confirm_=makeButton("Start download","torrentPreviewConfirm");confirm_->hide();rediscover_=makeButton("Retry discovery","torrentDetailsRediscover");rediscover_->setEnabled(false);connect(rediscover_,&QPushButton::clicked,this,[this]{if(busy_)return;busy_=true;rediscover_->setEnabled(false);retryAt_=QDateTime::currentSecsSinceEpoch()+30;await(engine_.rediscover(id_),[this]{error_->setText("Discovery requested. Tracker retry intervals still apply.");});});footerLayout->addWidget(apply_);footerLayout->addWidget(confirm_);footerLayout->addWidget(rediscover_);footerLayout->addStretch();layout->addWidget(actions_);connect(apply_,&QPushButton::clicked,this,[this]{save(false);});connect(confirm_,&QPushButton::clicked,this,[this]{save(true);});auto* timer=new QTimer(this);timer->setInterval(750);connect(timer,&QTimer::timeout,this,[this]{if(isVisible())poll();});timer->start();poll();
     }
 };
 class SettingsDialog final:public Dialog {
@@ -135,7 +163,13 @@ public:
     }
 };
 }
-void showAddTorrent(TorrentEngine& engine,QString folder,QWidget* parent){if(auto* old=parent->findChild<QDialog*>("addTorrentDialog")){old->showNormal();old->raise();return;}auto* dialog=new AddDialog(engine,std::move(folder),parent);dialog->show();}
-void showTorrentDetails(TorrentEngine& engine,QString id,QWidget* parent){for(auto* old:parent->findChildren<QDialog*>("torrentDetailsDialog"))if(old->property("torrentId").toString()==id){old->showNormal();old->raise();return;}auto* dialog=new DetailsDialog(engine,std::move(id),parent);dialog->show();}
+void showAddTorrent(TorrentEngine& engine,QString folder,QWidget* parent,QString source){
+    for(auto* old:parent->findChildren<QDialog*>("addTorrentDialog")){
+        auto* input=old->findChild<QLineEdit*>("torrentSource");
+        if(source.isEmpty()||input->text()==source){old->showNormal();old->raise();input->setFocus();return;}
+    }
+    auto* dialog=new AddDialog(engine,std::move(folder),parent);dialog->findChild<QLineEdit*>("torrentSource")->setText(source);dialog->show();
+}
+QWidget* createTorrentDetails(torrent::TorrentEngine& engine,QString id,QWidget* parent){return new DetailsPanel(engine,std::move(id),parent);}
 void showTorrentSettings(TorrentEngine& engine,QWidget* parent){if(auto* old=parent->findChild<QDialog*>("torrentSettingsDialog")){old->showNormal();old->raise();return;}auto* dialog=new SettingsDialog(engine,parent);dialog->show();}
 }

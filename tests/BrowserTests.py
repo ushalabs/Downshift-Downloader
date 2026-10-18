@@ -26,6 +26,13 @@ def main():
         try:
             assert request(exe,"ping")["state"]=="ready";checks+=1
             assert not host(exe,dict(version=1,command="media",url="https://www.youtube.com/watch?v=undefined",title="Video"))[1]["ok"];checks+=1
+            magnet='magnet:?xt=urn:btih:'+'0123456789abcdef'*2+'01234567'+'&dn=Private%20fixture'
+            for invalid in ('https://example.com/file', 'magnet:?dn=missing', 'magnet:?xt=urn:btih:bad', magnet+'\n'):
+                assert not host(exe,dict(version=1,command='torrent',url=invalid))[1]['ok'];checks+=1
+            assert request(exe,'torrent',url=magnet)['state']=='torrent-dialog';checks+=1
+            p.stdin.write('torrent\n');p.stdin.flush();dialogs=json.loads(p.stdout.readline());assert len(dialogs)==1 and dialogs[0]['source']==magnet and dialogs[0]['inspectEnabled'];assert rows(p)==[];checks+=1
+            request(exe,'torrent',url=magnet);p.stdin.write('torrent\n');p.stdin.flush();assert len(json.loads(p.stdout.readline()))==1;checks+=1
+            p.stdin.write('torrent-close\n');p.stdin.flush();json.loads(p.stdout.readline())
             key=uuid.uuid4().hex;values=dict(key=key,url=url,filename="browser.bin",total=str(server.size))
             accepted=request(exe,"prepare",**values);assert accepted["state"]=="prepared";assert rows(p)[0]["status"]==6 and not (root/"Programs"/"browser.bin.part").exists();checks+=1
             assert request(exe,"prepare",**values)["downloadId"]==accepted["downloadId"] and len(rows(p))==1;checks+=1

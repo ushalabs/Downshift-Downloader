@@ -1,0 +1,30 @@
+#include "TorrentFixture.h"
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QElapsedTimer>
+#include <QUrl>
+#include <libtorrent/write_resume_data.hpp>
+using namespace t4;
+int main(int argc,char** argv){QCoreApplication app(argc,argv);QTemporaryDir temp;
+try{
+    require(temp.isValid(),"Private discovery fixture");const auto root=temp.path(),metadata=create(root,lt::create_torrent::v1_only,"discovery");Seed seed(root,metadata);
+    QTcpServer stalled,working;require(stalled.listen(QHostAddress::LocalHost)&&working.listen(QHostAddress::LocalHost),"Independent local trackers listen");int stalledRequests=0,workingRequests=0;
+    QObject::connect(&stalled,&QTcpServer::newConnection,[&]{while(stalled.hasPendingConnections()){auto* socket=stalled.nextPendingConnection();++stalledRequests;QObject::connect(socket,&QTcpSocket::readyRead,socket,[socket]{socket->readAll();});}});
+    QObject::connect(&working,&QTcpServer::newConnection,[&]{while(working.hasPendingConnections()){auto* socket=working.nextPendingConnection();QObject::connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{auto request=socket->property("request").toByteArray()+socket->readAll();socket->setProperty("request",request);if(!request.contains("\r\n\r\n")||socket->property("answered").toBool())return;socket->setProperty("answered",true);++workingRequests;QByteArray peer;peer.append(char(127));peer.append(char(0));peer.append(char(0));peer.append(char(1));peer.append(char(seed.port()>>8));peer.append(char(seed.port()&255));const QByteArray body="d8:intervali1800e5:peers6:"+peer+"e";socket->write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);socket->disconnectFromHost();});}});
+    auto params=lt::load_torrent_file(metadata.toStdString());auto uri=QString::fromStdString(lt::make_magnet_uri(params));for(auto* tracker:{&stalled,&working})uri+="&tr="+QString::fromLatin1(QUrl::toPercentEncoding(QString("http://127.0.0.1:%1/announce").arg(tracker->serverPort())));
+    TorrentEngine engine({false,true,QDir(root).filePath("torrents.sqlite")});AddOptions options;options.metadataOnly=true;
+    std::cout<<"Discovery stage: add magnet"<<std::endl;QElapsedTimer elapsed;elapsed.start();const auto id=engine.addMagnet(uri,QDir(root).filePath("payload"),options).get();
+    // No connectPeer shortcut: only real tracker announce and peer handshake.
+    std::cout<<"Discovery stage: wait metadata"<<std::endl;wait([&]{return row(engine,id).metadata;},15);const auto milliseconds=elapsed.elapsed();const auto resolved=row(engine,id);
+    require(milliseconds<15000&&stalledRequests>0&&workingRequests>0,"Working tracker resolves metadata while first tracker remains stalled");require(resolved.metadataOnly&&resolved.state==State::Paused&&resolved.downloadedBytes==0,"Discovery pauses before any payload");require(!QFileInfo::exists(QDir(root).filePath("payload/discovery/file0.bin")),"Metadata discovery creates no payload file");
+    std::cout<<"Discovery stage: remove preview"<<std::endl;auto removal=engine.remove(id);require(removal.wait_for(std::chrono::seconds(5))==std::future_status::ready,"Preview removal settles while metadata priorities finish");removal.get();std::cout<<"Discovery stage: preview removed"<<std::endl;
+    const auto cancelled=engine.addMagnet(uri,QDir(root).filePath("cancelled-preview"),options).get();wait([&]{return row(engine,cancelled).metadata;},15);
+    auto cancellation=engine.cancel(cancelled);require(cancellation.wait_for(std::chrono::seconds(5))==std::future_status::ready,"Preview cancellation settles while metadata priorities finish");cancellation.get();require(row(engine,cancelled).state==State::Cancelled,"Priority completion cannot overwrite cancellation state");engine.remove(cancelled).get();
+    for(auto* tracker:{&stalled,&working}){params.trackers.push_back(QString("http://127.0.0.1:%1/announce").arg(tracker->serverPort()).toStdString());params.tracker_tiers.push_back(0);}
+    const auto bytes=lt::write_torrent_file_buf(params,{});const auto tracked=QDir(root).filePath("tracked.torrent");QFile metadataFile(tracked);require(metadataFile.open(QIODevice::WriteOnly)&&metadataFile.write(bytes.data(),static_cast<qint64>(bytes.size()))==static_cast<qint64>(bytes.size()),"Tracker file metadata writes");metadataFile.close();
+    std::cout<<"Discovery stage: add torrent file"<<std::endl;AddOptions transfer;const auto fileId=engine.addFile(tracked,QDir(root).filePath("file-payload"),transfer).get();engine.rediscover(fileId).get();
+    std::cout<<"Discovery stage: wait payload"<<std::endl;wait([&]{return row(engine,fileId).state==State::Complete;},15);const auto finished=row(engine,fileId);require(finished.respondingTrackers>0&&finished.trackerCount==2,"Tracker health remains available after file metadata is known");
+    for(int n=0;n<2;++n)require(digest(QDir(root).filePath(QString("file-payload/discovery/file%1.bin").arg(n)))==digest(QDir(root).filePath(QString("seed/discovery/file%1.bin").arg(n))),"Torrent-file tracker-discovered payload SHA-256 matches donor");
+    std::cout<<"Discovery stage: unknown metadata"<<std::endl;const auto unknown=engine.addMagnet("magnet:?xt=urn:btih:ffffffffffffffffffffffffffffffffffffffff",QDir(root).filePath("unknown"),options).get();engine.rediscover(unknown).get();rejected([&]{engine.rediscover(unknown).get();},"Repeated discovery requests are throttled");wait([&]{return row(engine,unknown).metadataWaitSeconds>=1;});require(!row(engine,unknown).metadata&&row(engine,unknown).peers==0&&row(engine,unknown).dhtNodes==0,"Unavailable metadata reports elapsed time and zero local sources honestly");std::cout<<"Discovery stage: cancel unknown"<<std::endl;engine.cancel(unknown).get();std::cout<<"Discovery stage: shutdown"<<std::endl;engine.shutdown().get();
+    std::cout<<"Tracker discovery checks passed: "<<checks<<"; metadata milliseconds="<<milliseconds<<"; stalled tracker requests="<<stalledRequests<<"; working tracker requests="<<workingRequests<<std::endl;return 0;
+}catch(const std::exception& e){std::cerr<<e.what()<<std::endl;return 1;}}

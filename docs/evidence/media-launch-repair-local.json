@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-16",
+  "issue": "Chrome video button opened the old app without mediaStreams capability",
+  "cause": "Both Desktop shortcut and Chrome native-host registration resolved to the old development Release directory; the verified newer product was built separately to preserve the then-running transfer. No new installation was present.",
+  "repair": "Idle app closed gracefully; Downshift.exe, DownshiftNativeHost.exe and matching build-source.json replaced at existing launch path, with previous binaries backed up. Native-host registration, shortcut and data binding unchanged. Updated app relaunched and activated using native open.",
+  "beforeCapabilities": {
+    "browserTransfer": true,
+    "magnetLinks": true,
+    "serverFilename": true
+  },
+  "afterCapabilities": {
+    "browserTransfer": true,
+    "magnetLinks": true,
+    "mediaStreams": true,
+    "serverFilename": true
+  },
+  "historyEntries": 17,
+  "torrentEntries": 3,
+  "httpHistoryAndSettingsUnchanged": true,
+  "physicalQueueIdentityUnchanged": true,
+  "torrentIntentSelectionsAndProofsUnchanged": true,
+  "existingTorrentFileStatsUnchanged": true,
+  "existingTorrentFilesChecked": 45,
+  "verifiedPinnedVideoTools": 12,
+  "updatedApplicationSha256": "a0ceb65abfa8e01d05a086ec97f995af8cb707bd6cf644b2b6cfcfb48a09249a",
+  "updatedNativeHostSha256": "8f007e84f8ee864e6238e41b312ddba9d8ef46e025e7c297c2fa04f64986fabe",
+  "openResponse": {
+    "ok": true,
+    "state": "ready",
+    "version": 1
+  },
+  "limitations": "Read-only normal bridge/capability and state preservation verification. No real streaming episode downloaded and no new site-support claim. Existing verified installer unchanged. No Git mutations."
+}

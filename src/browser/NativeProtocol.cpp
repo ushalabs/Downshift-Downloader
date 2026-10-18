@@ -1,4 +1,6 @@
 #include "NativeProtocol.h"
+#include "core/DownloadQueue/MediaContext.h"
+#include "core/DownloadQueue/VideoUrl.h"
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -6,6 +8,8 @@
 #include <QJsonDocument>
 #include <QSet>
 #include <QUrl>
+#include <QUrlQuery>
+#include <QRegularExpression>
 #include <vector>
 #include <algorithm>
 #include <cstring>
@@ -39,10 +43,20 @@ void validate(const QJsonObject& request) {
         if(request.contains("sourceError")){const auto value=request.value("sourceError").toString();if(!request.value("sourceError").isString() || value.size()>80 || std::any_of(value.begin(),value.end(),[](QChar c){return !QString("ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789").contains(c);}))fail();}
         bool valid=false;const auto n=request.value("total").toString().toLongLong(&valid);if(!valid || n < -1 || (request.value("complete").toBool() && n<0))fail();
         if(request.contains("received")){bool ok=false;const auto count=request.value("received").toString().toLongLong(&ok);if(!ok || count<0)fail();}
+    }else if(command=="torrent"){
+        allowed.insert("url");const auto address=request.value("url").toString();const QUrl url(address,QUrl::StrictMode);
+        if(address.isEmpty()||address.size()>32768||std::any_of(address.begin(),address.end(),[](QChar c){return c.unicode()<32||c.unicode()==127;})||!url.isValid()||url.scheme()!="magnet"||!url.authority().isEmpty()||!url.path().isEmpty()||url.hasFragment())fail();
+        bool hash=false;for(const auto& topic:QUrlQuery(url).allQueryItemValues("xt"))if(QRegularExpression("^urn:(btih:([0-9a-f]{40}|[a-z2-7]{32})|btmh:1220[0-9a-f]{64})$",QRegularExpression::CaseInsensitiveOption).match(topic).hasMatch())hash=true;
+        if(!hash)fail();
     }else if(command=="media"){
-        allowed.unite({"url","title"});const auto address=request.value("url").toString();const QUrl url(address);
+        allowed.unite({"url","title","context"});const auto address=request.value("url").toString();const QUrl url(address);
         if(address.isEmpty() || address.size()>32768 || address.contains(QChar(0)) || !url.isValid() || (url.scheme()!="https" && url.scheme()!="http") || url.host().isEmpty() || !url.userInfo().isEmpty())fail();
         if(!request.value("title").isString() || request.value("title").toString().size()>200 || request.value("title").toString().contains(QChar(0)))fail();
+        if(request.contains("context")){
+            if(!request.value("context").isObject() || !validMediaContext(request.value("context").toObject()))fail();
+            const auto video=request.value("context").toObject().value("youtube").toObject();
+            if(!video.isEmpty() && youtubeVideo(address)!="https://www.youtube.com/watch?v="+video.value("id").toString())fail();
+        }
     }else if(command=="commit" || command=="abort" || command=="status"){
         allowed.insert("key");if(!hexadecimal(request.value("key").toString()))fail();
         if(command=="commit"){

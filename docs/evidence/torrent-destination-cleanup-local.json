@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-17",
+  "scope": "Torrent default destination and empty legacy wrapper cleanup only",
+  "productSourceFilesChanged": [
+    "src/gui/TorrentDialogs.cpp",
+    "src/torrent/TorrentEngine.cpp"
+  ],
+  "tests": {
+    "configuration": "Release",
+    "groups": [
+      "torrent.gui",
+      "torrent.management",
+      "torrent.foundation"
+    ],
+    "passed": 3,
+    "failed": 0,
+    "seconds": 190.31,
+    "guiChecks": 93,
+    "managementChecks": 395,
+    "foundationChecks": 142,
+    "privateQueues": true,
+    "publicSwarmTest": false,
+    "debugTest": false,
+    "remoteCI": false
+  },
+  "updater": {
+    "checks": 12,
+    "fixtureRoot": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\installed-hotfix-verification\\64269f69e82f45db985171707e58d423",
+    "normalInstallationChanged": false,
+    "scenarios": [
+      "mapped image replacement without termination",
+      "controlled rollback"
+    ]
+  },
+  "installed": {
+    "target": "C:\\Program Files\\Downshift",
+    "isolated": false,
+    "userDataTouched": false,
+    "backup": "C:\\Program Files\\Downshift\\.hotfix-backup-c440ddc0547e4d03bb4d251e36e3b037",
+    "files": [
+      {
+        "path": "Downshift.exe",
+        "before": "5159da07b98af437b554cc8e93d17b5350cad455918f16f5dfdcb7dec9ab53a1",
+        "after": "24a1cd070882dab3e7ed0c996ef9a680517f2e5a17f88bbbf12a0736833c7a4a"
+      },
+      {
+        "path": "build-source.json",
+        "before": "072fbb74f1067d2edffeb12de0bfcb6c9fb29fa3c6cb8c66c7eacceb6b1ce30f",
+        "after": "93cebcd2ac796fe89008f5c5cfa2bcdc83c7f38ca23858d22a7224667aacb94c"
+      }
+    ],
+    "registrationChanged": false,
+    "ok": true,
+    "product": "Downshift",
+    "restartRequired": true,
+    "processesTerminated": false
+  },
+  "installedAndBackupHashesMatched": true,
+  "installedSourceFingerprintMatched": true,
+  "installedPrivateStartupExit": 0,
+  "runningProcessPreserved": 12680,
+  "restartRequired": true,
+  "existingDestinationsMoved": false,
+  "recursiveUserDownloadScan": false,
+  "installerRebuilt": false,
+  "gitMutated": false
+}

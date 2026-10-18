@@ -5,6 +5,7 @@
 #include <QLabel>
 #include "torrent/TorrentEngine.h"
 #include <optional>
+#include <map>
 class QTableWidget;
 class QLineEdit;
 class QComboBox;
@@ -12,6 +13,7 @@ class QPushButton;
 class QSystemTrayIcon;
 class QScrollArea;
 class QTabWidget;
+class QStackedWidget;
 class QNetworkAccessManager;
 class QNetworkReply;
 namespace downshift {
@@ -24,10 +26,13 @@ public:
     void confirmDownload(const QueueEntry& entry);
     void captureError(){message("Connecting your browser download to Downshift…",false);}
     void openSettings();
-    void openVideo(QString url,QString title,QString folder={});
+    void openVideo(QString url,QString title,QString folder={},QJsonObject context={},QString filename={});
+    void resumeVideo(const QueueEntry& entry);
+    void showDownloads();
+    void requestExit();
     void refresh();
     void attachTorrents(torrent::TorrentEngine& engine);
-    void openTorrent();
+    void openTorrent(QString source={});
     void chromeStatus(QString status){chromeStatus_=std::move(status);if(auto* label=findChild<QLabel*>("chromeStatus"))label->setText("Chrome integration: "+chromeStatus_);}
 private:
     void resizeEvent(QResizeEvent* event) override;
@@ -55,6 +60,7 @@ private:
     const QueueEntry* selected() const;
     const torrent::Snapshot* selectedTorrent() const;
     void torrentMenu();
+    void torrentDetails(const QString& id);
     void renderTorrentRow(int row,const torrent::Snapshot& snapshot);
     void watchTorrent(std::future<void> future);
     QueueManager& queue_;
@@ -71,7 +77,7 @@ private:
     torrent::TorrentEngine* torrents_=nullptr;
     std::vector<torrent::Snapshot> torrentRows_;
     std::optional<std::future<std::vector<torrent::Snapshot>>> torrentPending_;
-    bool torrentClosing_=false,torrentClosed_=false;
+    bool torrentClosing_=false,torrentClosed_=false,exitRequested_=false;
     bool torrentBusy_=false;
     QLabel *summary_=nullptr,*speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
     QLabel *totalMetric_=nullptr,*activeMetric_=nullptr,*dataMetric_=nullptr,*emptyHelp_=nullptr,*identity_=nullptr;
@@ -80,6 +86,8 @@ private:
     QLabel *thumbnail_=nullptr,*videoInfo_=nullptr,*connectionInfo_=nullptr,*taskLog_=nullptr;
     QPushButton *sourceLink_=nullptr,*detailFolder_=nullptr,*detailCopy_=nullptr,*detailAction_=nullptr;
     QTabWidget* detailTabs_=nullptr;
+    QStackedWidget* torrentDetailsStack_=nullptr;
+    std::map<QString,QWidget*> torrentPanels_;
     QNetworkAccessManager* thumbnails_=nullptr;
     QString previewKey_;
     QNetworkReply* thumbnailReply_=nullptr;

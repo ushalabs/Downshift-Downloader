@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-16",
+  "feature": "Video helper Pause/Resume",
+  "cause": "The GUI excluded media tasks from Pause and the helper path had only cancel/finish, without retained pause state or a resume controller.",
+  "method": "Stop only the owned helper job; persist Paused without cleanup; retain owned staging and a bounded encrypted recipe; resume the same ID, context, selected quality and name with helper continuation; restore paused controller after view/queue owner restart. Merging/verification excludes Pause. Native HTTP/torrent scheduling and completion checks retained.",
+  "verification": [
+    {
+      "configuration": "release",
+      "groups": 7,
+      "failures": 0,
+      "mediaAssertions": 130,
+      "report": "build/windows-msvc/build/video-pause-release-junit.xml"
+    },
+    {
+      "configuration": "debug",
+      "groups": 7,
+      "failures": 0,
+      "mediaAssertions": 130,
+      "report": "build/windows-msvc/build/video-pause-debug-junit.xml"
+    }
+  ],
+  "independentMediaProof": [
+    "Direct resume used a nonzero byte range and final SHA-256 matched its complete source",
+    "Resumed HLS output had full audio/video duration and every decoded video frame matched the source playlist"
+  ],
+  "normalHistoryCount": 24,
+  "normalActiveMediaOrHttpCount": 2,
+  "normalStateUnchanged": true,
+  "physicalStoreAndBindingUnchanged": true,
+  "torrentSelectionsIntentProofsAnd45FileStatsUnchanged": true,
+  "normalAppProcessPreserved": true,
+  "staging": {
+    "compiledSources": 81,
+    "updated": [
+      {
+        "sha256": "8dd99a62368f64a7b06f9b70fb20507a2b25b76cefb824ea5b0915b5a7f76e4b",
+        "previousSha256": "8a8d0d42c58fe3f97c2266110d56da1b8bcc1ddec1af91d45d21df5e484e87bd",
+        "previous": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\windows-msvc\\Release\\build-source.previous-video-pause-8a8d0d42c58f.json",
+        "name": "build-source.json"
+      },
+      {
+        "sha256": "51382183eb24433c5540698b1400c96a928d2f84c772eadca064e35a78433617",
+        "previousSha256": "cc49cf6d5de4cb333c49978fd392d67e1337958160e0d7098d2db6fbed0dcb96",
+        "previous": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\windows-msvc\\Release\\Downshift.previous-video-pause-cc49cf6d5de4.exe",
+        "name": "Downshift.exe"
+      },
+      {
+        "sha256": "5fed515ed8ad404bbbbab6ed1fad8cd073614076def58686d0bc3088249b8055",
+        "previousSha256": "4f623eb24307eca95412a2222ba08d03265333f1f56430e5ece57b436bf62140",
+        "previous": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\windows-msvc\\Release\\DownshiftNativeHost.previous-video-pause-4f623eb24307.exe",
+        "name": "DownshiftNativeHost.exe"
+      }
+    ],
+    "stagedForNextLaunch": true,
+    "existingProcessPreserved": true,
+    "startTime": "2026-10-16T20:36:53.8169535+05:00",
+    "pid": 11716
+  },
+  "requiresNextApplicationLaunch": true,
+  "setupUnchangedSha256": "6832a02ca1898349c4106630f98ae5c12cfb8c0c63ad5170986863dd84331c55",
+  "upstreamReference": "https://github.com/yt-dlp/yt-dlp#download-options",
+  "limitations": "Existing running process remains the previous build, with its two video transfers untouched; exit through tray and reopen after they finish to use new controls. Sources may expire or refuse continuation; helpers may re-fetch a fragment. Verification is local private acceptance, not a public-site, remote CI or clean-VM guarantee. No commits, packaging, delegation or publication."
+}

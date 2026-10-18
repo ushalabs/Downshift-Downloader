@@ -41,13 +41,17 @@ try {
     }finally{$sourceZip.Dispose()};$checks++
     foreach($required in @('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','libcurl.dll','sqlite3.dll','platforms/qwindows.dll','licenses/qtbase/copyright','Qt6Network.dll','torrent-rasterbar.dll','libcrypto-3-x64.dll','imageformats/qwebp.dll','imageformats/qjpeg.dll','tls/qschannelbackend.dll','jpeg62.dll','libwebp.dll','libwebpdemux.dll','libwebpmux.dll','libsharpyuv.dll','licenses/libtorrent/copyright','licenses/openssl/copyright','licenses/boost-asio/copyright','licenses/qtimageformats/copyright','licenses/libwebp/copyright','source-snapshot.json','build-source.json','TORRENTS.md')){if(!(Test-Path -LiteralPath (Join-Path $root $required))){throw "Missing runtime or license: $required"}};$checks++
     if(Test-Path -LiteralPath (Join-Path $root 'media-tools')){throw 'Optional upstream media executables must not be redistributed in this package.'};$checks++
+    foreach($required in @('scripts/media-tools-lock.json','scripts/Uninstall-MediaTools.ps1','scripts/Open-ChromeSetup.ps1','scripts/chrome-setup-template.txt','Chrome-setup.txt')){if(!(Test-Path -LiteralPath (Join-Path $root $required))){throw "Missing setup helper: $required"}};$checks++
     $extension=Get-Content -LiteralPath (Join-Path $root 'extension/manifest.json') -Raw|ConvertFrom-Json
     if($extension.version -ne $manifest.version){throw 'Extension/product version mismatch.'};$checks++
     $shortcut=Join-Path $testRoot 'Downshift.lnk';$shell=New-Object -ComObject WScript.Shell
     $oldLink=$shell.CreateShortcut($shortcut);$oldLink.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$oldLink.Save()
     $oldBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($shortcut))
-    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -IsolatedTest
-    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -IsolatedTest
+    $additional=Join-Path $testRoot 'Desktop-Downshift.lnk'
+    $oldAdditional=$shell.CreateShortcut($additional);$oldAdditional.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$oldAdditional.Save()
+    $additionalBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($additional))
+    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -AdditionalShortcutPath $additional -IsolatedTest
+    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -AdditionalShortcutPath $additional -IsolatedTest
     $registered=Read-Registration
     if($registered -ne (Join-Path $root 'org.ushalabs.downshift.packaging-test.json')){throw 'Native host registration failed.'};$checks++
     $hostManifest=Get-Content -LiteralPath $registered -Raw|ConvertFrom-Json
@@ -77,13 +81,16 @@ try {
     & (Join-Path $root 'scripts/Uninstall-Portable.ps1') -IsolatedTest
     if((Read-Registration) -ne $previous){throw 'Uninstall failed to restore previous registration.'};$checks++
     if([Convert]::ToBase64String([IO.File]::ReadAllBytes($shortcut)) -ne $oldBytes){throw 'Uninstall failed to restore previous shortcut.'};$checks++
+    if([Convert]::ToBase64String([IO.File]::ReadAllBytes($additional)) -ne $additionalBytes){throw 'Uninstall failed to restore the previous Desktop shortcut.'};$checks++
     if(!(Test-Path -LiteralPath (Join-Path $root 'Downshift.exe'))){throw 'Uninstall removed portable binaries unexpectedly.'};$checks++
     # A later installation must not be clobbered by this one's uninstall.
-    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -IsolatedTest
+    & (Join-Path $root 'scripts/Install-Portable.ps1') -ShortcutPath $shortcut -AdditionalShortcutPath $additional -IsolatedTest
     $key=$registry.CreateSubKey($registryPath);try{$key.SetValue('','other-installation.json')}finally{$key.Dispose()}
     $other=$shell.CreateShortcut($shortcut);$other.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$other.Save()
+    $otherAdditional=$shell.CreateShortcut($additional);$otherAdditional.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$otherAdditional.Save()
     & (Join-Path $root 'scripts/Uninstall-Portable.ps1') -IsolatedTest
     if((Read-Registration) -ne 'other-installation.json' -or $shell.CreateShortcut($shortcut).TargetPath -ne (Join-Path $env:WINDIR 'notepad.exe')){throw 'Uninstall changed another installation.'};$checks++
+    if($shell.CreateShortcut($additional).TargetPath -ne (Join-Path $env:WINDIR 'notepad.exe')){throw 'Uninstall changed a later Desktop shortcut.'};$checks++
     if(!$TorrentTestDriver -or !$PythonExecutable){throw 'T4 package acceptance requires -TorrentTestDriver and -PythonExecutable.'}
     $testDriver=Join-Path $root 'downshift_torrent_acceptance_tests.exe'
     Copy-Item -LiteralPath $TorrentTestDriver -Destination $testDriver

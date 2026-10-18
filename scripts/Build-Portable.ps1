@@ -1,15 +1,16 @@
-param([string]$OutputDirectory='', [switch]$RequireClean, [switch]$LocalPreview)
+param([string]$OutputDirectory='', [switch]$RequireClean, [switch]$LocalPreview, [string]$BinaryDirectory='')
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
 $sourceDirty=!!(& git -C $root status --porcelain)
 if($RequireClean -and $sourceDirty){throw 'Release packaging requires a clean source checkout.'}
 if($sourceDirty -and !$LocalPreview){throw 'Uncommitted packaging requires explicit -LocalPreview; release packaging still requires -RequireClean.'}
-$fingerprint=Get-Content -LiteralPath (Join-Path $root 'build/windows-msvc/Release/build-source.json') -Raw -Encoding utf8|ConvertFrom-Json
+if(!$BinaryDirectory){$BinaryDirectory=Join-Path $root 'build/windows-msvc/Release'}
+$build=[IO.Path]::GetFullPath($BinaryDirectory)
+$fingerprint=Get-Content -LiteralPath (Join-Path $build 'build-source.json') -Raw -Encoding utf8|ConvertFrom-Json
 if($fingerprint.configuration -ne 'Release'){throw 'Package requires a Release build fingerprint.'}
 foreach($entry in $fingerprint.files.PSObject.Properties){if((Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash.ToLower() -ne $entry.Value){throw "Stale binary: rebuild before packaging ($($entry.Name))."}}
 if(!$OutputDirectory){$OutputDirectory=Join-Path $root 'build\releases'}
 $OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
-$build=Join-Path $root 'build\windows-msvc\Release'
 $match=[regex]::Match((Get-Content (Join-Path $root 'CMakeLists.txt') -Raw),'project\(Downshift VERSION ([0-9.]+)')
 if(!$match.Success){throw 'Missing product version.'}
 $version=$match.Groups[1].Value
@@ -32,8 +33,11 @@ foreach($dll in (Get-ChildItem -LiteralPath $crt -Filter '*.dll' -File)){
 }
 Copy-Item -LiteralPath (Join-Path $root 'extension') -Destination $portable -Recurse
 Copy-Item -Path (Join-Path $root 'packaging\*.cmd'),(Join-Path $root 'packaging\Read-me.txt') -Destination $portable
+Copy-Item -LiteralPath (Join-Path $root 'packaging/NSIS-LICENSE.txt') -Destination $portable
 $scripts=Join-Path $portable 'scripts';New-Item -ItemType Directory -Path $scripts | Out-Null
-foreach($script in @('Install-Portable.ps1','Uninstall-Portable.ps1','Install-MediaTools.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $scripts}
+foreach($script in @('Install-Portable.ps1','Uninstall-Portable.ps1','Install-MediaTools.ps1','Uninstall-MediaTools.ps1','media-tools-lock.json','Open-ChromeSetup.ps1','chrome-setup-template.txt')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $scripts}
+$chromeInstructions=Get-Content -LiteralPath (Join-Path $scripts 'chrome-setup-template.txt') -Raw -Encoding utf8
+[IO.File]::WriteAllText((Join-Path $portable 'Chrome-setup.txt'),$chromeInstructions.Replace('{{EXTENSION_PATH}}','extension (inside the folder where you extracted Downshift)'),[Text.UTF8Encoding]::new($true))
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE'),(Join-Path $build 'build-source.json'),(Join-Path $root 'docs/TORRENTS.md') -Destination $portable
 Copy-Item -LiteralPath (Join-Path $root 'docs\THIRD_PARTY_NOTICES.md') -Destination $portable
 $licenses=Join-Path $portable 'licenses';New-Item -ItemType Directory -Path $licenses | Out-Null

@@ -1,0 +1,37 @@
+Downshift - Developed by UshaLabs
+Getting started with Chrome
+
+1. Finish installing Downshift. Keep the internet on while setup installs
+   the video tools. You do not need to install a separate video enabler.
+
+2. Open Downshift using its Desktop icon or the Windows Start menu.
+
+3. Open Chrome. Type chrome://extensions in the address bar and press Enter.
+
+4. Turn on Developer mode at the top right.
+
+5. Click Load unpacked and choose the folder below. You can paste a full
+   path into the folder picker, press Enter, then click Select Folder:
+
+   {{EXTENSION_PATH}}
+
+6. Check that Downshift is switched on. If you have an older Downshift
+   extension from another folder, remove that old copy first.
+
+7. Refresh any web pages that were already open. After updating Downshift,
+   click the Reload arrow on its Chrome extension card first, then refresh
+   the video page.
+
+You are ready. Normal downloads can now be sent to Downshift. For videos,
+start playing the video, click Download this video when it appears, choose
+the quality (or Default), and click Download Video. Some protected videos
+cannot be downloaded, and the button may not appear on every website.
+
+To add a download yourself, open Downshift and click Add download.
+For torrents, choose Torrents, then Add torrent.
+
+Closing the main window keeps downloads running in the system tray when
+that option is enabled. To stop the app completely, right-click its tray
+icon and choose Exit Downshift.
+
+You can reopen these instructions from Start > Downshift > Chrome setup.

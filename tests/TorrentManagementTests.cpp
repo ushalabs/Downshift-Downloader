@@ -107,12 +107,37 @@ void management(const QString& root,const QString& metadata,const QString& name)
     // Same size and restored modification time must not make corrupt bytes trusted.
     const auto final=QDir(save).filePath(name+"/file0.bin");QFile corrupted(final);require(corrupted.open(QIODevice::ReadWrite),"Open completed file for corruption fixture");const auto modified=QFileInfo(final).lastModified();corrupted.write(QByteArray(16384,'x'));require(corrupted.setFileTime(modified,QFileDevice::FileModificationTime),"Corruption fixture preserves modification time");corrupted.close();
     {
-        TorrentEngine engine({false,true,store});engine.configure(id,{0,128*1024,4},{}).get();engine.resume(id).get();
+        TorrentEngine engine({false,true,store});wait([&]{return !row(engine,id).verifyingCompletion;});require(row(engine,id).state==State::Paused,"Startup rehash detects corrupt completed files without starting a transfer");engine.configure(id,{0,128*1024,4},{}).get();engine.resume(id).get();
         wait([&]{const auto r=row(engine,id);return r.state==State::Downloading&&r.verifiedBytes<r.selectedBytes;},15);require(row(engine,id).state!=State::Complete,"Restored file rehash catches same-size corruption");
         engine.connectPeer(id,"127.0.0.1",seed.port()).get();wait([&]{return row(engine,id).state==State::Complete;});require(digest(final)==digest(QDir(root).filePath("seed/"+name+"/file0.bin")),"Native peer repair restores corrupt piece");
         QFile unrelated(QDir(save).filePath("unrelated.txt"));require(unrelated.open(QIODevice::WriteOnly),"Unrelated file fixture");unrelated.write("retain");unrelated.close();engine.remove(id,true,true).get();require(engine.snapshots().get().empty(),"Confirmed delete removes torrent record after native disk acknowledgement");require(!QFileInfo::exists(final)&&QFileInfo::exists(unrelated.fileName()),"Deletion targets payload, retains unrelated files");engine.shutdown().get();
     }
     {TorrentEngine engine({false,true,store});require(engine.snapshots().get().empty(),"Explicit empty torrent store survives restart");engine.shutdown().get();}
+}
+void completedRestart(const QString& root,const QString& metadata,const QString& name){
+    std::cout<<"Completed restart recovery: "<<name.toStdString()<<std::endl;
+    Seed seed(root,metadata);const auto store=QDir(root).filePath(name+"-complete.sqlite"),save=QDir(root).filePath(name+"-complete");QString id;qint64 received=0,uploaded=0;
+    {
+        TorrentEngine engine({false,true,store});AddOptions options;options.priorities={7,0};id=engine.addFile(metadata,save,options).get();engine.connectPeer(id,"127.0.0.1",seed.port()).get();wait([&]{return row(engine,id).state==State::Complete;});engine.shutdown().get();
+    }
+    // Exercise old records too: the authenticated per-file completion proofs
+    // predate the optional completed field added by this repair.
+    {TorrentStore legacy(store);auto records=legacy.load();auto object=QJsonDocument::fromJson(records.front().second).object();object.remove("completed");legacy.save(id,QJsonDocument(object).toJson(QJsonDocument::Compact));}
+    {
+        TorrentEngine engine({false,true,store});wait([&]{return row(engine,id).state==State::Complete;});auto value=row(engine,id);received=value.downloadedBytes;uploaded=value.uploadedBytes;
+        require(!value.verifyingCompletion&&value.nativePaused&&value.verifiedBytes==value.selectedBytes,"Completed selected files restore automatically to fully verified completion");
+        require(value.files[1].priority==0&&value.peers==0,"Legacy completed selection restores without connecting to the saved donor");
+        std::this_thread::sleep_for(std::chrono::milliseconds(700));value=row(engine,id);require(value.state==State::Complete&&value.downloadedBytes==received&&value.uploadedBytes==uploaded&&value.peers==0,"Startup verification starts neither payload download nor seeding");engine.shutdown().get();
+    }
+    const auto file=QDir(save).filePath(name+"/file0.bin");const auto modified=QFileInfo(file).lastModified();QFile corrupt(file);require(corrupt.open(QIODevice::ReadWrite),"Corrupt completed fixture opens");require(corrupt.write(QByteArray(16384,'x'))==16384&&corrupt.setFileTime(modified,QFileDevice::FileModificationTime),"Corrupt fixture retains size and modification time");corrupt.close();
+    {
+        TorrentEngine engine({false,true,store});wait([&]{return !row(engine,id).verifyingCompletion;});auto value=row(engine,id);require(value.state==State::Paused&&value.verifiedBytes<value.selectedBytes&&!value.error.isEmpty(),"Changed completed files restore paused with actual verified progress");require(value.downloadedBytes==received&&value.uploadedBytes==uploaded&&QFileInfo::exists(file),"Unverified data is retained and no repair starts automatically");
+        engine.resume(id).get();engine.connectPeer(id,"127.0.0.1",seed.port()).get();wait([&]{return row(engine,id).state==State::Complete;});require(digest(file)==digest(QDir(root).filePath("seed/"+name+"/file0.bin")),"Explicit repair restores exact selected-file SHA-256");engine.shutdown().get();
+    }
+    require(QFile::remove(file),"Remove only generated completed fixture");
+    {
+        TorrentEngine engine({false,true,store});wait([&]{return !row(engine,id).verifyingCompletion;});const auto value=row(engine,id);require(value.state==State::Paused&&value.verifiedBytes<value.selectedBytes&&!QFileInfo::exists(file),"Missing completed file is not marked completed or recreated automatically");engine.shutdown().get();
+    }
 }
 void storage(const QString& root,const QString& metadata){
     const auto store=QDir(root).filePath("privacy.sqlite"),save=QDir(root).filePath("privacy-data");QString id;
@@ -246,6 +271,35 @@ void crash(const QString& root,const QString& metadata){
     const auto name=QString::fromStdString(lt::load_torrent_file(metadata.toUtf8().toStdString()).ti->name());const auto final=QDir(save).filePath(name+"/file0.bin");require(digest(final)==digest(QDir(root).filePath("seed/"+name+"/file0.bin")),"Process-death recovery final SHA-256");
     engine.remove(id).get();require(QFileInfo::exists(final)&&engine.snapshots().get().empty(),"Remove-only retains downloaded file");engine.shutdown().get();
 }
+void sharedDestination(const QString& root,const QString& first,const QString& second){
+    std::cout<<"Shared torrent destination"<<std::endl;
+    const auto save=QDir(root).filePath("shared/Torrents"),store=QDir(root).filePath("shared.sqlite");QString kept,cancelled;
+    Seed firstSeed(root,first),secondSeed(root,second);
+    const auto final=QDir(save).filePath("manage-v1/file0.bin");
+    {
+        TorrentEngine engine({false,true,store});AddOptions selected;selected.priorities={4,0};
+        kept=engine.addFile(first,save,selected).get();engine.connectPeer(kept,"127.0.0.1",firstSeed.port()).get();wait([&]{return row(engine,kept).state==State::Complete;});
+        const auto checksum=digest(final);
+        const auto collision=metadataOnly(root,"shared-case-collision",{{"MANAGE-V1/file0.bin",12345}},lt::create_torrent::v1_only);
+        rejected([&]{engine.addFile(collision,save,{true}).get();},"Shared root rejects case-insensitive file collisions before native storage attaches");
+        const auto parent=metadataOnly(root,"shared-parent-collision",{{"manage-v1",12345}},lt::create_torrent::v1_only);
+        rejected([&]{engine.addFile(parent,save,{true}).get();},"Shared root rejects file-versus-directory collisions");
+        const auto reserved=metadataOnly(root,"shared-partfile-collision",{{("."+QString(40,'a')+".parts").toStdString(),12345}},lt::create_torrent::v1_only);
+        rejected([&]{engine.addFile(reserved,save,{true}).get();},"Shared payload cannot replace native partial storage");
+        selected.limits={64*1024,128*1024,3};const auto magnet=QString::fromStdString(lt::make_magnet_uri(lt::load_torrent_file(second.toUtf8().toStdString())));
+        cancelled=engine.addMagnet(magnet,save,selected).get();engine.connectPeer(cancelled,"127.0.0.1",secondSeed.port()).get();wait([&]{const auto s=row(engine,cancelled);return s.verifiedBytes>=32768&&s.verifiedBytes<s.selectedBytes;});
+        engine.cancel(cancelled).get();require(!QFileInfo::exists(QDir(save).filePath("manage-v2/file0.bin")),"Cancelled shared-root magnet removes only its incomplete file");
+        require(digest(final)==checksum&&QDir(save).exists(),"Cancelling a neighbouring torrent preserves completed bytes and the shared folder");
+        require(QDir(save).entryList(QDir::Dirs|QDir::NoDotAndDotDot)==QStringList{"manage-v1"},"Only metadata-named content folders remain; no random wrapper or empty cancelled payload folder");engine.shutdown().get();
+    }
+    {TorrentEngine engine({false,true,store});wait([&]{return row(engine,kept).state==State::Complete;});require(row(engine,cancelled).state==State::Cancelled&&row(engine,kept).directory==row(engine,cancelled).directory,"Shared destination and completion/cancellation survive restart");engine.shutdown().get();}
+    const auto legacy=QDir(root).filePath("legacy/Torrents/deadbeef"),legacyStore=QDir(root).filePath("legacy.sqlite");QString old;
+    {TorrentEngine engine({false,true,legacyStore});old=engine.addFile(first,legacy,{true}).get();engine.cancel(old).get();require(!QFileInfo::exists(legacy),"Cancellation removes an empty recorded legacy random wrapper");engine.shutdown().get();}
+    require(QDir().mkpath(legacy),"Recreate historical empty wrapper for startup cleanup fixture");
+    {TorrentEngine engine({false,true,legacyStore});require(row(engine,old).state==State::Cancelled&&!QFileInfo::exists(legacy),"Startup cleans a legacy cancelled empty wrapper without recreating it");engine.shutdown().get();}
+    require(QDir().mkpath(legacy),"Legacy unrelated-data fixture folder");QFile unrelated(QDir(legacy).filePath("unrelated.txt"));require(unrelated.open(QIODevice::WriteOnly)&&unrelated.write("keep")==4,"Legacy unrelated-data fixture");unrelated.close();
+    {TorrentEngine engine({false,true,legacyStore});require(row(engine,old).state==State::Cancelled&&QFileInfo::exists(unrelated.fileName()),"Legacy cleanup retains nonempty folders and unrelated data");engine.shutdown().get();}
+}
 void incompleteCleanup(const QString& root,const QString& metadata){
     std::cout<<"Incomplete payload cleanup"<<std::endl;Seed seed(root,metadata);const auto store=QDir(root).filePath("cleanup-store.sqlite"),save=QDir(root).filePath("cleanup-payload");QString id;
     {
@@ -271,7 +325,9 @@ int main(int argc,char** argv){
         const auto v1=create(temp.path(),lt::create_torrent::v1_only,"manage-v1"),v2=create(temp.path(),lt::create_torrent::v2_only,"manage-v2"),hybrid=create(temp.path(),{},"manage-hybrid");
         if(app.arguments().contains("--selection-race")){for(const auto& metadata:{v1,v2,hybrid})selectionStress(temp.path(),metadata);std::cout<<"Selection ordering checks: "<<checks<<std::endl;return 0;}
         if(app.arguments().contains("--caps")){capsAndRatio(temp.path(),v1);std::cout<<"Caps/ratio checks: "<<checks<<std::endl;return 0;}
-        incompleteCleanup(temp.path(),v1);management(temp.path(),v1,"manage-v1");management(temp.path(),v2,"manage-v2");management(temp.path(),hybrid,"manage-hybrid");std::cout<<"Storage validation"<<std::endl;storage(temp.path(),v1);std::cout<<"Lifecycle validation"<<std::endl;lifecycle(temp.path(),v1,v2);capsAndRatio(temp.path(),v1);std::cout<<"Process-death validation"<<std::endl;crash(temp.path(),v1);physicalIdentity(temp.path(),v1);resolvedMagnet(temp.path(),hybrid);for(const auto& metadata:{v1,v2,hybrid})selectionStress(temp.path(),metadata);unexplainedEmpty(temp.path(),v1);
+        sharedDestination(temp.path(),v1,v2);
+        if(app.arguments().contains("--shared-destination")){std::cout<<"Shared destination checks: "<<checks<<std::endl;return 0;}
+        incompleteCleanup(temp.path(),v1);management(temp.path(),v1,"manage-v1");management(temp.path(),v2,"manage-v2");management(temp.path(),hybrid,"manage-hybrid");completedRestart(temp.path(),v1,"manage-v1");completedRestart(temp.path(),v2,"manage-v2");completedRestart(temp.path(),hybrid,"manage-hybrid");std::cout<<"Storage validation"<<std::endl;storage(temp.path(),v1);std::cout<<"Lifecycle validation"<<std::endl;lifecycle(temp.path(),v1,v2);capsAndRatio(temp.path(),v1);std::cout<<"Process-death validation"<<std::endl;crash(temp.path(),v1);physicalIdentity(temp.path(),v1);resolvedMagnet(temp.path(),hybrid);for(const auto& metadata:{v1,v2,hybrid})selectionStress(temp.path(),metadata);unexplainedEmpty(temp.path(),v1);
         std::cout<<"Torrent management checks passed: "<<checks<<" (native selected transfers, pause/restart/rehash, policies, encryption, ownership and deletion)\n";return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

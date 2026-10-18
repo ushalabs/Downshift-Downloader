@@ -1,4 +1,6 @@
 #include "QueueManager.h"
+#include "MediaContext.h"
+#include "MediaResume.h"
 #include "Categories.h"
 #include "VideoUrl.h"
 #include "OwnedMedia.h"
@@ -50,12 +52,13 @@ QString statusText(QueueStatus s) {
     case QueueStatus::Paused: return "Paused"; case QueueStatus::Completed: return "Completed"; case QueueStatus::Failed: return "Failed";
     case QueueStatus::Cancelled: return "Cancelled"; case QueueStatus::Prepared: return "Awaiting Chrome"; } return "Unknown";
 }
-QJsonObject QueueSettings::json() const { return {{"version",1},{"directory",directory},{"simultaneous",simultaneous},{"perHost",perHost},{"hostConnections",hostConnections},{"connections",connections},{"automatic",automatic},{"dark",dark},{"startOnLaunch",startOnLaunch},{"notifications",notifications},{"diagnostics",diagnostics},{"speedLimit",QString::number(speedLimit)}}; }
+QJsonObject QueueSettings::json() const { return {{"version",1},{"directory",directory},{"simultaneous",simultaneous},{"perHost",perHost},{"hostConnections",hostConnections},{"connections",connections},{"automatic",automatic},{"dark",dark},{"startOnLaunch",startOnLaunch},{"notifications",notifications},{"diagnostics",diagnostics},{"closeToTray",closeToTray},{"speedLimit",QString::number(speedLimit)}}; }
 QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
     QueueSettings s; s.directory = o.value("directory").toString(); s.simultaneous = o.value("simultaneous").toInt(3); s.perHost = o.value("perHost").toInt(2);
     s.hostConnections = o.value("hostConnections").toInt(16); s.connections = o.value("connections").toInt(16);
     s.automatic = o.value("automatic").toBool(true); s.dark = o.value("dark").toBool(); s.startOnLaunch = o.value("startOnLaunch").toBool();
     s.notifications = o.value("notifications").toBool(true); s.diagnostics = o.value("diagnostics").toBool(); s.speedLimit = o.value("speedLimit").toString().toULongLong();
+    s.closeToTray=o.value("closeToTray").toBool(true);
     if (s.simultaneous < 1 || s.simultaneous > 16 || s.perHost < 1 || s.perHost > 16 || s.hostConnections < 1 || s.hostConnections > 64 || s.connections < 1 || s.connections > 16 || s.speedLimit > 10ULL*1024*1024*1024) invalid("Invalid queue settings.");
     return s;
 }
@@ -132,7 +135,8 @@ void QueueManager::initialize() {
         try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());}
         for(auto& e:entries_){
             if(!e.media && !e.browserTransfer && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
-            if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to start a fresh transfer.";if(e.mediaStaged)try{cleanup(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());}save(e);}
+            if(e.media&&e.mediaStaged&&validMediaResume(e.videoMetadata.value("resumeRecipe").toObject())&&(e.status==QueueStatus::Running||e.status==QueueStatus::Queued)){e.status=QueueStatus::Paused;e.error="Video interrupted. Choose Resume to continue its retained partial files.";save(e);}
+            else if(e.media && (e.status==QueueStatus::Running || e.status==QueueStatus::Queued)) {e.status=QueueStatus::Failed;e.error="Video task interrupted. Choose Retry video to start a fresh transfer.";if(e.mediaStaged)try{cleanup(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());}save(e);}
             else if(e.status==QueueStatus::Running || (e.status==QueueStatus::Queued && !settings_.startOnLaunch)) { e.status=QueueStatus::Paused; e.error="Interrupted or held at startup. Choose Resume to continue."; save(e); }
             if(e.mediaStaged&&(e.status==QueueStatus::Failed||e.status==QueueStatus::Cancelled)&&QFileInfo::exists(ownedMedia::workspace(e.mediaFolder,e.id)))try{cleanup(e);e.error+=" Incomplete video data removed after restart.";save(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());save(e);}
             e.progress.activeRanges=0;e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.etaSeconds.reset();
@@ -257,10 +261,14 @@ std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString
         if(entries_.size()>=10000 || !QFileInfo(folder).isDir()) invalid("Select an existing video folder, or remove old history if it is full.");
         QueueEntry e;e.url=url;e.origin=origin(url);e.media=true;e.mediaTitle=title.left(300);
         e.mediaFolder=QFileInfo(folder).canonicalFilePath();e.destination=e.mediaFolder;
-        for(const auto& old:entries_)if(old.media && old.status==QueueStatus::Running && old.url==url && old.mediaFolder.compare(e.mediaFolder,Qt::CaseInsensitive)==0)invalid("This video is already downloading into that folder.");
+        for(const auto& old:entries_)if(old.media && (old.status==QueueStatus::Running||(old.status==QueueStatus::Paused&&validMediaResume(old.videoMetadata.value("resumeRecipe").toObject()))) && old.url==url && old.mediaFolder.compare(e.mediaFolder,Qt::CaseInsensitive)==0)invalid("This video already has an active or paused task in that folder. Resume it from the list.");
         e.id=QString::fromStdString(ResumeJournal::newId());e.mediaStaged=true;
-        for(const auto& field:QStringList{"title","thumbnail","originalPage","webpage_url","extractor_key","duration","height"})if(metadata.contains(field))e.videoMetadata.insert(field,metadata.value(field));
-        if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>16384)invalid("Video preview metadata exceeds its limit.");
+        if(metadata.contains("requestContext") && (!metadata.value("requestContext").isObject() || !validMediaContext(metadata.value("requestContext").toObject())))invalid("Invalid video request context.");
+        const auto browser=metadata.value("requestContext").toObject().value("youtube").toObject();if(!browser.isEmpty()&&youtubeVideo(url)!="https://www.youtube.com/watch?v="+browser.value("id").toString())invalid("The browser source does not match this video.");
+        if(metadata.contains("resumeRecipe")&&!validMediaResume(metadata.value("resumeRecipe").toObject()))invalid("Invalid video resume selection.");
+        if(metadata.contains("browserSource") && (!metadata.value("browserSource").isBool() || (metadata.value("browserSource").toBool()&&browser.isEmpty())))invalid("Invalid video source selection.");
+        for(const auto& field:QStringList{"title","thumbnail","originalPage","webpage_url","extractor_key","duration","height","requestContext","downloadName","resumeRecipe","browserSource"})if(metadata.contains(field))e.videoMetadata.insert(field,metadata.value(field));
+        if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>65536)invalid("Video preview metadata exceeds its limit.");
         const auto stage=ownedMedia::workspace(e.mediaFolder,e.id);ordinaryParents(path(stage));if(!QDir().mkdir(stage))invalid("Cannot create a private video staging folder.");e.mediaIdentity=ownedMedia::identity(stage);
         e.status=QueueStatus::Running;e.created=QDateTime::currentSecsSinceEpoch();save(e);entries_.push_back(e);return e.id;
     });
@@ -268,13 +276,24 @@ std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString
 std::future<void> QueueManager::mediaProgress(QString id,DownloadProgress progress) {
     return submit([this,id=std::move(id),progress] {auto& e=entry(id);if(e.media && e.status==QueueStatus::Running)e.progress=progress;});
 }
+std::future<void> QueueManager::pauseMedia(QString id,bool paused,QJsonObject context) {return submit([this,id=std::move(id),paused,context=std::move(context)]{
+    auto& e=entry(id);if(!e.media||!e.mediaStaged||!validMediaResume(e.videoMetadata.value("resumeRecipe").toObject())||e.status!=(paused?QueueStatus::Running:QueueStatus::Paused))invalid("This video cannot change its pause state.");
+    auto metadata=e.videoMetadata;if(!context.isEmpty()){
+        if(paused || !validMediaContext(context) || (context.contains("youtube") && youtubeVideo(e.url)!="https://www.youtube.com/watch?v="+context.value("youtube").toObject().value("id").toString()))invalid("Invalid refreshed video source.");
+        metadata["requestContext"]=context;if(QJsonDocument(metadata).toJson(QJsonDocument::Compact).size()>65536)invalid("Video preview metadata exceeds its limit.");
+    }
+    const auto stage=ownedMedia::workspace(e.mediaFolder,e.id);ordinaryParents(path(stage));if(e.mediaIdentity.isEmpty()||ownedMedia::identity(stage)!=e.mediaIdentity)invalid("Video staging ownership changed. Existing files were retained.");
+    e.videoMetadata=metadata;
+    e.status=paused?QueueStatus::Paused:QueueStatus::Running;e.error.clear();e.progress.smoothedBytesPerSecond=e.progress.instantaneousBytesPerSecond=0;e.progress.activeRanges=0;e.progress.etaSeconds.reset();e.progress.resumable=true;save(e);
+});}
 std::future<QString> QueueManager::finishMedia(QString id,QueueStatus status,QString file,QString error,QJsonObject metadata) {
     return submit([this,id=std::move(id),status,file=std::move(file),error=std::move(error),metadata=std::move(metadata)] {
-        auto& e=entry(id);if(!e.media || e.status!=QueueStatus::Running)invalid("This video task is no longer active.");
+        auto& e=entry(id);if(!e.media || (e.status!=QueueStatus::Running&&e.status!=QueueStatus::Paused))invalid("This video task is no longer active.");
         if(status!=QueueStatus::Completed && status!=QueueStatus::Failed && status!=QueueStatus::Cancelled)invalid("Invalid video result.");
+        if(status==QueueStatus::Completed&&e.status==QueueStatus::Paused)invalid("Resume this video before completing it.");
         if(status==QueueStatus::Completed) {
             for(const auto& field:QStringList{"title","thumbnail","webpage_url","duration","height","ext"})if(metadata.contains(field))e.videoMetadata[field]=metadata.value(field);
-            if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>16384)invalid("Video preview metadata exceeds its limit.");
+            if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>65536)invalid("Video preview metadata exceeds its limit.");
             // Completion is durable only for a nonempty, ordinary file in the chosen folder.
             // The asynchronous ffprobe stage in MediaDialog verifies playable video first.
             const auto d=destination(file);const QFileInfo info(d);

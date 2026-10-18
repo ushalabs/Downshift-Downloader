@@ -23,7 +23,7 @@ bool io(HANDLE pipe,void* data,DWORD size,bool write,std::stop_token stop) {
     return count==size;
 }
 }
-PipeServer::PipeServer(QueueManager& queue,std::function<void()> open,std::function<void(QString,QString)> media,std::function<void()> blocked):queue_(queue),open_(std::move(open)),media_(std::move(media)),blocked_(std::move(blocked)),thread_([this](std::stop_token stop){run(stop);}){}
+PipeServer::PipeServer(QueueManager& queue,std::function<void()> open,std::function<void(QString,QString,QJsonObject)> media,std::function<void()> blocked,std::function<void(QString)> torrent):queue_(queue),open_(std::move(open)),media_(std::move(media)),blocked_(std::move(blocked)),torrent_(std::move(torrent)),thread_([this](std::stop_token stop){run(stop);}){}
 PipeServer::~PipeServer(){thread_.request_stop();}
 void PipeServer::run(std::stop_token stop) {
     try {
@@ -55,14 +55,15 @@ void PipeServer::run(std::stop_token stop) {
 }
 QJsonObject PipeServer::handle(const QJsonObject& request,std::stop_token stop) {
     validate(request);const auto command=request.value("command").toString();
-    if(command=="ping"){const auto snapshot=queue_.snapshot().get();int paused=0,running=0;for(const auto& entry:snapshot.entries){if(entry.status==QueueStatus::Paused)++paused;if(entry.status==QueueStatus::Running || entry.status==QueueStatus::Queued)++running;}return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"historyCount",static_cast<int>(snapshot.entries.size())},{"storageIdentity",storageIdentity(queue_.databasePath())},{"pausedCount",paused},{"activeCount",running},{"capabilities",QJsonObject{{"serverFilename",true},{"browserTransfer",true}}}};}
+    if(command=="ping"){const auto snapshot=queue_.snapshot().get();int paused=0,running=0;for(const auto& entry:snapshot.entries){if(entry.status==QueueStatus::Paused)++paused;if(entry.status==QueueStatus::Running || entry.status==QueueStatus::Queued)++running;}return {{"state","ready"},{"appVersion",QStringLiteral(DOWNSHIFT_BROWSER_VERSION)},{"historyCount",static_cast<int>(snapshot.entries.size())},{"storageIdentity",storageIdentity(queue_.databasePath())},{"pausedCount",paused},{"activeCount",running},{"capabilities",QJsonObject{{"serverFilename",true},{"browserTransfer",true},{"mediaStreams",true},{"browserYouTube",true},{"magnetLinks",static_cast<bool>(torrent_)}}}};}
     if(command=="open"){open_();return {{"state","ready"}};}
     if(command=="blocked"){open_();if(blocked_)blocked_();return {{"state","blocked"}};}
+    if(command=="torrent"){if(!torrent_)throw std::runtime_error("Torrent links are unavailable in this application.");open_();torrent_(request.value("url").toString());return {{"state","torrent-dialog"}};}
     if(command=="media"){
         if(!media_)throw std::runtime_error("Video downloads are unavailable in this application.");
         auto url=request.value("url").toString();
         if(youtubeHost(QUrl(url).host())){url=youtubeVideo(url);if(url.isEmpty())throw std::runtime_error("This player has no valid YouTube video address. Refresh the video page and retry.");}
-        media_(url,request.value("title").toString());return {{"state","video-dialog"}};
+        media_(url,request.value("title").toString(),request.value("context").toObject());return {{"state","video-dialog"}};
     }
     const auto key=request.value("key").toString();
     if(command=="browser-prepare") {

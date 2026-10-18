@@ -1,0 +1,289 @@
+{
+  "date": "2026-10-16",
+  "version": "0.4.4",
+  "checkoutHead": "d45264da63a1f5d5185416d8f67310aa9f86d0fe",
+  "gitMutations": false,
+  "workingTreeUncommitted": true,
+  "scope": [
+    "Automatic verified recovery of completed selected files, including legacy records",
+    "Changed/missing files remain paused without automatic network transfer",
+    "Completed/seeding torrents do not offer Resume; stopping a seed retains Completed",
+    "Inline Overview/Files/Trackers/Peers/Settings; arrows only expand/collapse"
+  ],
+  "configurations": {
+    "release": {
+      "finalPassingCoverage": 11,
+      "batches": [
+        {
+          "groups": 11,
+          "failures": 1,
+          "skipped": 0,
+          "tests": {
+            "torrent.discovery": {
+              "passed": true,
+              "seconds": 4.13712,
+              "checks": [
+                "28"
+              ]
+            },
+            "torrent.failure": {
+              "passed": true,
+              "seconds": 4.9466,
+              "checks": [
+                "22"
+              ]
+            },
+            "gui.overhaul.1": {
+              "passed": true,
+              "seconds": 14.6862,
+              "checks": [
+                "86"
+              ]
+            },
+            "gui.overhaul.1.25": {
+              "passed": true,
+              "seconds": 14.7626,
+              "checks": [
+                "86"
+              ]
+            },
+            "gui.overhaul.1.5": {
+              "passed": true,
+              "seconds": 14.7212,
+              "checks": [
+                "86"
+              ]
+            },
+            "torrent.gui": {
+              "passed": false,
+              "seconds": 11.6045,
+              "checks": []
+            },
+            "torrent.management": {
+              "passed": true,
+              "seconds": 140.286,
+              "checks": []
+            },
+            "torrent.foundation": {
+              "passed": true,
+              "seconds": 16.7244,
+              "checks": [
+                "142"
+              ]
+            },
+            "torrent.acceptance": {
+              "passed": true,
+              "seconds": 21.8014,
+              "checks": [
+                "191"
+              ]
+            },
+            "foundation.gui.minimal": {
+              "passed": true,
+              "seconds": 1.254,
+              "checks": []
+            },
+            "foundation.gui.windows": {
+              "passed": true,
+              "seconds": 1.19102,
+              "checks": []
+            }
+          },
+          "junit": "build/torrent-restart-release-junit.xml"
+        },
+        {
+          "groups": 3,
+          "failures": 0,
+          "skipped": 0,
+          "tests": {
+            "torrent.gui": {
+              "passed": true,
+              "seconds": 18.8236,
+              "checks": [
+                "90"
+              ]
+            },
+            "foundation.gui.minimal": {
+              "passed": true,
+              "seconds": 1.15231,
+              "checks": []
+            },
+            "foundation.gui.windows": {
+              "passed": true,
+              "seconds": 1.32339,
+              "checks": []
+            }
+          },
+          "junit": "build/torrent-restart-release-final-junit.xml"
+        }
+      ]
+    },
+    "debug": {
+      "finalPassingCoverage": 11,
+      "batches": [
+        {
+          "groups": 11,
+          "failures": 0,
+          "skipped": 0,
+          "tests": {
+            "torrent.discovery": {
+              "passed": true,
+              "seconds": 4.53387,
+              "checks": [
+                "28"
+              ]
+            },
+            "torrent.failure": {
+              "passed": true,
+              "seconds": 3.42286,
+              "checks": [
+                "22"
+              ]
+            },
+            "gui.overhaul.1": {
+              "passed": true,
+              "seconds": 20.6239,
+              "checks": [
+                "86"
+              ]
+            },
+            "gui.overhaul.1.25": {
+              "passed": true,
+              "seconds": 19.8882,
+              "checks": [
+                "86"
+              ]
+            },
+            "gui.overhaul.1.5": {
+              "passed": true,
+              "seconds": 20.2679,
+              "checks": [
+                "86"
+              ]
+            },
+            "torrent.gui": {
+              "passed": true,
+              "seconds": 22.647,
+              "checks": [
+                "90"
+              ]
+            },
+            "torrent.management": {
+              "passed": true,
+              "seconds": 137.001,
+              "checks": []
+            },
+            "torrent.foundation": {
+              "passed": true,
+              "seconds": 17.831,
+              "checks": [
+                "142"
+              ]
+            },
+            "torrent.acceptance": {
+              "passed": true,
+              "seconds": 21.3038,
+              "checks": [
+                "191"
+              ]
+            },
+            "foundation.gui.minimal": {
+              "passed": true,
+              "seconds": 1.62744,
+              "checks": []
+            },
+            "foundation.gui.windows": {
+              "passed": true,
+              "seconds": 1.67894,
+              "checks": []
+            }
+          },
+          "junit": "build/torrent-restart-debug-junit.xml"
+        },
+        {
+          "groups": 3,
+          "failures": 0,
+          "skipped": 0,
+          "tests": {
+            "torrent.gui": {
+              "passed": true,
+              "seconds": 22.9291,
+              "checks": [
+                "90"
+              ]
+            },
+            "foundation.gui.minimal": {
+              "passed": true,
+              "seconds": 1.71217,
+              "checks": []
+            },
+            "foundation.gui.windows": {
+              "passed": true,
+              "seconds": 1.83815,
+              "checks": []
+            }
+          },
+          "junit": "build/torrent-restart-debug-final-junit.xml"
+        }
+      ]
+    }
+  },
+  "initialReleaseGuiFailure": "Fixture sampled the toolbar before its queued native snapshot refresh; it now waits for the Completed action label. Final complete GUI scenarios pass in both configurations.",
+  "preservation": {
+    "httpHistoryRecords": 15,
+    "httpPausedCount": 1,
+    "exactEncryptedHttpStateUnchanged": true,
+    "pausedPhysicalFilesAndCheckpointsUnchanged": true,
+    "realTorrentSelectionsOwnershipAndFilesUnchanged": 2,
+    "nativeStore": {
+      "realTorrentCount": 2,
+      "completedCount": 1,
+      "records": [
+        {
+          "completed": false,
+          "paused": true,
+          "nativePaused": 1,
+          "receivedBytes": 0,
+          "selectedFiles": 2,
+          "completeFileProofs": 0,
+          "nativeVerifiedPieces": 0
+        },
+        {
+          "completed": true,
+          "paused": true,
+          "nativePaused": 1,
+          "receivedBytes": 2158907505,
+          "selectedFiles": 3,
+          "completeFileProofs": 3,
+          "nativeVerifiedPieces": 514
+        }
+      ],
+      "readOnly": true
+    },
+    "normalAppReady": true
+  },
+  "protectedHttpCoreDatabaseFilesUnchanged": 30,
+  "builds": {
+    "Release": {
+      "matchingSourceFingerprint": true,
+      "appSha256": "6cdc65d8b4fc0e811fe368bc96a36c9adc27055698df7215733f4e3fdc2285c9"
+    },
+    "Debug": {
+      "matchingSourceFingerprint": true,
+      "appSha256": "27e7bfd0a7230a9adfad9419ecfe8eebf8521205ff97945263479a2904e997a5"
+    }
+  },
+  "normalUiInspection": {
+    "actualCompletedRow100Percent": true,
+    "completedToolbarActionDisabled": true,
+    "detailsInMainWindow": true,
+    "collapseAndExpandLeaveOneWindow": true,
+    "onlySelectionAndExpansionChanged": true
+  },
+  "maintenance": "A background relaunch had a hidden main window. After verifying idle state, the owned process received WM_CLOSE and completed normal checkpoint shutdown; no forced termination. Final normal app was launched interactively and inspected.",
+  "limits": [
+    "Targeted local coverage across batches, not a new complete 28-group run",
+    "No fresh public swarm or browser transfer test required by these changes",
+    "No new portable package, remote CI or publication"
+  ]
+}

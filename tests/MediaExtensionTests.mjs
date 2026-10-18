@@ -1,8 +1,36 @@
 import assert from "node:assert/strict";
 import {MediaSources,publicUrl,youtubePage} from "../extension/media.js";
 import {HandoffController} from "../extension/handoff.js";
+import {youtubeDescriptor,youtubeStreamUrl} from '../extension/youtube-streams.js';
 let checks=0;const check=(value)=>{assert(value);checks++;};
 check(!publicUrl("javascript:alert(1)"));check(!publicUrl("https://name:secret@example.com/video.mp4"));check(!publicUrl("file:///C:/video.mp4"));check(!publicUrl("blob:https://example.com/one"));
+{
+ const id='FQmqRVK3kHg',page=`https://www.youtube.com/watch?v=${id}`,sender={url:page,documentId:'now',frameId:0,tab:{id:90}},sources=new MediaSources(()=>0);
+ const url='https://rr1.googlevideo.com/videoplayback?id=resource&itag=137&clen=100&range=0-99',audio='https://rr1.googlevideo.com/videoplayback?id=resource&itag=140&clen=30';
+ const formats=[{itag:137,resourceId:'resource',height:1080,mime:'video/mp4',bytes:100},{itag:140,url:audio,mime:'audio/mp4',bytes:30}];
+ check(!youtubeStreamUrl(url+'&sparams=range'));check(!youtubeStreamUrl(url+'&ump=1'));check(!youtubeStreamUrl(url.replace('rr1.googlevideo.com','googlevideo.com.evil.test')));
+ check(!youtubeStreamUrl(url+'&expire=1'));check(!youtubeDescriptor({id,duration:1,formats:[]},id));
+ check(youtubeStreamUrl('https://manifest.googlevideo.com/api/manifest/hls_variant/id/example/index.m3u8',true));check(youtubeStreamUrl('https://manifest.googlevideo.com/api/manifest/hls_playlist/id/example/index.m3u8',true));
+ sources.observeYouTube({page,video:{id,duration:20,formats}},sender);
+ check(!sources.resolveRequest({page},sender).context.youtube);
+ sources.observe({url,statusCode:206,tabId:90,documentId:'now',frameId:0,responseHeaders:[{name:'Content-Type',value:'video/mp4'}]});
+ const resolved=sources.resolveRequest({page},sender);check(resolved.url===page);check(resolved.context.youtube.formats.length===2);check(!resolved.context.youtube.formats[0].url.includes('range='));
+ // A raw player URL is not necessarily the transformed URL that played.
+ formats[0].url=url+'&n=untransformed';
+ sources.observeYouTube({page,video:{id,duration:20,formats}},sender);
+ sources.observe({url:url+'&n=loaded',statusCode:206,tabId:90,documentId:'now',frameId:0,responseHeaders:[{name:'Content-Type',value:'video/mp4'}]});
+ // Newer successful requests win over a previous URL for the same track.
+ sources.youtubeMedia.set(90,sources.youtubeMedia.get(90).slice(-1));
+ check(sources.resolveRequest({page},sender).context.youtube.formats[0].url.includes('n=loaded'));
+ delete formats[0].bytes;sources.observeYouTube({page,video:{id,duration:20,formats}},sender);
+ check(sources.resolveRequest({page},sender).context.youtube.formats[0].filesize===100);
+ const feed={...sender,url:'https://www.youtube.com/'};
+ sources.observeYouTube({page,video:{id,duration:20,formats}},feed);
+ check(sources.resolveRequest({page:feed.url,videoPage:page},feed).context.youtube.id===id);
+ check(!sources.resolveRequest({page},{...sender,documentId:'new'}).context.youtube);
+ check(!sources.resolveRequest({page:page.replace(id,'HyfC9nZvIJM')},sender).context.youtube);
+ sources.forget(90);check(!sources.resolveRequest({page},sender).context.youtube);
+}
 check(youtubePage("https://www.youtube.com/watch?v=EEUVLOzuu8Q&list=abc")==="https://www.youtube.com/watch?v=EEUVLOzuu8Q");
 check(youtubePage("https://www.youtube.com/embed/EEUVLOzuu8Q")==="https://www.youtube.com/watch?v=EEUVLOzuu8Q");
 check(!youtubePage("https://youtube.com.evil.test/watch?v=EEUVLOzuu8Q"));
@@ -26,6 +54,26 @@ check(sources.resolve({page:"https://www.youtube.com/watch?v=HyfC9nZvIJM",videoP
 clock=600001;check(sources.resolve({},sender)===sender.url);
 sources.tabs.clear();observe("https://cdn.example.com/foreign.mp4",2);check(sources.resolve({},sender)===sender.url);
 sources.tabs.clear();observe("https://cdn.example.com/segment.ts");observe("https://r1.googlevideo.com/videoplayback");check(sources.tabs.size===0);
+const embedded={url:"https://player.example/embed/one",documentId:"current",frameId:4,tab:{id:2,incognito:false}};
+sources.request({requestId:"master",url:"https://cdn.example/master.txt",tabId:2,frameId:4,method:"GET",requestHeaders:[{name:"Referer",value:embedded.url},{name:"Origin",value:"https://player.example"},{name:"User-Agent",value:"FixturePlayer"},{name:"Cookie",value:"never export"},{name:"Authorization",value:"never export"}]});
+sources.observe({requestId:"master",tabId:2,frameId:4,documentId:"current",url:"https://cdn.example/master.txt",statusCode:200,responseHeaders:[{name:"Content-Type",value:"text/plain"}]});
+sources.probe({url:"https://cdn.example/master.txt",format:"hls"},embedded);
+sources.probe({url:"https://cdn.example/variant.txt",format:"hls"},embedded);
+// Generic MIME probes retain the observed request context, with credentials excluded.
+sources.request({requestId:"master2",url:"https://cdn.example/master.txt",tabId:2,frameId:4,method:"GET",requestHeaders:[{name:"Referer",value:embedded.url},{name:"Origin",value:"https://player.example"},{name:"User-Agent",value:"FixturePlayer"},{name:"Cookie",value:"never export"}]});
+sources.observe({requestId:"master2",tabId:2,frameId:4,documentId:"current",url:"https://cdn.example/master.txt",statusCode:200,responseHeaders:[{name:"Content-Type",value:"text/plain"}]});
+const selected=sources.resolveRequest({page:embedded.url,source:"blob:player",playerCount:1},embedded);
+check(selected.url==="https://cdn.example/master.txt");
+check(selected.context.referer===embedded.url && selected.context.origin==="https://player.example" && selected.context.userAgent==="FixturePlayer");
+check(Object.keys(selected.context).sort().join(',')==='detectedStream,origin,referer,userAgent');
+check(sources.resolve({page:embedded.url,playerCount:2},embedded)===embedded.url);
+check(sources.resolve({page:embedded.url,playerCount:1},{...embedded,documentId:"old"})===embedded.url);
+check(sources.resolve({page:"https://player.example/embed/two",playerCount:1},embedded)==="https://player.example/embed/two");
+check(!sources.resolveRequest({page:embedded.url,playerCount:1,protected:true},embedded));
+sources.forget(2);check(!sources.tabs.has(2));
+sources.probe({url:"https://cdn.example/variant-first.txt",format:"hls"},embedded);
+clock++;sources.probe({url:"https://cdn.example/master-later.txt",format:"hls",master:true},embedded);
+check(sources.resolve({page:embedded.url,playerCount:1},embedded)==="https://cdn.example/master-later.txt");sources.forget(2);
 for(let i=0;i<300;i++)observe(`https://cdn.example.com/${i}.mp4`,0,i);check(sources.tabs.size===128);
 let saved;const controller=new HandoffController({load:async()=>undefined,save:async state=>saved=structuredClone(state)});await controller.load();check(controller.summary().enabled===true);
 const disabled=new HandoffController({load:async()=>({enabled:false})});await disabled.load();check(disabled.summary().enabled===false);

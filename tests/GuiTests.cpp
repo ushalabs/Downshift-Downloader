@@ -56,7 +56,7 @@ int main(int argc,char** argv) {
             QResizeEvent compact(QSize(860,570),QSize(1200,750));QApplication::sendEvent(&window,&compact);check(window.findChild<QTableWidget*>("downloadTable")->isColumnHidden(6),"Compact resize policy hides connection details");window.resize(860,570);
             last=std::chrono::steady_clock::now();measuring=true;
             widget<QPushButton>(window,"addButton")->click();auto* add=widget<QDialog>(window,"addDialog");
-            widget<QLineEdit>(*add,"addUrl")->setText(url);widget<QLineEdit>(*add,"addDestination")->setText(file);widget<QLineEdit>(*add,"addSha256")->setText(sha);widget<QSpinBox>(*add,"addSpeedLimit")->setValue(256);widget<QPushButton>(*add,"addSubmit")->click();
+            widget<QLineEdit>(*add,"addUrl")->setText(url);widget<QLineEdit>(*add,"addDestination")->setText(QDir(root).filePath("original.bin"));widget<QLineEdit>(*add,"addFilename")->setText(QFileInfo(file).fileName());check(widget<QLineEdit>(*add,"addDestination")->text()==file,"Top name field sets manual download filename");widget<QLineEdit>(*add,"addSha256")->setText(sha);widget<QSpinBox>(*add,"addSpeedLimit")->setValue(256);widget<QPushButton>(*add,"addSubmit")->click();
             auto* table=widget<QTableWidget>(window,"downloadTable");wait([&]{return table->rowCount()==1 && window.current().entries[0].progress.downloadedBytes>100000;});table->selectRow(0);
             if(window.current().entries[0].status!=downshift::QueueStatus::Running)
                 std::cerr<<"Observed queue status="<<static_cast<int>(window.current().entries[0].status)<<" error="<<window.current().entries[0].error.toStdString()<<'\n';

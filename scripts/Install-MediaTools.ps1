@@ -1,30 +1,66 @@
-param([ValidateSet('Release','Debug')][string]$Configuration='Release',[string]$Destination='')
+param([ValidateSet('Release','Debug')][string]$Configuration='Release',[string]$Destination='',[string]$CacheDirectory='',[switch]$RemoveDownloadCache)
 $ErrorActionPreference='Stop'
+function File-Sha256([string]$path){
+    $inputStream=[IO.File]::OpenRead($path);$hasher=[Security.Cryptography.SHA256]::Create()
+    try{return ([BitConverter]::ToString($hasher.ComputeHash($inputStream))).Replace('-','').ToLower()}
+    finally{$hasher.Dispose();$inputStream.Dispose()}
+}
+$ProgressPreference='SilentlyContinue'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $portable=Test-Path -LiteralPath (Join-Path $projectRoot 'Downshift.exe')
-$cache=if($portable){Join-Path $env:LOCALAPPDATA 'Downshift\media-cache'}else{Join-Path $projectRoot '.tools\media'}
+if(!$CacheDirectory){$CacheDirectory=if($portable){Join-Path $env:LOCALAPPDATA 'Downshift\media-cache'}else{Join-Path $projectRoot '.tools\media'}}
 if(!$Destination){$Destination=if($portable){Join-Path $projectRoot 'media-tools'}else{Join-Path $projectRoot "build\windows-msvc\$Configuration\media-tools"}}
-$destination=[System.IO.Path]::GetFullPath($Destination)
-New-Item -ItemType Directory -Force -Path $cache,$destination | Out-Null
-$assets=@(
-    @{Name='yt-dlp.exe';Url='https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe';Hash='66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a'},
-    @{Name='deno.zip';Url='https://github.com/denoland/deno/releases/download/v2.9.7/deno-x86_64-pc-windows-msvc.zip';Hash='a0c3101b4158d1dfb7d6a78a7bf0f3de80c96bb423c152beec8beb22786f2238'},
-    @{Name='ffmpeg.zip';Url='https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-12-13-12/ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1.zip';Hash='fa628b9de20254fe7c80605a4c6af54d0bffdda0807363ee7557131c2b78e051'}
-)
-foreach($asset in $assets) {
-    $file=Join-Path $cache $asset.Name
-    if(!(Test-Path -LiteralPath $file) -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower() -ne $asset.Hash) {
-        Write-Host "Downloading $($asset.Name) from its pinned upstream release…"
-        Invoke-WebRequest -Uri $asset.Url -OutFile $file
+$destination=[IO.Path]::GetFullPath($Destination)
+$cache=[IO.Path]::GetFullPath($CacheDirectory)
+$lock=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'media-tools-lock.json') -Raw | ConvertFrom-Json
+New-Item -ItemType Directory -Force -Path $destination | Out-Null
+if((Get-Item -LiteralPath $destination).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked media-tools directory refused.'}
+function Matches-Hash([string]$path,[string]$expected){return ((Test-Path -LiteralPath $path -PathType Leaf) -and (File-Sha256 $path) -eq $expected)}
+$ready=$true
+foreach($file in $lock.files){if(!(Matches-Hash (Join-Path $destination $file.name) $file.sha256)){$ready=$false;break}}
+if(!$ready){
+    New-Item -ItemType Directory -Force -Path $cache | Out-Null
+    # Verify all archives before replacing an installed helper.
+    foreach($asset in $lock.assets){
+        $archive=Join-Path $cache $asset.name
+        if(!(Matches-Hash $archive $asset.sha256)){
+            Write-Host "Downloading $($asset.name) for video support..."
+            $partial=Join-Path $cache ('download-'+[guid]::NewGuid().ToString('N')+'.tmp')
+            try{
+                Invoke-WebRequest -UseBasicParsing -Uri $asset.url -OutFile $partial -TimeoutSec 900
+                if(!(Matches-Hash $partial $asset.sha256)){throw "Checksum mismatch: $($asset.name). Video tools were not installed."}
+                Move-Item -LiteralPath $partial -Destination $archive -Force
+            }finally{if(Test-Path -LiteralPath $partial){Remove-Item -LiteralPath $partial -Force}}
+        }
     }
-    if((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower() -ne $asset.Hash) {throw "Checksum mismatch: $($asset.Name). No helper will be installed."}
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $stage=Join-Path $destination ('install-'+[guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $stage | Out-Null
+    try{
+        foreach($file in $lock.files){
+            $output=Join-Path $stage $file.name
+            if(!$file.entry){Copy-Item -LiteralPath (Join-Path $cache $file.asset) -Destination $output}
+            else{
+                $zip=[IO.Compression.ZipFile]::OpenRead((Join-Path $cache $file.asset))
+                try{
+                    $entry=$zip.GetEntry($file.entry);if(!$entry){throw "Missing video runtime: $($file.name)"}
+                    [IO.Compression.ZipFileExtensions]::ExtractToFile($entry,$output)
+                }finally{$zip.Dispose()}
+            }
+            if(!(Matches-Hash $output $file.sha256)){throw "Extracted video runtime differs: $($file.name)"}
+        }
+        foreach($file in $lock.files){Copy-Item -LiteralPath (Join-Path $stage $file.name) -Destination $destination -Force}
+    }finally{
+        $resolved=[IO.Path]::GetFullPath($stage)
+        if(!$resolved.StartsWith($destination+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $resolved -Leaf) -notlike 'install-*'){throw 'Unsafe video staging cleanup path.'}
+        Remove-Item -LiteralPath $resolved -Recurse -Force
+    }
 }
-Copy-Item -LiteralPath (Join-Path $cache 'yt-dlp.exe') -Destination $destination
-Expand-Archive -LiteralPath (Join-Path $cache 'deno.zip') -DestinationPath (Join-Path $cache 'deno') -Force
-Copy-Item -LiteralPath (Join-Path $cache 'deno\deno.exe') -Destination $destination
-Expand-Archive -LiteralPath (Join-Path $cache 'ffmpeg.zip') -DestinationPath (Join-Path $cache 'ffmpeg') -Force
-$ffmpegFolder=Get-ChildItem -LiteralPath (Join-Path $cache 'ffmpeg') -Directory | Select-Object -First 1
-Copy-Item -Path (Join-Path $ffmpegFolder.FullName 'bin\*') -Destination $destination -Force
-Copy-Item -LiteralPath (Join-Path $ffmpegFolder.FullName 'LICENSE.txt') -Destination (Join-Path $destination 'FFMPEG-LICENSE.txt')
-$assets | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'sources.json') -Encoding utf8
-Write-Host "Verified local video helpers installed in $destination. No system PATH or browser settings changed."
+foreach($file in $lock.files){if(!(Matches-Hash (Join-Path $destination $file.name) $file.sha256)){throw 'Video tools did not install completely.'}}
+$lock.assets | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'sources.json') -Encoding utf8
+@{schema=1;root=$destination;lockSha256=(File-Sha256 (Join-Path $PSScriptRoot 'media-tools-lock.json'));sourcesSha256=(File-Sha256 (Join-Path $destination 'sources.json'))}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $destination 'installed-files.json') -Encoding utf8
+if($RemoveDownloadCache -and (Test-Path -LiteralPath $cache -PathType Container)){
+    foreach($asset in $lock.assets){$path=Join-Path $cache $asset.name;if(Matches-Hash $path $asset.sha256){Remove-Item -LiteralPath $path -Force}}
+    if(!(Get-ChildItem -LiteralPath $cache -Force | Select-Object -First 1)){Remove-Item -LiteralPath $cache -Force}
+}
+Write-Host 'Video support installed and verified. No system PATH or browser settings changed.'

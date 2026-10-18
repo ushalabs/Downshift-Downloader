@@ -1,5 +1,11 @@
 # Downshift for Chrome
 
+The Windows EXE installer registers the native host and defaults to opening a Chrome setup guide, Chrome's Extensions page and the installed extension folder. Video tools install automatically during EXE setup. This unpublished local extension still requires Developer mode > Load unpacked once; automatic Windows external installation requires a Chrome Web Store listing and browser confirmation. Setup does not edit Chrome profiles or managed policies. See [Chrome's installation rules](https://developer.chrome.com/docs/extensions/how-to/distribute/install-extensions) and [packaging](PACKAGING.md).
+
+## Magnet links, 2026-10-16
+
+Reload the updated unpacked Downshift extension and refresh existing pages. With capture enabled, a normal magnet-link click opens the native Add torrent dialog with the link already filled in. Press Enter or Read metadata, choose files and confirm before payload downloading. This uses the existing restricted native host and local pipe; HTTP downloading remains unchanged. Capture-off and incognito are respected. This does not register a Windows-wide magnet handler or intercept address-bar protocol navigation.
+
 ## Capture history guard, 0.4.4
 
 Completed Chrome download history is not a capture source. Unknown completed items from metadata changes or browser restoration are ignored. A tiny already-completed file needs a current filename event or a fresh creation event with a recent start time; saved handoff receipts remain recoverable. Bounded completed-ID receipts prevent delayed duplicate events from recapturing a delivered response across worker restarts. Reload the unpacked extension after updating the app. This fix does not bulk-delete prior cancelled rows or their files.

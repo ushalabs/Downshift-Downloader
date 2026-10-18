@@ -52,11 +52,11 @@ int main(int argc, char* argv[]) {
         window.show();
         std::unique_ptr<downshift::browser::PipeServer> browser;
         if(!smokeTest) {
-            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();window.activateWindow();},Qt::QueuedConnection);},[&window,&queue](QString url,QString title){
-                QMetaObject::invokeMethod(&window,[&window,&queue,url=std::move(url),title=std::move(title)]{
-                    window.openVideo(url,title);
+            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();window.activateWindow();},Qt::QueuedConnection);},[&window,&queue](QString url,QString title,QJsonObject context){
+                QMetaObject::invokeMethod(&window,[&window,&queue,url=std::move(url),title=std::move(title),context=std::move(context)]{
+                    window.openVideo(url,title,{},context);
                 },Qt::QueuedConnection);
-            },[&window]{QMetaObject::invokeMethod(&window,[&window]{window.captureError();},Qt::QueuedConnection);});
+            },[&window]{QMetaObject::invokeMethod(&window,[&window]{window.captureError();},Qt::QueuedConnection);},[&window](QString source){QMetaObject::invokeMethod(&window,[&window,source=std::move(source)]{window.openTorrent(source);},Qt::QueuedConnection);});
             auto* status=new QTimer(&window);status->setInterval(1000);QObject::connect(status,&QTimer::timeout,&window,[&window,&browser]{window.chromeStatus(browser->active() ? "Ready for the extension":"Unavailable");});status->start();
         }
 

@@ -12,6 +12,19 @@ class ChromeHandler(Handler):
     def do_GET(self):
         import sys
         print("Chrome fixture request range="+str(self.headers.get("Range")),file=sys.stderr,flush=True)
+        if self.path.startswith('/media-root'):
+            payload=f'<!doctype html><title>Embedded media fixture</title><iframe style="width:650px;height:400px" src="http://localhost:{self.server.server_port}/media-embed"></iframe>'.encode()
+            self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
+        if self.path.startswith('/media-embed'):
+            payload=b'''<!doctype html><title>Unknown embedded player</title><video style="width:480px;height:270px" controls></video><script>document.querySelector('video').src=URL.createObjectURL(new Blob([],{type:'video/mp4'}));fetch('/manifest.txt').then(r=>r.text()).then(()=>fetch('/variant.txt')).then(r=>r.text());</script>'''
+            self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
+        if self.path in ('/manifest.txt','/variant.txt','/media-segment'):
+            expected=f'http://localhost:{self.server.server_port}/media-embed'
+            if self.headers.get('Referer')!=expected:self.send_error(403,'Missing embedded player referrer');return
+            if self.path=='/manifest.txt':payload=b'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000\n/variant.txt\n'
+            elif self.path=='/variant.txt':payload=b'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:3\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXTINF:2.0,\n/media-segment\n#EXT-X-ENDLIST\n'
+            else:payload=self.server.segment_file.read_bytes()
+            self.send_response(200);self.send_header('Content-Type','video/mp2t' if self.path=='/media-segment' else 'text/plain');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith('/picture'):
             payload=self.server.picture_bytes;self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith("/video.mp4") and getattr(self.server,'media_file',None):
@@ -48,4 +61,5 @@ if __name__=="__main__":
     import pathlib,sys
     server=ChromeServer();server.configure(4*1024*1024,per_connection_bps=1024*1024)
     if len(sys.argv)>1:server.media_file=pathlib.Path(sys.argv[1])
+    if len(sys.argv)>2:server.segment_file=pathlib.Path(sys.argv[2])
     print(server.server_port,flush=True);server.serve_forever()

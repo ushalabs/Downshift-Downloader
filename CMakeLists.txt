@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Downshift VERSION 0.4.4 LANGUAGES CXX)
+project(Downshift VERSION 1.0.0 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Downshift requires Windows and the MSVC C++ toolchain.")
@@ -97,6 +97,10 @@ enable_language(RC)
 configure_file(packaging/Downshift.rc.in Downshift.rc @ONLY)
 target_sources(downshift PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Downshift.rc")
 set_target_properties(downshift PROPERTIES OUTPUT_NAME Downshift)
+set(DOWNSHIFT_PRODUCT_OUTPUT_DIRECTORY "" CACHE PATH "Separate product runtime directory for previews while another build is running")
+if(DOWNSHIFT_PRODUCT_OUTPUT_DIRECTORY)
+    set_target_properties(downshift downshift_native_host PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${DOWNSHIFT_PRODUCT_OUTPUT_DIRECTORY}")
+endif()
 target_link_libraries(downshift PRIVATE downshift_gui downshift_browser shell32 ole32)
 target_compile_definitions(downshift PRIVATE
     DOWNSHIFT_VERSION="${PROJECT_VERSION}"
@@ -147,6 +151,21 @@ add_custom_command(TARGET downshift POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(downshift_torrent_recovery_tests tests/TorrentRecoveryTests.cpp
+        src/torrent/TorrentEngine.cpp src/torrent/TorrentEngine.h src/torrent/StallRecovery.h src/torrent/TorrentStore.cpp src/torrent/TorrentStore.h)
+    set_target_properties(downshift_torrent_recovery_tests PROPERTIES AUTOMOC ON)
+    target_include_directories(downshift_torrent_recovery_tests PRIVATE src tests)
+    target_compile_definitions(downshift_torrent_recovery_tests PRIVATE DOWNSHIFT_TORRENT_RECOVERY_TEST _WIN32_WINNT=0x0A00)
+    target_compile_options(downshift_torrent_recovery_tests PRIVATE /W4 /permissive- /utf-8)
+    target_link_libraries(downshift_torrent_recovery_tests PRIVATE Qt6::Network LibtorrentRasterbar::torrent-rasterbar unofficial::sqlite3::sqlite3 crypt32)
+    add_test(NAME torrent.recovery COMMAND downshift_torrent_recovery_tests)
+    set_tests_properties(torrent.recovery PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
+    add_executable(downshift_torrent_discovery_tests tests/TorrentDiscoveryTests.cpp)
+    target_link_libraries(downshift_torrent_discovery_tests PRIVATE downshift_torrent Qt6::Network LibtorrentRasterbar::torrent-rasterbar)
+    target_compile_options(downshift_torrent_discovery_tests PRIVATE /W4 /permissive- /utf-8)
+    target_compile_definitions(downshift_torrent_discovery_tests PRIVATE _WIN32_WINNT=0x0A00)
+    add_test(NAME torrent.discovery COMMAND downshift_torrent_discovery_tests)
+    set_tests_properties(torrent.discovery PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE)
     add_executable(downshift_torrent_failure_tests tests/TorrentFailureTests.cpp tests/TorrentFaultDisk.cpp
         src/torrent/TorrentEngine.cpp src/torrent/TorrentEngine.h src/torrent/TorrentStore.cpp src/torrent/TorrentStore.h)
     set_target_properties(downshift_torrent_failure_tests PROPERTIES AUTOMOC ON)
@@ -203,6 +222,7 @@ if(BUILD_TESTING)
         add_test(NAME browser.extension COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/ExtensionTests.mjs")
         add_test(NAME browser.bridge COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserBridgeTests.mjs")
         add_test(NAME browser.media COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaExtensionTests.mjs")
+        add_test(NAME browser.media-probe COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaProbeTests.mjs")
         add_test(NAME engine.transport COMMAND Python3::Interpreter
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/TransportTests.py" "$<TARGET_FILE:downshift_download>" "${NODE_EXECUTABLE}")
         set_tests_properties(engine.transport PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
@@ -231,7 +251,11 @@ if(BUILD_TESTING)
     add_test(NAME gui.media COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaIntegration.py" "$<TARGET_FILE:downshift_media_tests>"
         "${CMAKE_CURRENT_BINARY_DIR}/media-shots/$<CONFIG>")
-    set_tests_properties(gui.media PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
+    set_tests_properties(gui.media PROPERTIES TIMEOUT 480 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
+    # Opt-in real Internet acceptance; never part of offline/CI fixture tests.
+    add_executable(downshift_youtube_live_tests tests/YouTubeLiveTests.cpp)
+    target_link_libraries(downshift_youtube_live_tests PRIVATE downshift_gui)
+    target_compile_options(downshift_youtube_live_tests PRIVATE /W4 /permissive- /utf-8)
     target_link_libraries(downshift_gui_tests PRIVATE downshift_gui)
     target_compile_options(downshift_gui_tests PRIVATE /W4 /permissive- /utf-8)
     add_test(NAME gui.integration COMMAND Python3::Interpreter

@@ -9,13 +9,14 @@
 #include <thread>
 using namespace downshift::torrent;
 namespace {
-QJsonObject report(const Snapshot& row){return {{"id",row.id},{"state",static_cast<int>(row.state)},{"metadata",row.metadata},{"verifiedBytes",QString::number(row.verifiedBytes)},{"totalBytes",QString::number(row.totalBytes)},{"selectedBytes",QString::number(row.selectedBytes)},{"downloadBytesPerSecond",row.downloadBytesPerSecond},{"uploadBytesPerSecond",row.uploadBytesPerSecond},{"peers",row.peers},{"seeds",row.seeds},{"ratio",row.ratio},{"seedingSeconds",QString::number(row.seedingSeconds)}};}
+QJsonObject report(const Snapshot& row){return {{"id",row.id},{"state",static_cast<int>(row.state)},{"metadata",row.metadata},{"metadataOnly",row.metadataOnly},{"verifyingCompletion",row.verifyingCompletion},{"nativePaused",row.nativePaused},{"uploadOnly",row.uploadOnly},{"selectionPending",row.selectionPending},{"metadataWaitSeconds",QString::number(row.metadataWaitSeconds)},{"dhtNodes",row.dhtNodes},{"candidatePeers",row.candidatePeers},{"connectingPeers",row.connectingPeers},{"respondingTrackers",row.respondingTrackers},{"failedTrackers",row.failedTrackers},{"trackerCount",row.trackerCount},{"downloadedBytes",QString::number(row.downloadedBytes)},{"verifiedBytes",QString::number(row.verifiedBytes)},{"totalBytes",QString::number(row.totalBytes)},{"selectedBytes",QString::number(row.selectedBytes)},{"downloadBytesPerSecond",row.downloadBytesPerSecond},{"uploadBytesPerSecond",row.uploadBytesPerSecond},{"peers",row.peers},{"seeds",row.seeds},{"ratio",row.ratio},{"seedingSeconds",QString::number(row.seedingSeconds)}};}
 void output(const QJsonObject& object){std::cout<<QJsonDocument(object).toJson(QJsonDocument::Compact).constData()<<std::endl;}
 int number(const QCommandLineParser& parser,const char* key){bool ok=false;const auto value=parser.value(key).toInt(&ok);if(!ok)throw std::runtime_error("Invalid integer option.");return value;}
 }
 int main(int argc,char** argv){
     QCoreApplication app(argc,argv);QCoreApplication::setApplicationName("DownshiftTorrent");
-    QCommandLineParser parser;parser.setApplicationDescription("Downshift Torrent T2 developer tool. Peers can see your IP. Persistent sessions restore paused; use --resume with a saved ID. The Qt torrent interface is a later phase.");parser.addHelpOption();
+    QCommandLineParser parser;parser.setApplicationDescription("Downshift torrent diagnostic tool. Peers can see your IP. Persistent sessions restore paused; use --resume with a saved ID.");parser.addHelpOption();
+    parser.addOption({"metadata-only","Resolve the file list without requesting payload pieces."});
     parser.addOption({"torrent","Local torrent metadata.","file"});parser.addOption({"magnet","Magnet URI.","uri"});parser.addOption({"save","Absolute, separate destination for this torrent.","directory"});
     parser.addOption({"database","Absolute torrent SQLite store (separate from queue.sqlite).","file"});parser.addOption({"list","List retained torrent IDs/state."});parser.addOption({"id","Saved torrent ID for a management command.","id"});
     for(const auto* key:{"pause","resume","cancel","remove","delete-data","details","configure"})parser.addOption({key,QString("%1 the torrent selected by --id.").arg(key)});
@@ -28,7 +29,8 @@ int main(int argc,char** argv){
         const bool adding=parser.isSet("torrent")||parser.isSet("magnet");int actions=0;QString action;
         for(const auto* key:{"pause","resume","cancel","remove","delete-data","details","configure"})if(parser.isSet(key)){++actions;action=key;}
         if((adding&&(parser.isSet("torrent")==parser.isSet("magnet")||!parser.isSet("save")||actions||parser.isSet("id")))||actions>1||(!adding&&!parser.isSet("list")&&!parser.isSet("global-limits")&&actions==0)||(actions&&(!parser.isSet("id")||!parser.isSet("database")))){std::cerr<<"Use --torrent/--magnet with --save, or --database with --list/--id and one management action.\n";return 2;}
-        AddOptions config;config.paused=parser.isSet("paused");config.limits={number(parser,"download-limit"),number(parser,"upload-limit"),number(parser,"connections")};
+        if(parser.isSet("metadata-only")&&!adding){std::cerr<<"--metadata-only requires a new --magnet or --torrent lookup.\n";return 2;}
+        AddOptions config;config.paused=parser.isSet("paused");config.metadataOnly=parser.isSet("metadata-only");config.limits={number(parser,"download-limit"),number(parser,"upload-limit"),number(parser,"connections")};
         const auto policy=parser.value("seed");if(policy=="stop")config.seeding.mode=SeedMode::Stop;else if(policy=="ratio")config.seeding.mode=SeedMode::Ratio;else if(policy=="time")config.seeding.mode=SeedMode::Time;else if(policy=="manual")config.seeding.mode=SeedMode::Manual;else throw std::runtime_error("Invalid seed policy.");
         bool ok=false;config.seeding.ratio=parser.value("seed-ratio").toDouble(&ok);if(!ok)throw std::runtime_error("Invalid seed ratio.");config.seeding.seconds=number(parser,"seed-seconds");
         if(parser.isSet("priorities"))for(const auto& value:parser.value("priorities").split(',')){const auto priority=value.toInt(&ok);if(!ok)throw std::runtime_error("Invalid file priority.");config.priorities.push_back(priority);}
@@ -44,7 +46,7 @@ int main(int argc,char** argv){
         const bool wait=(adding&&!config.paused)||action=="resume";int result=wait?3:0;
         const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(timeout);
         do{
-            const auto rows=engine.snapshots().get();for(const auto& row:rows)if(!wait||row.id==id){output(report(row));if(wait&&row.state==State::Complete)result=0;if(wait&&row.state==State::Failed){std::cerr<<row.error.toStdString()<<'\n';result=1;}}
+            const auto rows=engine.snapshots().get();for(const auto& row:rows)if(!wait||row.id==id){output(report(row));if(wait&&(row.state==State::Complete||(config.metadataOnly&&row.metadata)))result=0;if(wait&&row.state==State::Failed){std::cerr<<row.error.toStdString()<<'\n';result=1;}}
             if(!wait||result!=3)break;std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }while(std::chrono::steady_clock::now()<end);
         engine.shutdown().get();if(result==3)std::cerr<<"Bounded wait expired. Files and committed recovery data retained; persistent sessions reopen paused.\n";return result;

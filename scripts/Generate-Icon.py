@@ -24,6 +24,10 @@ image=image.resize((256,256),Image.Resampling.LANCZOS)
 image.save(root/'downshift.png')
 (root/'downshift.rgba').write_bytes(image.tobytes())
 image.save(root/'downshift.ico',bitmap_format='bmp',sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
+extension_icons=root.parent/'extension'/'icons'
+extension_icons.mkdir(exist_ok=True)
+for size in (16,32,48,128):
+    image.resize((size,size),Image.Resampling.LANCZOS).save(extension_icons/f'downshift-{size}.png')
 chevron=Image.new('RGBA',(56,56),(0,0,0,0))
 ImageDraw.Draw(chevron).line([(12,20),(28,36),(44,20)],fill='#b94278',width=8,joint='curve')
 small=chevron.resize((14,14),Image.Resampling.LANCZOS)

@@ -1,0 +1,77 @@
+{
+  "discoveryIdleSeconds": 45,
+  "liveUserTestPending": true,
+  "normalUserStateModified": false,
+  "productionClock": "real steady clock",
+  "maximumRetryDelaySeconds": 600,
+  "limitations": "Controlled loopback peer outage, not a real Internet/adapter outage or public swarm acceptance. Management passed before the final pending-removal correction; final affected native tests passed on the corrected sources.",
+  "date": "2026-10-16",
+  "feature": "Automatic active-torrent stall recovery",
+  "startupChecks": [
+    {
+      "exitCode": 0,
+      "executable": "build/windows-msvc/Release/Downshift-recovery-preview.exe"
+    },
+    {
+      "exitCode": 0,
+      "executable": "build/windows-msvc/Debug/Downshift.exe"
+    }
+  ],
+  "protectedHttpCoreDatabaseSourcesUnchanged": 30,
+  "firstReconnectIdleSeconds": 90,
+  "finalTargetedTests": [
+    {
+      "seconds": 5.36362,
+      "name": "torrent.discovery",
+      "passed": true,
+      "report": "build/torrent-stall-release-final-junit.xml"
+    },
+    {
+      "seconds": 3.81053,
+      "name": "torrent.failure",
+      "passed": true,
+      "report": "build/torrent-stall-release-final-junit.xml"
+    },
+    {
+      "seconds": 5.50931,
+      "name": "torrent.discovery",
+      "passed": true,
+      "report": "build/torrent-stall-debug-discovery-final-junit.xml"
+    },
+    {
+      "seconds": 4.38138,
+      "name": "torrent.failure",
+      "passed": true,
+      "report": "build/torrent-stall-debug-final-junit.xml"
+    },
+    {
+      "seconds": 37.9905,
+      "name": "torrent.recovery",
+      "passed": true,
+      "report": "build/torrent-stall-release-recovery-final-junit.xml"
+    },
+    {
+      "seconds": 36.5064,
+      "name": "torrent.recovery",
+      "passed": true,
+      "report": "build/torrent-stall-debug-recovery-final-junit.xml"
+    }
+  ],
+  "existingSetupSha256": "215c39f00a0845cb4095fd7ffe21d5907b0cfb8a5b3c2fdf5b4c450433c77974",
+  "installed": {
+    "restarted": false,
+    "previous": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\windows-msvc\\Release\\Downshift.before-pending-priority-fix-fe452b81e456467091bc5fc9f1ec3bbf.exe",
+    "sha256": "F4AB040105720A74D2DDE2380F8E553C97FBA344FA802E9D3B70AB989D43D5CC",
+    "repackaged": false,
+    "runningProcesses": [
+      {
+        "Id": 22520,
+        "StartTime": "2026-10-16T12:13:43.232759+05:00"
+      }
+    ],
+    "installed": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\windows-msvc\\Release\\Downshift.exe"
+  },
+  "repackaged": false,
+  "privateAcceleratedClock": true,
+  "gitMutations": false
+}

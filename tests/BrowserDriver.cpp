@@ -14,6 +14,7 @@
 #include <QPixmap>
 #include <QLabel>
 #include <QPushButton>
+#include <QLineEdit>
 #include <QEvent>
 #include <iostream>
 int main(int argc,char** argv) {
@@ -21,14 +22,15 @@ int main(int argc,char** argv) {
     if(argc==3){if(QString::fromLatin1(argv[2])!="--isolated-browser-test")return 2;downshift::browser::useIsolatedTestPipe();app.installEventFilter(&hidden);}
     downshift::CurlRuntime curl;downshift::QueueManager queue(QDir(QString::fromLocal8Bit(argv[1])).filePath("queue.sqlite"));
     auto s=queue.snapshot().get().settings;s.directory=QString::fromLocal8Bit(argv[1]);s.notifications=false;queue.configure(s).get();
-    downshift::MainWindow window(queue);window.show();
-    downshift::browser::PipeServer server(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();},Qt::QueuedConnection);},[&window](QString url,QString title){QMetaObject::invokeMethod(&window,[&window,url,title]{window.openVideo(url,title);},Qt::QueuedConnection);});for(int i=0;i<100 && !server.active();++i)std::this_thread::sleep_for(std::chrono::milliseconds(20));if(!server.active())return 3;
+    downshift::torrent::TorrentEngine torrents({false,true,QDir(QString::fromLocal8Bit(argv[1])).filePath("torrents.sqlite")});downshift::MainWindow window(queue);window.attachTorrents(torrents);window.show();
+    downshift::browser::PipeServer server(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();},Qt::QueuedConnection);},[&window](QString url,QString title,QJsonObject context){QMetaObject::invokeMethod(&window,[&window,url,title,context]{window.openVideo(url,title,{},context);},Qt::QueuedConnection);},{},[&window](QString source){QMetaObject::invokeMethod(&window,[&window,source]{window.openTorrent(source);},Qt::QueuedConnection);});for(int i=0;i<100 && !server.active();++i)std::this_thread::sleep_for(std::chrono::milliseconds(20));if(!server.active())return 3;
     std::cout<<"ready"<<std::endl;
     std::thread commands([&]{std::string line;
     while(std::getline(std::cin,line)) {
         if(line=="exit")break;
         if(line.starts_with("main-shot ")){QMetaObject::invokeMethod(&window,[&]{window.grab().save(QString::fromStdString(line.substr(10)),"BMP");},Qt::BlockingQueuedConnection);std::cout<<"captured"<<std::endl;continue;}
         if(line=="summary"){QJsonObject summary;QMetaObject::invokeMethod(&window,[&]{summary={{"ready",window.ready()},{"records",static_cast<int>(window.current().entries.size())},{"summary",window.findChild<QLabel*>("summary")->text()}};},Qt::BlockingQueuedConnection);std::cout<<QJsonDocument(summary).toJson(QJsonDocument::Compact).constData()<<std::endl;continue;}
+        if(line=="torrent"||line=="torrent-close"){QJsonArray dialogs;QMetaObject::invokeMethod(&window,[&]{for(auto* dialog:window.findChildren<QDialog*>("addTorrentDialog")){dialogs.append(QJsonObject{{"source",dialog->findChild<QLineEdit*>("torrentSource")->text()},{"inspectEnabled",dialog->findChild<QPushButton*>("torrentInspect")->isEnabled()}});if(line=="torrent-close")dialog->reject();}},Qt::BlockingQueuedConnection);std::cout<<QJsonDocument(dialogs).toJson(QJsonDocument::Compact).constData()<<std::endl;continue;}
         if(line=="confirm") {QMetaObject::invokeMethod(&window,[&]{for(auto* button:window.findChildren<QPushButton*>("captureStart"))if(button->isEnabled())button->click();},Qt::BlockingQueuedConnection);std::cout<<"confirmed"<<std::endl;continue;}
         if(line=="media" || line=="media-download" || line=="media-close" || line.starts_with("media-height ") || line.starts_with("media-shot ")) {
             QJsonArray media;QMetaObject::invokeMethod(&window,[&]{for(auto* dialog:window.findChildren<QDialog*>("mediaDialog")){

@@ -17,7 +17,7 @@ QString statusText(QueueStatus status);
 struct QueueSettings {
     QString directory;
     int simultaneous = 3, perHost = 2, hostConnections = 16, connections = 16;
-    bool automatic = true, dark = false, startOnLaunch = false, notifications = true, diagnostics = false;
+    bool automatic = true, dark = false, startOnLaunch = false, notifications = true, diagnostics = false, closeToTray = true;
     std::uint64_t speedLimit = 0;
     QJsonObject json() const;
     static QueueSettings fromJson(const QJsonObject&);
@@ -63,6 +63,7 @@ public:
     std::future<QString> categoryFolder(QString filename,QString mime={});
     std::future<QString> beginMedia(QString url, QString folder, QString title, QJsonObject metadata = {});
     std::future<void> mediaProgress(QString id, DownloadProgress progress);
+    std::future<void> pauseMedia(QString id,bool paused,QJsonObject context={});
     std::future<QString> finishMedia(QString id, QueueStatus status, QString file, QString error, QJsonObject metadata = {});
     std::future<QJsonObject> prepare(QString key,QString url,QString filename,DownloadEngine::Inspection inspection,QString mime={},bool browserTransfer=false);
     std::future<QJsonObject> handoff(QString key,QString command,bool prompt=false);

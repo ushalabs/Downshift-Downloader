@@ -5,6 +5,7 @@ import {saveImage} from './image-capture.js';
 const mediaSources = new MediaSources();
 const connection=new NativeConnection(()=>chrome.runtime.connectNative('org.ushalabs.downshift'));
 const sourceTags=new Map();
+chrome.webRequest.onBeforeSendHeaders.addListener(details=>mediaSources.request(details),{urls:['http://*/*','https://*/*']},['requestHeaders','extraHeaders']);
 chrome.webRequest.onBeforeRequest.addListener(details=>{if(details.method!=='GET')sourceTags.delete(details.url);},{urls:['http://*/*','https://*/*']});
 async function ensureApp() {
   const request = command=>connection.request({version:1,command});
@@ -21,7 +22,7 @@ chrome.webRequest.onHeadersReceived.addListener(details=>{
   mediaSources.observe(details);
   if(details.method==='GET' && details.statusCode===200){const tag=details.responseHeaders?.find(h=>h.name.toLowerCase()==='etag')?.value;if(tag && /^"[^\r\n]{1,500}"$/.test(tag)){sourceTags.delete(details.url);sourceTags.set(details.url,{tag,at:Date.now()});if(sourceTags.size>1000)sourceTags.delete(sourceTags.keys().next().value);}}
 }, {urls:["http://*/*","https://*/*"]}, ["responseHeaders"]);
-chrome.tabs.onRemoved.addListener(id=>mediaSources.tabs.delete(id));
+chrome.tabs.onRemoved.addListener(id=>mediaSources.forget(id));
 const controller=new HandoffController({
   ownId:chrome.runtime.id,
   captureEnabled:async()=>(await chrome.storage.local.get("handoffState")).handoffState?.enabled!==false,
@@ -91,6 +92,8 @@ chrome.runtime.onInstalled.addListener(()=>{chrome.alarms.create("downshift-reco
 chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(sender.id!==chrome.runtime.id || !message || typeof message.type!=="string")return false;
   let task;
+  if(message.type==='youtube-observed'){mediaSources.observeYouTube(message,sender);reply({ok:true});return false;}
+  if(message.type==="media-observed") {mediaSources.probe(message,sender);reply({ok:true});return false;}
   if(message.type==="media") {
     task = (async()=>{
       let current=message;
@@ -99,13 +102,24 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
       if(sender.frameId===0 && sender.tab?.id!==undefined){
         try{const tab=await chrome.tabs.get(sender.tab.id);if(/(^|\.)youtube\.com$/.test(new URL(tab.url).hostname))current={...message,page:tab.url};}catch{}
       }
-      const url=mediaSources.resolve(current,sender);
-      if(!url)throw Error("This player has no supported public video address. Refresh its video page and retry.");
+      const source=mediaSources.resolveRequest(current,sender);
+      if(!source)throw Error(message.protected ? "This player uses protected media and cannot be downloaded.":"This player has no supported public video address. Start playback, refresh its video page and retry.");
+      const app=await ensureApp();if(!app.capabilities?.mediaStreams)throw Error("Restart the updated Downshift app, reload its extension and refresh this video page.");
+      if(source.context?.youtube && !app.capabilities?.browserYouTube)throw Error('Install the updated Downshift app to use browser-resolved YouTube streams, then retry.');
       const opening = await controller.native("open");
       for(let attempt=0;attempt<8;attempt++) {
-        try { return await controller.native("media",{url,title:String(message.title || "Video").slice(0,200)}); }
+        try { return await controller.native("media",{...source,title:String(message.title || "Video").slice(0,200)}); }
         catch(error) { if(opening.state!=="opening" || attempt===7)throw error;await new Promise(resolve=>setTimeout(resolve,400)); }
       }
+    })();
+  }
+  else if(message.type==="magnet") {
+    task=(async()=>{
+      const url=message.url;
+      if(sender.tab?.id===undefined||sender.tab.incognito||!publicUrl(sender.url)||typeof url!=='string'||url.length>32768||/[\x00-\x1f\x7f]/.test(url)||!/^magnet:\?/i.test(url))throw Error('This magnet link cannot be captured.');
+      if((await chrome.storage.local.get('handoffState')).handoffState?.enabled===false)throw Error('Enable Downshift capture to open magnet links.');
+      const app=await ensureApp();if(!app.capabilities?.magnetLinks)throw Error('Close the old Downshift window and open the updated Desktop shortcut, then retry.');
+      const result=await connection.request({version:1,command:'torrent',url});if(!result?.ok)throw Error(result?.error||'Could not open this magnet link.');return result;
     })();
   }
   else if(message.type==="link") {

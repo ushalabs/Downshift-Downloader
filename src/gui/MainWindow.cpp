@@ -6,6 +6,8 @@
 #include <QMimeData>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QKeyEvent>
 #include <QDesktopServices>
 #include <QStandardPaths>
 #include "Brand.h"
@@ -13,6 +15,8 @@
 #include "Design.h"
 #include "DownloadDelegate.h"
 #include "core/DownloadQueue/Categories.h"
+#include "core/DownloadQueue/MediaContext.h"
+#include "core/DownloadQueue/MediaResume.h"
 #include <QShortcut>
 #include <QAction>
 #include "core/DownloadQueue/VideoUrl.h"
@@ -24,6 +28,7 @@
 #include <QFormLayout>
 #include <QDateTime>
 #include <QTabWidget>
+#include <QStackedWidget>
 #include <QClipboard>
 #include <QGridLayout>
 #include <QNetworkAccessManager>
@@ -48,13 +53,36 @@
 #include <numeric>
 namespace downshift {
 namespace {
+class DownloadTable final:public QTableWidget {
+    bool adjusting_=false,pending_=false;
+    void alignScrollBar(){
+        auto* container=verticalScrollBar()->parentWidget();
+        if(!container||adjusting_)return;
+        auto area=container->geometry();area.setTop(viewport()->mapTo(container->parentWidget(),QPoint{}).y());
+        if(area==container->geometry()||area.height()<1)return;
+        adjusting_=true;container->setGeometry(area);adjusting_=false;
+    }
+    bool eventFilter(QObject* object,QEvent* event)override{
+        if(!adjusting_&&!pending_&&(event->type()==QEvent::Resize||event->type()==QEvent::Move)){
+            pending_=true;QTimer::singleShot(0,this,[this]{pending_=false;alignScrollBar();});
+        }
+        return QTableWidget::eventFilter(object,event);
+    }
+    void updateGeometries()override{QTableWidget::updateGeometries();alignScrollBar();}
+    void mousePressEvent(QMouseEvent* event)override{setProperty("detailsAllowed",event->button()!=Qt::RightButton);QTableWidget::mousePressEvent(event);}
+    void keyPressEvent(QKeyEvent* event)override{setProperty("detailsAllowed",true);QTableWidget::keyPressEvent(event);}
+public:
+    DownloadTable():QTableWidget(0,11){setProperty("detailsAllowed",true);verticalScrollBar()->parentWidget()->installEventFilter(this);}
+};
 QString bytes(std::uint64_t n) {
     double value=static_cast<double>(n); const char* units[]={"B","KiB","MiB","GiB","TiB"}; int unit=0;
     while(value>=1024 && unit<4) {value/=1024; ++unit;} return QString("%1 %2").arg(value,0,'f',unit ? 1 : 0).arg(units[unit]);
 }
 QString duration(double seconds) { if(!std::isfinite(seconds) || seconds<0) return "—"; const auto n=static_cast<qint64>(seconds); if(n>=3600) return QString("%1h %2m").arg(n/3600).arg((n/60)%60); if(n>=60) return QString("%1m %2s").arg(n/60).arg(n%60); return QString("%1s").arg(n); }
 }
-void MainWindow::openVideo(QString address,QString title,QString folder) {
+void MainWindow::openVideo(QString address,QString title,QString folder,QJsonObject context,QString filename) {
+    if(!validMediaContext(context)){message("The video request context is invalid. Refresh its page and retry.",true);return;}
+    if(context.contains("youtube") && youtubeVideo(address)!="https://www.youtube.com/watch?v="+context.value("youtube").toObject().value("id").toString()){message("The browser video no longer matches this page. Refresh its page and retry.",true);return;}
     if(youtubeHost(QUrl(address).host())) {
         const auto canonical=youtubeVideo(address);
         if(canonical.isEmpty()){message("Open a specific YouTube video and use its Download this video button, or paste its watch/shorts link.",true);return;}
@@ -62,9 +90,22 @@ void MainWindow::openVideo(QString address,QString title,QString folder) {
     }
     const QUrl url(address);
     if(!url.isValid() || (url.scheme()!="https" && url.scheme()!="http") || url.host().isEmpty() || !url.userInfo().isEmpty() || address.size()>32768 || address.contains(QChar(0))){message("Enter an HTTP or HTTPS video address without a username or password.",true);return;}
-    int count=0;for(auto* child:findChildren<QDialog*>(QString(),Qt::FindDirectChildrenOnly))if(auto* dialog=dynamic_cast<MediaDialog*>(child)){++count;if(dialog->property("mediaUrl").toString()==address){dialog->showNormal();dialog->raise();dialog->activateWindow();return;}}
-    if(count>=4){message("Close an existing video window before opening another.",true);return;}
-    auto* dialog=new MediaDialog(queue_,std::move(address),std::move(title),this,std::move(folder));dialog->show();dialog->raise();dialog->activateWindow();
+    int count=0;for(auto* child:findChildren<QDialog*>(QString(),Qt::FindDirectChildrenOnly))if(auto* dialog=dynamic_cast<MediaDialog*>(child)){++count;if(dialog->property("mediaUrl").toString()==address){dialog->refreshBrowserSource(context);dialog->present();return;}}
+    if(count>=4){message("Finish or cancel an existing video task before opening another.",true);return;}
+    auto* dialog=new MediaDialog(queue_,std::move(address),std::move(title),this,std::move(folder),std::move(context));dialog->setDownloadName(filename);dialog->present();
+}
+void MainWindow::showDownloads(){showNormal();raise();activateWindow();for(auto* child:findChildren<QWidget*>(QString(),Qt::FindDirectChildrenOnly))if(child->property("showFromTray").toBool()){child->setProperty("showFromTray",false);child->show();}}
+void MainWindow::resumeVideo(const QueueEntry& entry){
+    for(auto* child:findChildren<QDialog*>("mediaDialog"))if(child->property("mediaId").toString()==entry.id)if(auto* media=dynamic_cast<MediaDialog*>(child)){media->resume();return;}
+    if(!validMediaResume(entry.videoMetadata.value("resumeRecipe").toObject())){openVideo(entry.url,entry.mediaTitle,entry.mediaFolder,entry.videoMetadata.value("requestContext").toObject(),entry.videoMetadata.value("downloadName").toString());return;}
+    auto* media=new MediaDialog(queue_,entry.url,entry.mediaTitle,this,entry.mediaFolder,entry.videoMetadata.value("requestContext").toObject(),entry);media->resume();media->present();
+}
+void MainWindow::requestExit(){
+    if(exitRequested_){close();return;}
+    const bool active=std::any_of(current_.entries.begin(),current_.entries.end(),[](const auto& e){return e.status==QueueStatus::Running||e.status==QueueStatus::Queued;})||std::any_of(torrentRows_.begin(),torrentRows_.end(),[](const auto& e){return torrentActive(e);});
+    bool mediaActive=false;for(auto* child:findChildren<QDialog*>("mediaDialog"))if(auto* media=dynamic_cast<MediaDialog*>(child);media&&media->active())mediaActive=true;
+    if((active||mediaActive)&&QMessageBox::question(this,"Exit Downshift","Exit Downshift and stop ongoing downloads? Choose No to keep downloading in the background.",QMessageBox::Yes|QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes)return;
+    exitRequested_=true;QApplication::setQuitOnLastWindowClosed(true);close();
 }
 QPushButton* makeButton(const QString& text,const char* name,QWidget* parent) { auto* b=new QPushButton(text,parent); b->setObjectName(name); b->setCursor(Qt::PointingHandCursor); b->setMinimumHeight(36); return b; }
 MainWindow::MainWindow(QueueManager& queue,QWidget* parent,QNetworkAccessManager* previewNetwork):QMainWindow(parent),queue_(queue) {
@@ -97,9 +138,9 @@ MainWindow::MainWindow(QueueManager& queue,QWidget* parent,QNetworkAccessManager
     banner_=new Notification(content);
     auto* list=new QWidget; auto* listLayout=new QVBoxLayout(list); listLayout->setContentsMargins(0,0,0,0);
     emptyPanel_=new QWidget;emptyPanel_->setObjectName("emptyPanel");auto* emptyLayout=new QVBoxLayout(emptyPanel_);emptyLayout->setAlignment(Qt::AlignCenter);emptyLayout->setSpacing(12);auto* illustration=new QLabel;illustration->setAlignment(Qt::AlignCenter);illustration->setPixmap(lineIcon(Symbol::Download,QColor("#e91e79")).pixmap(48,48));emptyLayout->addWidget(illustration);empty_=new QLabel("Loading saved downloads…");empty_->setObjectName("emptyState");empty_->setAlignment(Qt::AlignCenter);emptyLayout->addWidget(empty_);emptyHelp_=new QLabel("Your history is being opened.");emptyHelp_->setWordWrap(true);emptyHelp_->setAlignment(Qt::AlignCenter);emptyHelp_->setObjectName("muted");emptyLayout->addWidget(emptyHelp_);emptyAdd_=makeButton("Add download","emptyAdd");emptyAdd_->setProperty("primary",true);emptyAdd_->setEnabled(false);emptyLayout->addWidget(emptyAdd_,0,Qt::AlignCenter);connect(emptyAdd_,&QPushButton::clicked,this,[this]{if(page_==4)openTorrent();else openAdd();});listLayout->addWidget(emptyPanel_,1);
-    table_=new QTableWidget(0,11);table_->setObjectName("downloadTable");table_->setHorizontalHeaderLabels({"Name","Size","Downloaded","Progress","Speed","Time left","Connections","Status","Type / Priority","Added",""});table_->setEditTriggers(QAbstractItemView::NoEditTriggers);table_->setSelectionBehavior(QAbstractItemView::SelectRows);table_->setSelectionMode(QAbstractItemView::SingleSelection);table_->setShowGrid(false);table_->verticalHeader()->hide();table_->verticalHeader()->setDefaultSectionSize(64);table_->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft|Qt::AlignVCenter);table_->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);table_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::Stretch);for(const auto& pair:std::vector<std::pair<int,int>>{{1,86},{2,95},{3,122},{4,100},{5,82},{6,90},{7,114},{8,70},{9,92},{10,34}})table_->setColumnWidth(pair.first,pair.second);table_->setItemDelegate(new DownloadDelegate(table_));table_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);table_->setContextMenuPolicy(Qt::CustomContextMenu);listLayout->addWidget(table_);table_->hide();layout->addWidget(list,1);
+    table_=new DownloadTable;table_->setObjectName("downloadTable");table_->setHorizontalHeaderLabels({"Name","Size","Downloaded","Progress","Speed","Time left","Connections","Status","Type / Priority","Added",""});table_->setEditTriggers(QAbstractItemView::NoEditTriggers);table_->setSelectionBehavior(QAbstractItemView::SelectRows);table_->setSelectionMode(QAbstractItemView::SingleSelection);table_->setShowGrid(false);table_->verticalHeader()->hide();table_->verticalHeader()->setDefaultSectionSize(64);table_->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft|Qt::AlignVCenter);table_->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);table_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::Stretch);for(const auto& pair:std::vector<std::pair<int,int>>{{1,86},{2,95},{3,122},{4,100},{5,82},{6,90},{7,114},{8,70},{9,92},{10,34}})table_->setColumnWidth(pair.first,pair.second);table_->setItemDelegate(new DownloadDelegate(table_));table_->setColumnWidth(7,DownloadDelegate::statusColumnWidth(table_->font()));table_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);table_->setContextMenuPolicy(Qt::CustomContextMenu);listLayout->addWidget(table_);table_->hide();layout->addWidget(list,1);
     table_->setMouseTracking(true);table_->setColumnHidden(2,true);table_->setColumnHidden(5,true);table_->setColumnHidden(6,true);table_->setColumnHidden(8,true);
-    connect(table_,&QTableWidget::cellClicked,this,[this](int,int col){if(col==10)more();});
+    connect(table_,&QTableWidget::cellClicked,this,[this](int,int col){if(!table_->property("detailsAllowed").toBool())return;if(col==10)more();else details();});
     connect(table_,&QTableWidget::cellDoubleClicked,this,[this](int,int){if(const auto* e=selected();e&&e->status==QueueStatus::Completed){const auto file=e->destination;auto* confirm=new QMessageBox(QMessageBox::Question,"Open downloaded file","Open this file with its Windows application?\n\n"+QFileInfo(file).fileName(),QMessageBox::Yes|QMessageBox::No,this);confirm->setAttribute(Qt::WA_DeleteOnClose);confirm->setDefaultButton(QMessageBox::No);connect(confirm,&QMessageBox::finished,this,[this,file](int answer){if(answer==QMessageBox::Yes&&!QDesktopServices::openUrl(QUrl::fromLocalFile(file)))message("Windows could not open this file.",true);});confirm->open();}});
     connect(table_,&QTableWidget::itemSelectionChanged,this,&MainWindow::details); connect(table_,&QTableWidget::customContextMenuRequested,this,[this](const QPoint&){more();});
     retryHistory_=makeButton("Retry loading","retryHistory");retryHistory_->hide();emptyLayout->addWidget(retryHistory_,0,Qt::AlignCenter);connect(retryHistory_,&QPushButton::clicked,this,[this]{retryHistory_->setEnabled(false);empty_->setText("Loading saved downloads…");emptyHelp_->setText("Opening the existing database; download files are preserved.");watch(queue_.retryLoading(),[this]{banner_->hide();refresh();});});
@@ -115,14 +156,13 @@ MainWindow::MainWindow(QueueManager& queue,QWidget* parent,QNetworkAccessManager
     auto* detail=new QWidget;auto* dl=new QVBoxLayout(detail);dl->setContentsMargins(0,0,0,0);detailTabs_=new QTabWidget;detailTabs_->setObjectName("downloadDetailsTabs");dl->addWidget(detailTabs_);auto* overview=new QWidget;auto* grid=new QGridLayout(overview);grid->setContentsMargins(2,6,2,2);grid->setHorizontalSpacing(16);grid->setVerticalSpacing(3);
     const QStringList names={"Source","Destination","Size","Downloaded","Speed","Average speed","Elapsed","Time left","Connections","Verified bytes","Resume","Error"};
     for(int i=0;i<names.size();++i){auto* label=new QLabel("—");label->setObjectName("detail"+QString::number(i));label->setTextFormat(Qt::PlainText);label->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);label->setMinimumWidth(0);label->setWordWrap(true);label->setMaximumHeight(36);label->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);auto* caption=new QLabel(names[i]);caption->setObjectName("muted");const int column=i%4,row=(i/4)*2;grid->addWidget(caption,row,column);grid->addWidget(label,row+1,column);grid->setColumnStretch(column,1);detailLabels_.emplace_back(names[i],label);}
-    detailTabs_->addTab(overview,"Overview");connectionInfo_=new QLabel;connectionInfo_->setWordWrap(true);connectionInfo_->setMargin(10);detailTabs_->addTab(connectionInfo_,"Connections");taskLog_=new QLabel;taskLog_->setTextFormat(Qt::PlainText);taskLog_->setWordWrap(true);taskLog_->setMargin(10);detailTabs_->addTab(taskLog_,"Task status");
+    detailTabs_->addTab(overview,"Overview");connectionInfo_=new QLabel;connectionInfo_->setWordWrap(true);connectionInfo_->setMargin(10);detailTabs_->addTab(connectionInfo_,"Connections");taskLog_=new QLabel;taskLog_->setTextFormat(Qt::PlainText);taskLog_->setWordWrap(true);taskLog_->setMargin(10);detailTabs_->addTab(taskLog_,"Task status");torrentDetailsStack_=new QStackedWidget;dl->addWidget(torrentDetailsStack_);torrentDetailsStack_->hide();
     detailScroll_=new QScrollArea;detailScroll_->setWidgetResizable(true);detailScroll_->setFrameShape(QFrame::NoFrame);detailScroll_->setWidget(detail);detailScroll_->setMaximumHeight(168);detailLayout->addWidget(detailScroll_);layout->addWidget(detailsContainer_);detailsContainer_->hide();
     connect(detailToggle_,&QPushButton::toggled,this,[this](bool expanded){detailScroll_->setVisible(expanded);detailToggle_->setIcon(lineIcon(expanded?Symbol::Chevron:Symbol::ChevronUp));detailToggle_->setToolTip(expanded?"Collapse details":"Expand details");if(const auto* e=selected())preview(e);});
-    connect(detailToggle_,&QPushButton::clicked,this,[this]{if(const auto* row=selectedTorrent())showTorrentDetails(*torrents_,row->id,this);});
     thumbnails_=previewNetwork?previewNetwork:new QNetworkAccessManager(this);
     connect(sourceLink_,&QPushButton::clicked,this,[this]{const auto url=sourceLink_->property("originalPage").toUrl();if(url.isValid()&&(url.scheme()=="http"||url.scheme()=="https")&&url.userInfo().isEmpty())QDesktopServices::openUrl(url);});
-    tray_=new QSystemTrayIcon(windowIcon(),this); tray_->setToolTip("Downshift"); if(QSystemTrayIcon::isSystemTrayAvailable()) tray_->show();
-    connect(tray_,&QSystemTrayIcon::activated,this,[this](QSystemTrayIcon::ActivationReason r){if(r==QSystemTrayIcon::Trigger){showNormal();raise();activateWindow();}});
+    tray_=new QSystemTrayIcon(windowIcon(),this);tray_->setObjectName("systemTray");tray_->setToolTip("Downshift");auto* trayMenu=new QMenu(this);trayMenu->setObjectName("trayMenu");trayMenu->addAction("Show Downshift",this,&MainWindow::showDownloads);trayMenu->addSeparator();auto* exit=trayMenu->addAction("Exit Downshift",this,&MainWindow::requestExit);exit->setObjectName("trayExit");tray_->setContextMenu(trayMenu);
+    connect(tray_,&QSystemTrayIcon::activated,this,[this](QSystemTrayIcon::ActivationReason r){if(r==QSystemTrayIcon::Trigger||r==QSystemTrayIcon::DoubleClick)showDownloads();});
     theme(false); details();
     const auto shortcut=[&](const QKeySequence& keys,const std::function<void()>& action){auto* key=new QShortcut(keys,this);connect(key,&QShortcut::activated,this,action);};shortcut(QKeySequence("Ctrl+N"),[this]{if(page_==4)openTorrent();else openAdd();});shortcut(QKeySequence("Ctrl+F"),[this]{search_->setFocus();search_->selectAll();});shortcut(QKeySequence("Ctrl+,"),[this]{openSettings();});shortcut(QKeySequence("Escape"),[this]{table_->clearSelection();table_->setCurrentCell(-1,-1);details();});
     auto* timer=new QTimer(this); timer->setInterval(250); connect(timer,&QTimer::timeout,this,&MainWindow::refresh); timer->start(); refresh();
@@ -137,6 +177,8 @@ void MainWindow::refresh() {
     pending_.emplace(queue_.snapshot());
 }
 void MainWindow::apply(const QueueSnapshot& snapshot) {
+    const bool keep=!exitRequested_&&snapshot.settings.closeToTray&&QSystemTrayIcon::isSystemTrayAvailable();QApplication::setQuitOnLastWindowClosed(!keep);
+    tray_->setVisible(QSystemTrayIcon::isSystemTrayAvailable()&&!testAttribute(Qt::WA_DontShowOnScreen)&&!QApplication::arguments().contains("--smoke-test"));
     for(const auto& e:snapshot.entries)if(!e.handoffKey.isEmpty() && e.status==QueueStatus::Paused && e.error=="Choose where to save this download."){
         const auto old=std::find_if(current_.entries.begin(),current_.entries.end(),[&](const auto& row){return row.id==e.id;});
         if(old==current_.entries.end() || old->status==QueueStatus::Prepared)QTimer::singleShot(0,this,[this,e]{confirmDownload(e);});
@@ -203,22 +245,24 @@ void MainWindow::filter() {
 void MainWindow::details() {
     detailToggle_->setIcon(lineIcon(detailToggle_->isChecked()?Symbol::Chevron:Symbol::ChevronUp));
     if(const auto* row=selectedTorrent()){
-        start_->setText(row->metadataOnly?(row->metadata?"Choose files":"Find metadata"):"Resume");start_->setEnabled(!torrentClosing_&&!torrentBusy_&&row->state!=torrent::State::Cancelled&&(row->metadataOnly||(row->state!=torrent::State::Seeding&&row->state!=torrent::State::Downloading)));
-        pause_->setEnabled(!torrentClosing_&&!torrentBusy_&&torrentActive(*row));cancel_->setEnabled(!torrentClosing_&&!torrentBusy_&&row->state!=torrent::State::Cancelled&&row->state!=torrent::State::Complete&&row->state!=torrent::State::Seeding);more_->setEnabled(!torrentClosing_&&!torrentBusy_);detailsContainer_->show();detailScroll_->setVisible(detailToggle_->isChecked());detailToggle_->setCheckable(true);detailToggle_->setText("");detailToggle_->setToolTip("Open torrent overview, files, trackers and peers");
-        preview(nullptr);detailTitle_->setText(detailTitle_->fontMetrics().elidedText(row->name,Qt::ElideRight,qMax(100,detailTitle_->width())));detailTitle_->setToolTip(row->name);sourceLink_->setText("Torrent · "+QString::number(row->files.size())+" files · "+torrentStateText(*row));sourceLink_->setEnabled(false);detailCopy_->setEnabled(false);detailAction_->setEnabled(start_->isEnabled()||pause_->isEnabled());detailAction_->setIcon(lineIcon(pause_->isEnabled()?Symbol::Pause:Symbol::Resume));
+        start_->setText(row->state==torrent::State::Complete?"Completed":row->state==torrent::State::Seeding?"Seeding":row->verifyingCompletion?"Verifying":row->metadataOnly?(row->metadata?"Choose files":"Find metadata"):"Resume");start_->setEnabled(!torrentClosing_&&!torrentBusy_&&!row->verifyingCompletion&&row->state!=torrent::State::Complete&&row->state!=torrent::State::Cancelled&&(row->metadataOnly||(row->state!=torrent::State::Seeding&&row->state!=torrent::State::Downloading)));
+        pause_->setEnabled(!torrentClosing_&&!torrentBusy_&&!row->verifyingCompletion&&torrentActive(*row));cancel_->setEnabled(!torrentClosing_&&!torrentBusy_&&row->state!=torrent::State::Cancelled&&row->state!=torrent::State::Complete&&row->state!=torrent::State::Seeding);more_->setEnabled(!torrentClosing_&&!torrentBusy_);if(!table_->property("detailsAllowed").toBool()&&(!detailsContainer_->isVisible()||detailsContainer_->property("downloadId").toString()!=row->id)){detailsContainer_->hide();return;}detailsContainer_->setProperty("downloadId",row->id);detailsContainer_->show();detailScroll_->setVisible(detailToggle_->isChecked());detailToggle_->setCheckable(true);detailToggle_->setText("");detailToggle_->setToolTip(detailToggle_->isChecked()?"Collapse details":"Expand details");torrentDetails(row->id);
+        preview(nullptr);detailTitle_->setText(detailTitle_->fontMetrics().elidedText(row->name,Qt::ElideRight,qMax(100,detailTitle_->width())));detailTitle_->setToolTip(row->name);sourceLink_->setText("Torrent · "+QString::number(row->files.size())+" files · "+torrentStateText(*row));sourceLink_->setEnabled(false);detailCopy_->setEnabled(false);detailAction_->setEnabled(start_->isEnabled()||pause_->isEnabled());detailAction_->setIcon(lineIcon(pause_->isEnabled()?Symbol::Pause:Symbol::Resume));detailAction_->setToolTip(row->state==torrent::State::Complete?"Completed":pause_->isEnabled()?"Pause":"Resume");
         const QStringList values={"Torrent",row->directory,bytes(static_cast<std::uint64_t>(row->selectedBytes)),bytes(static_cast<std::uint64_t>(row->verifiedBytes)),bytes(static_cast<std::uint64_t>(row->downloadBytesPerSecond))+"/s","↑ "+bytes(static_cast<std::uint64_t>(row->uploadBytesPerSecond))+"/s",QString("Ratio %1").arg(row->ratio,0,'f',2),row->downloadBytesPerSecond>0?duration(static_cast<double>(row->selectedBytes-row->verifiedBytes)/row->downloadBytesPerSecond):QString("—"),QString("%1 peers / %2 seeds").arg(row->peers).arg(row->seeds),bytes(static_cast<std::uint64_t>(row->verifiedBytes)),torrentStateText(*row),row->error.isEmpty()?QString("None"):row->error};
         for(std::size_t i=0;i<detailLabels_.size();++i){detailLabels_[i].second->setText(values[static_cast<int>(i)]);detailLabels_[i].second->setToolTip(values[static_cast<int>(i)]);}
-        detailTabs_->setTabVisible(1,true);detailTabs_->setTabText(1,"Peers & seeding");connectionInfo_->setText(QString("%1 connected peers · %2 seeds\nUpload %3/s · Ratio %4 · Seeding %5 s\nOpen torrent details for individual peers, files and tracker status.").arg(row->peers).arg(row->seeds).arg(bytes(static_cast<std::uint64_t>(row->uploadBytesPerSecond))).arg(row->ratio,0,'f',3).arg(row->seedingSeconds));taskLog_->setText(torrentStateText(*row)+(row->error.isEmpty()?QString():"\n"+row->error));return;
+        return;
     }
-    detailToggle_->setCheckable(true);detailToggle_->setText("");detailToggle_->setToolTip("Expand or collapse download details");
-    const auto* e=selected();start_->setText(e && (e->media || (!e->browserTransfer && !youtubeVideo(e->url).isEmpty())) ? "Retry video":"Resume"); start_->setEnabled(e && e->status!=QueueStatus::Completed && e->status!=QueueStatus::Running && e->status!=QueueStatus::Prepared); pause_->setEnabled(e && !e->media && (e->status==QueueStatus::Running || e->status==QueueStatus::Queued)); cancel_->setEnabled(e && (e->media ? e->status==QueueStatus::Running:e->status!=QueueStatus::Completed && e->status!=QueueStatus::Cancelled && e->status!=QueueStatus::Prepared)); more_->setEnabled(e!=nullptr);
+    const auto* e=selected();MediaDialog* mediaTask=nullptr;if(e&&e->media)for(auto* child:findChildren<QDialog*>("mediaDialog"))if(child->property("mediaId").toString()==e->id)mediaTask=dynamic_cast<MediaDialog*>(child);const bool retained=e&&e->media&&e->status==QueueStatus::Paused&&validMediaResume(e->videoMetadata.value("resumeRecipe").toObject());start_->setText(e && ((e->media&&!retained&&e->status!=QueueStatus::Running&&e->status!=QueueStatus::Completed)||(!e->media&&!e->browserTransfer&&!youtubeVideo(e->url).isEmpty())) ? "Retry video":"Resume"); start_->setEnabled(e && e->status!=QueueStatus::Completed && e->status!=QueueStatus::Running && e->status!=QueueStatus::Prepared); pause_->setEnabled(e && (e->media ? mediaTask&&mediaTask->canPause():(e->status==QueueStatus::Running || e->status==QueueStatus::Queued))); cancel_->setEnabled(e && (e->media ? (e->status==QueueStatus::Running||e->status==QueueStatus::Paused):e->status!=QueueStatus::Completed && e->status!=QueueStatus::Cancelled && e->status!=QueueStatus::Prepared)); more_->setEnabled(e!=nullptr);
+    if(e&&!table_->property("detailsAllowed").toBool()&&(!detailsContainer_->isVisible()||detailsContainer_->property("downloadId").toString()!=e->id)){detailsContainer_->hide();return;}
+    if(e)detailsContainer_->setProperty("downloadId",e->id);
+    torrentDetailsStack_->hide();detailTabs_->show();detailScroll_->setMaximumHeight(168);detailToggle_->setCheckable(true);detailToggle_->setText("");detailToggle_->setToolTip(detailToggle_->isChecked()?"Collapse details":"Expand details");
     detailsContainer_->setVisible(e!=nullptr);preview(e);if(!e) {detailTitle_->setText("Select a download");for(auto& [name,label]:detailLabels_)label->setText("—");return;}
     detailScroll_->setVisible(detailToggle_->isChecked());
     const auto& p=e->progress; const auto title=e->media&&!e->mediaTitle.isEmpty()?e->mediaTitle:QFileInfo(e->destination).fileName();detailTitle_->setText(detailTitle_->fontMetrics().elidedText(title,Qt::ElideRight,qMax(100,detailTitle_->width())));detailTitle_->setToolTip(title);
     detailCopy_->setEnabled(true);detailAction_->setEnabled(e->status==QueueStatus::Completed||start_->isEnabled()||pause_->isEnabled());detailAction_->setIcon(lineIcon(e->status==QueueStatus::Completed?Symbol::Program:pause_->isEnabled()?Symbol::Pause:Symbol::Resume));detailAction_->setToolTip(e->status==QueueStatus::Completed?"Open file…":pause_->isEnabled()?"Pause":"Resume or retry");
     detailTabs_->setTabVisible(1,!e->media);detailTabs_->setTabText(1,"Connections");connectionInfo_->setText(QString("%1 active / %2 target connections\n%3 verified\n%4").arg(p.activeRanges).arg(p.targetConnections).arg(bytes(p.verifiedBytes),p.resumable?"Range checkpoints are verified before reuse.":"This source requires a fresh transfer when it cannot resume."));taskLog_->setText(statusText(e->status)+" · Added "+QDateTime::fromSecsSinceEpoch(e->created).toString(Qt::ISODate)+(e->error.isEmpty()?QString():"\n"+e->error));
     const QStringList text={QUrl(e->url).adjusted(QUrl::RemoveQuery|QUrl::RemoveFragment|QUrl::RemoveUserInfo).toDisplayString(),e->destination,p.totalBytes ? bytes(*p.totalBytes):"Unknown",bytes(p.downloadedBytes),e->status==QueueStatus::Running ? bytes(static_cast<std::uint64_t>(p.smoothedBytesPerSecond))+"/s":"—",bytes(static_cast<std::uint64_t>(p.averageBytesPerSecond))+"/s",duration(p.elapsedSeconds),p.etaSeconds ? duration(*p.etaSeconds):"—",QString("%1 active / %2 target").arg(p.activeRanges).arg(p.targetConnections),bytes(p.verifiedBytes),p.resumable ? "Supported; verified before reuse":"Requires server validation; some files need Restart",e->error.isEmpty() ? "None":e->error};
-    for(std::size_t i=0;i<detailLabels_.size();++i){const auto value=e->media && i==10 ? QString("Retry starts a fresh video transfer; incomplete streams are removed."):text[static_cast<int>(i)];detailLabels_[i].second->setText(value);detailLabels_[i].second->setToolTip(value);}
+    for(std::size_t i=0;i<detailLabels_.size();++i){const auto value=e->media && i==10 ? (retained||mediaTask&&mediaTask->canPause()?QString("Pause retains partial files; Resume continues this video."):QString("Retry starts a fresh transfer after failure or cancellation.")):text[static_cast<int>(i)];detailLabels_[i].second->setText(value);detailLabels_[i].second->setToolTip(value);}
 }
 void MainWindow::message(const QString& text,bool error) {static_cast<Notification*>(banner_)->present(text,error?Notice::Critical:Notice::Success);}
 void MainWindow::watchTorrent(std::future<void> future){
@@ -227,12 +271,12 @@ void MainWindow::watchTorrent(std::future<void> future){
 }
 void MainWindow::perform(QueueAction action) {
     if(const auto* row=selectedTorrent()){
-        const auto id=row->id;if(action==QueueAction::Start){if(row->metadataOnly&&row->metadata){showTorrentDetails(*torrents_,id,this);return;}watchTorrent(torrents_->resume(id));}
+        const auto id=row->id;if(action==QueueAction::Start){if(row->state==torrent::State::Complete||row->verifyingCompletion)return;if(row->metadataOnly&&row->metadata){detailToggle_->setChecked(true);torrentDetails(id);return;}watchTorrent(torrents_->resume(id));}
         else if(action==QueueAction::Pause)watchTorrent(torrents_->pause(id));else if(action==QueueAction::Cancel)watchTorrent(torrents_->cancel(id));return;
     }
     if(const auto* e=selected()) {
     if(!e->media && !e->browserTransfer && !youtubeVideo(e->url).isEmpty() && action==QueueAction::Start){openVideo(e->url,"YouTube video");return;}
-    if(e->media){if(action==QueueAction::Start)openVideo(e->url,e->mediaTitle,e->mediaFolder);else if(action==QueueAction::Cancel)for(auto* dialog:findChildren<QDialog*>("mediaDialog"))if(dialog->property("mediaUrl").toString()==e->url)if(auto* media=dynamic_cast<MediaDialog*>(dialog))media->stop();return;}
+    if(e->media){if(action==QueueAction::Start){if(e->status==QueueStatus::Paused)resumeVideo(*e);else openVideo(e->url,e->mediaTitle,e->mediaFolder,e->videoMetadata.value("requestContext").toObject(),e->videoMetadata.value("downloadName").toString());}else {bool found=false;for(auto* dialog:findChildren<QDialog*>("mediaDialog"))if(dialog->property("mediaId").toString()==e->id)if(auto* media=dynamic_cast<MediaDialog*>(dialog)){found=true;if(action==QueueAction::Pause)media->pause();else if(action==QueueAction::Cancel)media->stop();}if(!found&&action==QueueAction::Cancel&&e->status==QueueStatus::Paused)watch(queue_.finishMedia(e->id,QueueStatus::Cancelled,{},"Cancelled. Incomplete video files removed."),[](const QString&){});}return;}
     watch(queue_.action(e->id,action),[this]{banner_->hide();});
 }}
 void MainWindow::dragEnterEvent(QDragEnterEvent* event){

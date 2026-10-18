@@ -1,0 +1,197 @@
+{
+  "date": "2026-10-16",
+  "version": "0.4.4",
+  "checkoutHead": "d45264da63a1f5d5185416d8f67310aa9f86d0fe",
+  "workingTreeUncommitted": true,
+  "gitMutations": false,
+  "scope": [
+    "Browse loads local torrent metadata immediately",
+    "Read metadata appears only for magnet input",
+    "One Start download action after file selection, without a checkbox, in both preview dialogs",
+    "Native independent bootstrap/tracker routes and discovery diagnostics"
+  ],
+  "release": {
+    "groups": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "tests": [
+      {
+        "name": "torrent.discovery",
+        "seconds": 3.83532,
+        "checks": [
+          "28"
+        ]
+      },
+      {
+        "name": "torrent.failure",
+        "seconds": 3.95687,
+        "checks": [
+          "22"
+        ]
+      },
+      {
+        "name": "torrent.gui",
+        "seconds": 18.9341,
+        "checks": [
+          "73"
+        ]
+      },
+      {
+        "name": "torrent.management",
+        "seconds": 121.953,
+        "checks": []
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 16.7904,
+        "checks": [
+          "142"
+        ]
+      },
+      {
+        "name": "torrent.acceptance",
+        "seconds": 20.2296,
+        "checks": [
+          "191"
+        ]
+      },
+      {
+        "name": "foundation.gui.minimal",
+        "seconds": 1.231,
+        "checks": []
+      },
+      {
+        "name": "foundation.gui.windows",
+        "seconds": 1.17974,
+        "checks": []
+      }
+    ]
+  },
+  "debug": {
+    "groups": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "tests": [
+      {
+        "name": "torrent.discovery",
+        "seconds": 4.43523,
+        "checks": [
+          "28"
+        ]
+      },
+      {
+        "name": "torrent.failure",
+        "seconds": 3.92212,
+        "checks": [
+          "22"
+        ]
+      },
+      {
+        "name": "torrent.gui",
+        "seconds": 22.1966,
+        "checks": [
+          "73"
+        ]
+      },
+      {
+        "name": "torrent.management",
+        "seconds": 122.934,
+        "checks": []
+      },
+      {
+        "name": "torrent.foundation",
+        "seconds": 17.6049,
+        "checks": [
+          "142"
+        ]
+      },
+      {
+        "name": "torrent.acceptance",
+        "seconds": 21.6581,
+        "checks": [
+          "191"
+        ]
+      },
+      {
+        "name": "foundation.gui.minimal",
+        "seconds": 1.61748,
+        "checks": []
+      },
+      {
+        "name": "foundation.gui.windows",
+        "seconds": 1.66172,
+        "checks": []
+      }
+    ]
+  },
+  "builds": {
+    "Release": {
+      "sourceFingerprintMatches": true,
+      "applicationSha256": "3449a389b4f2930b01f420c9219844fbe5f4f2f07c751504594007938a6d0abc"
+    },
+    "Debug": {
+      "sourceFingerprintMatches": true,
+      "applicationSha256": "ebe48fd69c5313dd6a5d231fa3046ed1be64edbd1ebb8ca988a53f1c1231444b"
+    }
+  },
+  "publicMetadataProbe": {
+    "source": {
+      "source": "https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/debian-13.7.0-amd64-netinst.iso.torrent",
+      "metadataSha256": "690700ed8de8d0987fcf8c136507471b1588b996696ca34f9cf972ee09b849e0",
+      "trackers": 1
+    },
+    "timeoutSeconds": 60,
+    "exitCode": 0,
+    "wallSeconds": 4.89100000000326,
+    "metadataResolved": true,
+    "peakPeers": 5,
+    "peakDhtNodes": 0,
+    "peakRespondingTrackers": 1,
+    "normalQueueUsed": false,
+    "payloadBytes": 0,
+    "payloadFiles": 0,
+    "independentReceivedInfoHashMatchesOfficial": true
+  },
+  "publicPartialPayloadProbe": {
+    "source": {
+      "source": "https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/debian-13.7.0-amd64-netinst.iso.torrent",
+      "metadataSha256": "690700ed8de8d0987fcf8c136507471b1588b996696ca34f9cf972ee09b849e0",
+      "trackers": 1
+    },
+    "durationLimitSeconds": 60,
+    "exitCode": 3,
+    "completeFile": false,
+    "publicPeersPeak": 28,
+    "publicSeedsPeak": 28,
+    "independentlyVerifiedPieces": 1294,
+    "independentlyVerifiedBytes": 339214336,
+    "method": "Independent SHA-1 reread of every checkpointed have-piece against original HTTPS torrent metadata; not a full ISO hash",
+    "normalQueueUsed": false
+  },
+  "sourceDiagnosis": "User confirmed original source also stalled in another client; different source works. No general native payload failure established.",
+  "preservation": {
+    "httpHistoryRecords": 15,
+    "httpPausedTasks": 1,
+    "httpActiveTasksAtRestart": 0,
+    "exactEncryptedHttpStateUnchanged": true,
+    "pausedPhysicalFilesAndCheckpointsUnchanged": true,
+    "realTorrentRecordsAndPhysicalFilesUnchanged": 2,
+    "protectedHttpSourceFilesUnchanged": 30,
+    "normalPhysicalStoreMatches": true
+  },
+  "limits": [
+    "Public ISO transfer was partial, not full ISO completion",
+    "Hidden Qt file-picker fixture; no claim of automated interaction with normal user file picker",
+    "No fresh actual Chrome run: browser sources unchanged by this follow-up",
+    "No new portable package, remote CI or publication; previous T4 preview predates these repairs"
+  ],
+  "evidenceLogs": [
+    "build/torrent-flow-tests-release.log",
+    "build/torrent-flow-tests-debug.log",
+    "build/torrent-flow-build-release.log",
+    "build/torrent-flow-build-debug.log",
+    "build/torrent-flow-build-app-release.log"
+  ]
+}

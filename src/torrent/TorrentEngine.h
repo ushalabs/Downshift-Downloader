@@ -21,10 +21,14 @@ struct Snapshot {
     State state=State::Adding;
     bool metadata=false;
     bool metadataOnly=false;
+    bool selectionPending=false,nativePaused=false,uploadOnly=false;
+    bool verifyingCompletion=false;
     qint64 created=0;
     qint64 totalBytes=0, verifiedBytes=0;
     int downloadBytesPerSecond=0, uploadBytesPerSecond=0, peers=0;
     int seeds=0;
+    int candidatePeers=0,connectingPeers=0,trackerCount=0,respondingTrackers=0,failedTrackers=0,dhtNodes=0;
+    qint64 metadataWaitSeconds=0;
     qint64 downloadedBytes=0, uploadedBytes=0, selectedBytes=0, seedingSeconds=0;
     double ratio=0, availability=0;
     Limits limits;
@@ -54,8 +58,11 @@ public:
     std::future<std::vector<Snapshot>> snapshots();
     std::future<void> pause(QString id);
     std::future<void> resume(QString id);
+    std::future<void> rediscover(QString id);
     // Finish a metadata-only preview after the user confirms its file selection.
     std::future<void> startSelected(QString id,bool paused);
+    // Retarget only an unconfirmed metadata preview; never move source files.
+    std::future<void> setPreviewDirectory(QString id,QString directory);
     std::future<void> checkpoint(QString id);
     std::future<void> configure(QString id,Limits limits,SeedPolicy seeding);
     // Priorities correspond to ordinary files in Snapshot.files (0 skip, 1..7).

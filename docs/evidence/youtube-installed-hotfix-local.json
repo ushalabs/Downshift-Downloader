@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-17",
+  "version": "0.4.6 installed hotfix",
+  "request": "Fix installed YouTube downloading and quality choices; no packaging.",
+  "defects": [
+    "A combined low-resolution format prematurely ended player resolution despite unresolved higher-quality adaptive tracks.",
+    "Supplied helper info lacked extractor; rejected streams raised KeyError instead of a normal source error.",
+    "Unverified browser formats were displayed as ready; known single resolution was misleadingly labeled Default quality."
+  ],
+  "repair": "Bounded same-origin player preparation when only muxed fallback exists; complete helper info; preflight direct formats before display; concrete resolution labels; clear rejected formats without anonymous watch-page fallback.",
+  "mediaGuiChecks": 151,
+  "browser": {
+    "checks": 52,
+    "scope": "Controlled YouTube origin in real private headless Chrome; watch/feed/serialized/metadata-only players, successful observed track preference, same-height alternates, refusal without anonymous fallback, stale-player rejection, trusted overlay clicks and no session export. Native transfer verified separately.",
+    "apiCalls": 4,
+    "normalProfileOrRegistrationUsed": false,
+    "publicYouTubeDownloadVerified": false
+  },
+  "updater": {
+    "normalInstallationChanged": false,
+    "scenarios": [
+      "mapped image replacement without termination",
+      "controlled rollback"
+    ],
+    "fixtureRoot": "C:\\Users\\HP\\Desktop\\Projects\\Downshift\\build\\installed-hotfix-verification\\9ec941ba67094121bd0c4dcbd0a2999e",
+    "checks": 14
+  },
+  "application": {
+    "target": "C:\\Program Files\\Downshift",
+    "isolated": false,
+    "userDataTouched": false,
+    "backup": "C:\\Program Files\\Downshift\\.hotfix-backup-228f8d65f9d94aa687cda5b64c93c2ca",
+    "files": [
+      {
+        "path": "Downshift.exe",
+        "before": "d6c6653c744a6020633de82b77e002b785588ac0786f68f318c0cd3d3dba6d49",
+        "after": "15f41f4d19e96c15d4a4b216e8ac02b628110281e0c1e93600fe4029cf28eb8d"
+      },
+      {
+        "path": "build-source.json",
+        "before": "9ba58ab58c35ab4e30b3358d8fe99e0ff6900ff14747be20b80122703d0a3304",
+        "after": "8d2fb09f01ed4105e0cb4e5a9a90d318943507570ca9314eafc26996e84ee2b4"
+      },
+      {
+        "path": "extension/youtube-player.js",
+        "before": "053863bafa6b97df0806cac9a757015991820f4f3e12168af0a0dc1c2532dc94",
+        "after": "c3b5efa9c434404add42491de528c73f85a27e092eee48d39b52078e483e189a"
+      }
+    ],
+    "registrationChanged": false,
+    "ok": true,
+    "product": "Downshift",
+    "restartRequired": true,
+    "processesTerminated": false
+  },
+  "installedFileAndBackupHashesVerified": true,
+  "installedHiddenSmokePassed": true,
+  "originalFailureIndependentlyReproduced": true,
+  "extensionRegressionGroupsPassed": 3,
+  "releaseBuildPassed": true,
+  "packagesCreated": false,
+  "existingSetupUnchanged": true,
+  "gitMutations": false,
+  "userChromeReloadOrLiveTransferVerified": false,
+  "limitations": "Installed files applied through administrator-approved elevation without repackaging. The original process exited without forced termination; the updated installed app was reopened and its native ping verified. Chrome extension reload/page refresh and real signed-in YouTube acceptance await user feedback. Controlled transfers are not presented as public YouTube success.",
+  "installedAppReopened": true,
+  "reopenedProcessId": 12140,
+  "nativePingAfterReopen": {
+    "ok": true,
+    "appVersion": "0.4.6",
+    "historyCount": 11,
+    "pausedCount": 1,
+    "activeCount": 0
+  }
+}

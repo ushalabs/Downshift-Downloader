@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-16",
+  "feature": "Generic embedded stream detection, request context and default quality",
+  "nativeGroups": [
+    {
+      "configuration": "Release",
+      "tests": 8,
+      "failures": 0,
+      "report": "build/media-repair-release-final-junit.xml"
+    },
+    {
+      "configuration": "Debug",
+      "tests": 7,
+      "failures": 0,
+      "report": "build/media-repair-debug-final-junit.xml"
+    },
+    {
+      "configuration": "Common JS final",
+      "tests": 2,
+      "failures": 0,
+      "report": "build/media-repair-common-js-final-junit.xml"
+    }
+  ],
+  "mediaGuiChecksPerConfiguration": 84,
+  "actualChromeChecks": 32,
+  "actualChromeGenericMimeEmbeddedDefaultTransfer": true,
+  "requestContext": "validated Referer/Origin/User-Agent only; no Cookie/Authorization; encrypted retry history",
+  "nativeApplicationSha256": "a0ceb65abfa8e01d05a086ec97f995af8cb707bd6cf644b2b6cfcfb48a09249a",
+  "compiledSourcesVerified": true,
+  "normalAppReplaced": false,
+  "normalChromeProfileChanged": false,
+  "liveSiteProbe": [
+    {
+      "site": "MyFlixer",
+      "title": "Game of Thrones - watchseries",
+      "frames": 2,
+      "sources": [],
+      "error": "",
+      "scope": "Isolated metadata/stream discovery only; media and named fragments blocked; no episode download."
+    },
+    {
+      "site": "9anime",
+      "title": "BLACK TORCH (Dub) Episode 12 English Subbed - 9anime",
+      "frames": 2,
+      "sources": [],
+      "error": "Error",
+      "scope": "Isolated metadata/stream discovery only; media and named fragments blocked; no episode download."
+    }
+  ],
+  "limitations": "Exact supplied live-site transfers remain unverified. No universal/DRM or browser-only authenticated stream guarantee. Local development machine, not clean VM/remote CI. Final setup/portable reports stored separately in dist."
+}

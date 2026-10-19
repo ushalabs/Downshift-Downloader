@@ -1,82 +1,183 @@
-# Downshift
+<p align="center">
+  <img src="docs/Downshift_banner.png" alt="Downshift Banner" width="100%" />
+</p>
 
-The current local source is **0.4.4**. It prevents completed Chrome history from opening new save dialogs and reduces video quality inspection to the metadata the form actually needs, fixing long-video results that exceeded the old buffer limit. Reload the unpacked extension and use the updated Desktop app together. This remains local and uncommitted.
+<h1 align="center">Downshift</h1>
 
-The pre-T4 GUI repair restores white light-theme surfaces, rounded dropdowns and video previews, removes redundant bars and adds clear detail controls. Images use the Pictures category without conversion. Reload the extension for the queued-image handoff repair and the **Save image to Downshift** image-menu action. Chrome’s built-in Save image as chooser can still appear; the Downshift action avoids it. See [GUI behavior and cleanup](docs/GUI_2.md).
+<p align="center">
+  <strong>An all-in-one download manager for Windows.</strong><br />
+  Fast file downloads, video downloads, torrent support, browser integration, and a modern native desktop experience.
+</p>
 
-The **0.4.3 browser response delivery** foundation receives generated blob/data files and session/POST downloads from their original browser response and finishes them in Downshift with a save dialog, encrypted history and verified native files. Public representations can use the existing segmented engine after validator matching. See [browser response delivery, recovery and limits](docs/BROWSER_RESPONSE_CAPTURE.md). No newer public package is published.
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D4?logo=windows&logoColor=white" />
+  <img src="https://img.shields.io/badge/version-1.0.0-EC1680" />
+  <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B&logoColor=white" />
+  <img src="https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white" />
+  <img src="https://img.shields.io/badge/license-MIT-blue" />
+</p>
 
-The 0.4.2 development history repair and storage-binding recovery procedure are documented in [HISTORY_RECOVERY.md](docs/HISTORY_RECOVERY.md). Public release artifacts remain at the separately verified v0.3.3 preview.
+<p align="center">
+  <strong>Microsoft Store Soon</strong> • <strong>Android Port Soon</strong>
+</p>
 
-Native BitTorrent T1–T3 adds a Rasterbar engine, encrypted recovery, a Torrents sidebar, shared history, file/magnet previews, file priorities, limits, seeding policies and native details/settings: see [torrent scope and usage](docs/TORRENTS.md). T3 is locally verified; T4 acceptance and packaging require approval.
+---
 
-The earlier **0.4.2 history storage repair, independent range connections and GUI 2.0** introduced neutral light/dark themes, responsive navigation/search, painted download rows, contextual details, sectioned Settings and the pink arrow icon. Startup distinguishes loading/failure from empty history and checks recovered storage identity. Segmented HTTP/2 downloads use independent reusable connections. See [performance diagnosis](docs/PERFORMANCE.md), [GUI 2.0](docs/GUI_2.md) and [history recovery](docs/HISTORY_RECOVERY.md). The verified published preview remains v0.3.3. The current local torrent GUI extends this design.
+## About Downshift
 
-![Windows checks](https://github.com/ushalabs/Downshift-Download-Manager/actions/workflows/build.yml/badge.svg)
+**Downshift** is a modern native Windows download manager built to handle different kinds of downloads in one place.
 
-Downshift is a free, open-source Windows download manager for ordinary files and supported videos. It uses a native C++20/Qt desktop, libcurl download engine, encrypted SQLite history and a Chrome extension. The 0.3.3 repair negotiates server capabilities, falls back to complete responses when safe ranges are unavailable, and handles supported HTTP content encoding. Browser handoff, verified recovery, quality choices, newest-first history and rounded pink forms share one native application.
+It supports:
 
-![Downshift GUI 2.0 desktop](assets/screenshots/downloads-gui2.png)
+- **Regular file downloads**
+- **Video downloads**
+- **Torrent downloads**
+- **Browser-assisted capture**
+- **Pause / Resume**
+- **Queue and speed management**
+- **A modern desktop UI with light and dark theme support**
 
-GUI 2.0 render with synthetic history fixtures; counts and files shown are test data.
+The goal of Downshift is to provide a clean, fast, and reliable download experience without the outdated feel of older download managers.
 
-## Get started
+---
 
-Get the Windows x64 portable archive from [verified v0.3.3 preview](https://github.com/ushalabs/Downshift-Download-Manager/releases/tag/v0.3.3). Extract the **whole ZIP** to a permanent writable folder and run **Setup.cmd**. Open the Desktop Downshift shortcut or Downshift.exe beside its DLLs. Windows 10/11 x64 is required; developer tools are not needed.
+## Main Interface
 
-For Chrome, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted package's **extension** folder. Reload existing video pages. A previously installed extension needs **Reload** after an update. Capture defaults on for fresh installs; saved off preferences persist. [Full setup](docs/PACKAGING.md) and [Chrome recovery](docs/CHROME.md) explain moving or uninstalling the package.
+<p align="center">
+  <img src="docs/Downshift%201.png" alt="Downshift Main Interface" width="100%" />
+</p>
 
-For video extraction/quality selection and merging, run **Enable-video.cmd** once. It downloads pinned, checksum-verified upstream yt-dlp, Deno and FFmpeg tools. These optional executables are not redistributed in the portable ZIP. Ordinary file downloads work immediately without them.
+The main dashboard gives a quick overview of:
 
-## Downloads
+- total downloads
+- active transfers
+- total speed
+- downloaded data
+- in-progress, completed, and attention-needed items
+- torrent downloads
+- download controls and search
 
-| Content | Initial destination |
-|---|---|
-| Videos | Downloads → Videos |
-| Images | Downloads → Pictures |
-| Audio | Downloads → Audios |
-| ZIP, RAR and other archives | Downloads → Zip |
-| Programs and all other files | Downloads → Programs |
+---
 
-Choose another location for any download. Settings can change the base folder. Existing history/files are preserved. Categories use filename/media type, not full-content decoding. Chrome handoffs open Downshift and a destination window before native transfer starts. Video records appear in All downloads and Completed; completion requires a verified saved local video, with its actual path and Open folder action.
+## Features
 
-Enabled capture promptly pauses Chrome and does not silently fall back when a handoff fails. Retry in the popup or turn capture off to use Chrome. Chrome may receive initial bytes or finish small files before its extension reports them; universal replacement cannot be guaranteed. Browser cookies/credentials are not imported. Authenticated, dangerous, incognito, browser-only, protected and unsupported resources have explicit limits. Player controls work on detected supported videos, including YouTube; they do not make every website or DRM stream downloadable. [Behavior and limits](docs/GENERAL_DOWNLOADS.md), [video support](docs/MEDIA.md).
+### All-in-one downloading
+Downshift combines multiple download workflows into a single desktop application:
 
-## Native engine and desktop
+- **HTTP / HTTPS downloads**
+- **Video downloads from supported sources**
+- **Torrent and magnet downloads**
+- **Browser integration**
+- **Unified download history**
 
-- Adaptive segmented transfers with automatic tuning or fixed 1–16 connection limits; streaming for servers without safe range capability.
-- TLS verification, exact range/length checks, strong ETag pinning for resume, optional trusted SHA-256, exclusive partial files and completion without overwriting existing files.
-- Encrypted crash-recovery checkpoints, bounded transient retries, pause/resume and explicit safe restart when resumability is unavailable.
-- Persistent queue/history, priorities, file concurrency/site limits and global/per-file pacing; video tasks have a separate helper concurrency/rate budget.
-- Live progress/speed/ETA, searchable history, compact responsive pink/plum themes and wider details when maximized. Downloads are never executed automatically.
+### Modern desktop UI
+Designed with a cleaner and more modern interface than traditional download managers:
 
-## Verification and performance
+- spacious layout
+- light and dark theme support
+- searchable download list
+- categorized sidebar
+- live status cards
+- detailed download information
+- native Windows feel
 
-Torrent T4 adds eight-torrent mixed HTTP/HTTPS acceptance, resource measurements, restart/recovery checks and native disk-full failure injection. Failed torrents can retry after their incomplete payload has been safely cleaned. Packaging verifies app-local torrent, TLS and image runtimes and matching application/library sources. Final results and limits are recorded in [development progress](docs/DEVELOPMENT_PROGRESS.md) and [torrent documentation](docs/TORRENTS.md). Local uncommitted previews use `Build-Portable.ps1 -LocalPreview`; they cannot be published by the release validator. No commits or pushes are part of this phase.
+### Download management
+Downshift includes the core controls expected from a serious downloader:
 
-Phase 8 retained **180 independently verified samples**, 90 pairs over 30 loopback cases with 100 MB/1 GB/5 GB files. [Measured results and provenance](docs/PERFORMANCE.md) include gains and regressions. They are cached HTTP/1.1 loopback measurements on one laptop, not Internet/physical-storage throughput. No direct speed advantage over IDM has been established.
+- pause / resume
+- cancel
+- queueing
+- connection controls
+- speed visibility
+- organized history
+- status-based filtering
+- settings for behavior and appearance
 
-## Build from source
+### Torrent support
+Torrent downloads are built directly into the application so users can manage normal downloads and torrents in one place.
 
-Install Visual Studio 2022/Build Tools with Desktop development with C++, MSVC v143 and a Windows SDK, plus Git, CMake 3.25+ and Python 3.10+ for tests. Node is used for extension controller tests. Python/Node are not required by the app.
+### Browser integration
+Downshift is designed to work alongside browser download flows to make grabbing supported downloads easier.
 
-```powershell
-./scripts/Bootstrap.ps1
-./scripts/Test-Environment.ps1
-cmake --preset windows-msvc
-cmake --build --preset release --parallel 2
-./scripts/Install-MediaTools.ps1 -Configuration Release
-ctest --preset release
-cmake --build --preset debug --parallel 2
-./scripts/Install-MediaTools.ps1 -Configuration Debug
-ctest --preset debug
-./build/windows-msvc/Release/Downshift.exe
-```
+---
 
-Bootstrap pins vcpkg to the manifest baseline and finds Visual Studio's bundled CMake. Keep bootstrap and configure in the same PowerShell session. The first source dependency build takes substantial time/space. Source developer details are in [installation](docs/INSTALLATION.md). Packaging a clean, tested Release uses `scripts/Build-Portable.ps1 -RequireClean` and `scripts/Test-Portable.ps1`.
+## Tech Stack
 
-## Documentation and license
+Downshift is built with:
 
-[Architecture](docs/ARCHITECTURE.md) · [desktop](docs/DESKTOP.md) · [queue](docs/QUEUE.md) · [recovery](docs/RECOVERY.md) · [tests](docs/TESTING.md) · [packaging](docs/PACKAGING.md) · [release notes](docs/RELEASE_NOTES.md) · [development progress](docs/DEVELOPMENT_PROGRESS.md).
+- **C++20**
+- **Qt 6**
+- **libcurl**
+- **SQLite**
+- **Rasterbar libtorrent**
+- **CMake**
+- **MSVC / Visual Studio**
+- **Windows-native packaging**
 
-Original Downshift source is [MIT](LICENSE). Libraries retain their own terms. Shared Qt uses the LGPLv3 option; the binary includes complete notices/license texts, and the matching release provides corresponding dependency sources/patches/build recipes. Library replacement is permitted. [Third-party notices](docs/THIRD_PARTY_NOTICES.md) and [library rebuilding](docs/REBUILD_LIBRARIES.md) describe the shipped inventory and replacement rights. The unsigned preview has no Windows installer, Chrome Web Store publication or automatic updater.
+This project is focused on native desktop performance, modern UI, and real-world usability.
+
+---
+
+## Settings
+
+<p align="center">
+  <img src="docs/Downshift%202.png" alt="Downshift Settings" width="100%" />
+</p>
+
+The settings screen allows configuration for things like:
+
+- download folder
+- simultaneous downloads
+- downloads per site
+- connections per site
+- connections per download
+- total speed limit
+- appearance
+- integration-related behavior
+
+It also carries the **UshaLabs** branding as part of the project identity.
+
+---
+
+## Project Status
+
+### Windows
+The Windows version is the primary version of Downshift and is currently the main focus.
+
+### Microsoft Store
+**Microsoft Store release is planned soon.**
+
+### Android
+An **Android port is planned soon** to extend Downshift beyond desktop and bring the same all-in-one idea to mobile.
+
+---
+
+## Why this project matters
+
+Downshift is not just a UI showcase — it is a real software engineering project built around:
+
+- native desktop development
+- networking
+- download workflows
+- torrent integration
+- file handling
+- UI/UX design
+- packaging and deployment
+
+It is being developed as both a usable application and a strong portfolio project.
+
+---
+
+## Repository Structure
+
+```text
+Downshift-Downloader/
+├── assets/
+├── docs/
+├── extension/
+├── packaging/
+├── scripts/
+├── src/
+├── tests/
+├── CMakeLists.txt
+└── README.md

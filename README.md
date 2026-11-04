@@ -1,13 +1,8 @@
-<p align="center">
+<h1 align="center">
   <img src="assets/downshift.png" alt="Downshift icon" width="84" height="84" />
-</p>
-
-<h1 align="center">Downshift</h1>
-
-<p align="center">
-  <strong>An all-in-one download manager for Windows.</strong><br />
-  Fast file downloads, video downloads, torrent support, browser integration, and a modern native desktop experience.
-</p>
+  <br />
+  Downshift
+</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D4?logo=windows&logoColor=white" />
@@ -15,6 +10,11 @@
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B&logoColor=white" />
   <img src="https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white" />
   <img src="https://img.shields.io/badge/license-MIT-blue" />
+</p>
+
+<p align="center">
+  <strong>An all-in-one download manager for Windows.</strong><br />
+  Fast file downloads, video downloads, torrent support, browser integration, and a modern native desktop experience.
 </p>
 
 <p align="center">

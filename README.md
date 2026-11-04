@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/Downshift_banner.png" alt="Downshift Banner" width="100%" />
+  <img src="assets/downshift.png" alt="Downshift icon" width="84" height="84" />
 </p>
 
 <h1 align="center">Downshift</h1>

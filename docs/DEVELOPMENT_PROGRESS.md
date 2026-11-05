@@ -1,5 +1,9 @@
 # Downshift development progress
 
+## FFmpeg archive retention (2026-11-05)
+
+Windows CI run #36 compiled Release, then hit HTTP 404 while installing FFmpeg. BtbN had retired the daily build pinned in the media tool lock. The lock now uses the October 2026 month-end build of the same Windows x64 LGPL shared 8.1 series. BtbN keeps month-end builds for two years, so renew this pin before October 2028. Archive and extracted-file SHA-256 checks remain required.
+
 ## Chrome download IDs after restart (2026-11-05)
 
 The repo ZIP reproduced the first-click failure with a closed app and a reused Chrome profile. Chrome assigned ID `1` again after the earlier completed handoff had been erased. The extension opened Downshift but skipped the new file because it had saved `1` as handled. The extension now matches both the ID and start time, ignores old ID-only markers, and checks the same identity before retrying history cleanup. A download released when capture is off can be picked up again after capture is enabled.

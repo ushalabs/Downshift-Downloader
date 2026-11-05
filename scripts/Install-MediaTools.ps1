@@ -27,7 +27,11 @@ if(!$ready){
             Write-Host "Downloading $($asset.name) for video support..."
             $partial=Join-Path $cache ('download-'+[guid]::NewGuid().ToString('N')+'.tmp')
             try{
-                Invoke-WebRequest -UseBasicParsing -Uri $asset.url -OutFile $partial -TimeoutSec 900
+                try{
+                    Invoke-WebRequest -UseBasicParsing -Uri $asset.url -OutFile $partial -TimeoutSec 900
+                }catch{
+                    throw "Could not download $($asset.name) from $($asset.url). $($_.Exception.Message)"
+                }
                 if(!(Matches-Hash $partial $asset.sha256)){throw "Checksum mismatch: $($asset.name). Video tools were not installed."}
                 Move-Item -LiteralPath $partial -Destination $archive -Force
             }finally{if(Test-Path -LiteralPath $partial){Remove-Item -LiteralPath $partial -Force}}

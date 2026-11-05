@@ -18,6 +18,22 @@ assert.equal(requests.length,1,'Probe must not issue another request');assert.eq
 const wrapper=context.fetch;vm.runInContext(script,context);assert.equal(context.fetch,wrapper,'Repeated script must not wrap twice');
 vm.runInContext("const xhr=new XMLHttpRequest();xhr.responseType='text';xhr.responseURL='https://cdn.test/manifest';xhr.responseText='<?xml version=\"1.0\"?><MPD type=\"static\">';xhr.open('GET',xhr.responseURL);xhr.listener();",context);
 assert.equal(messages.at(-1).format,'dash');
+{
+ const sent=[];
+ class FrameXhr extends Xhr {open(){this.opened=true;}}
+ const frame=vm.createContext({Map,Reflect,TextDecoder,XMLHttpRequest:FrameXhr,setTimeout,clearTimeout,
+  origin:'null',location:{origin:'https://frame.test'},postMessage:(value,target)=>sent.push({value,target}),
+  addEventListener:(_name,listener)=>{frame.receive=listener;},fetch:async()=>response});
+ frame.window=frame;
+ vm.runInContext(script,frame);
+ vm.runInContext("const xhr=new XMLHttpRequest();xhr.responseType='text';xhr.responseURL='https://cdn.test/live';xhr.responseText='#EXTM3U';xhr.open('GET',xhr.responseURL);xhr.listener();",frame);
+ assert.equal(sent.length,1);
+ assert.equal(sent[0].target,'*','An opaque frame posts to its own window without an invalid HTTPS target');
+ vm.runInContext("receive({source:{},origin:'null',data:{type:'downshift-manifest-replay'}});receive({source:window,origin:'https://frame.test',data:{type:'downshift-manifest-replay'}})",frame);
+ assert.equal(sent.length,1,'Foreign windows and incorrect origins cannot request replay');
+ vm.runInContext("receive({source:window,origin:'null',data:{type:'downshift-manifest-replay'}})",frame);
+ assert.equal(sent.length,2,'The same opaque document can replay its observations');
+}
 console.log('Media probe checks passed: fetch body preserved, no extra fetch, HLS/DASH generic MIME, duplicate injection guarded.');
 {
  const sent=[],callbacks=[],events={};let response={playabilityStatus:{status:'OK'},videoDetails:{videoId:'FQmqRVK3kHg',lengthSeconds:'30'},streamingData:{adaptiveFormats:[{itag:137,mimeType:'video/mp4; codecs="avc1"',height:1080,contentLength:'100',signatureCipher:'url='+encodeURIComponent('https://rr1.googlevideo.com/videoplayback?id=only-this-resource')}]}};

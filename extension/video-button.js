@@ -3,19 +3,21 @@
   globalThis.__downshiftVideoButtons = true;
   const players = new Map();
   const pendingYouTube=new Map();
+  const pageOrigin=globalThis.origin ?? location.origin;
   addEventListener("message",event=>{
     const value=event.data;
-    if(event.source===window && event.origin===location.origin && value?.type==='downshift-youtube-prepared'){
+    if(event.source!==window || event.origin!==pageOrigin)return;
+    if(value?.type==='downshift-youtube-prepared'){
       const complete=pendingYouTube.get(value.nonce);if(!complete)return;pendingYouTube.delete(value.nonce);
       if(value.video&&/^[\w-]{11}$/.test(value.video.id))chrome.runtime.sendMessage({type:'youtube-observed',page:'https://www.youtube.com/watch?v='+value.video.id,video:value.video}).catch(()=>{}).finally(()=>complete(value.video));else complete(null);return;
     }
-    if(event.source===window && event.origin===location.origin && value?.type==='downshift-youtube-observed'){
+    if(value?.type==='downshift-youtube-observed'){
       chrome.runtime.sendMessage({type:'youtube-observed',page:location.href,video:value.video}).catch(()=>{});return;
     }
-    if(event.source!==window || (event.origin!==location.origin&&location.origin!=="null") || value?.type!=="downshift-manifest-observed" || typeof value.url!=="string" || value.url.length>32768 || !["hls","dash"].includes(value.format))return;
+    if(value?.type!=="downshift-manifest-observed" || typeof value.url!=="string" || value.url.length>32768 || !["hls","dash"].includes(value.format))return;
     chrome.runtime.sendMessage({type:"media-observed",page:location.href,url:value.url,format:value.format,master:value.master===true}).catch(()=>{});
   });
-  postMessage({type:"downshift-manifest-replay"},location.origin==="null"?"*":location.origin);
+  postMessage({type:"downshift-manifest-replay"},pageOrigin==="null"?"*":pageOrigin);
   let scheduled = false;
   function requestLayout() { if (!scheduled) { scheduled = true; requestAnimationFrame(layout); } }
   function attach(video) {

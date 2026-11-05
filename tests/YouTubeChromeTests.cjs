@@ -17,7 +17,7 @@ const [chrome,out]=process.argv.slice(2).map(x=>path.resolve(x)),repo=path.resol
  const server=https.createServer({cert,key},async(req,res)=>{
   if(req.headers.host==='rr1.googlevideo.com'){const audio=req.url.includes('itag=140');res.writeHead(200,{'Content-Type':audio?'audio/mp4':'video/mp4','Access-Control-Allow-Origin':'https://www.youtube.com','Cache-Control':'no-store'});res.end(Buffer.alloc(audio?30:100));return;}
   let body='';for await(const chunk of req){body+=chunk;if(body.length>32768){res.destroy();return;}}
-  try{await handler({request:()=>({url:()=>`https://${req.headers.host}${req.url}`,postDataJSON:()=>JSON.parse(body),allHeaders:async()=>req.headers,resourceType:()=>req.headers['sec-fetch-dest']==='document'?'document':'script'}),fulfill:async value=>{res.writeHead(value.status||200,{'Content-Type':value.contentType||'text/plain','Cache-Control':'no-store'});res.end(value.body);},abort:async()=>res.end()});}catch(error){res.destroy();console.error(error);}
+  try{await handler({request:()=>({url:()=>`https://${req.headers.host}${req.url}`,postDataJSON:()=>JSON.parse(body),allHeaders:async()=>req.headers,resourceType:()=>['document','iframe'].includes(req.headers['sec-fetch-dest'])?'document':'script'}),fulfill:async value=>{res.writeHead(value.status||200,{'Content-Type':value.contentType||'text/plain','Cache-Control':'no-store'});res.end(value.body);},abort:async()=>res.end()});}catch(error){res.destroy();console.error(error);}
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));server.unref();
  const pin=crypto.createHash('sha256').update(new crypto.X509Certificate(cert).publicKey.export({type:'spki',format:'der'})).digest('base64');
@@ -27,6 +27,13 @@ const [chrome,out]=process.argv.slice(2).map(x=>path.resolve(x)),repo=path.resol
   let apiCalls=0,mode='watch',checks=0;const id='FQmqRVK3kHg',manifest='https://manifest.googlevideo.com/api/manifest/hls_variant/id/fixture/index.m3u8';
   const videoUrl='https://rr1.googlevideo.com/videoplayback?id=fixture&itag=137&clen=100&n=loaded',audioUrl='https://rr1.googlevideo.com/videoplayback?id=fixture&itag=140&clen=30';
   handler=async route=>{
+   if(mode==='opaque' && route.request().resourceType()==='document'){
+    const iframe=route.request().url().endsWith('/opaque-player');
+    await route.fulfill({contentType:'text/html',body:iframe
+      ? `<!doctype html><video style="width:320px;height:180px"></video><script>addEventListener('message',event=>{if(event.source===window&&event.data?.type==='downshift-manifest-replay')document.body.dataset.replayOrigin=event.origin;});</script>`
+      : '<!doctype html><iframe sandbox="allow-scripts" src="/opaque-player" width="400" height="240"></iframe>'});
+    return;
+   }
    if(route.request().url().includes('/youtubei/v1/player')){
     apiCalls++;const request=route.request(),body=request.postDataJSON(),headers=await request.allHeaders();assert.equal(body.videoId,id);assert(body.context.client.userAgent.includes('Safari'));assert(headers.cookie.includes('fixture-session=kept-in-browser'));assert(headers.authorization.startsWith('SAPISIDHASH '));assert.equal(headers['x-origin'],'https://www.youtube.com');
     const [timestamp,signature]=headers.authorization.slice('SAPISIDHASH '.length).split('_');assert.equal(signature,crypto.createHash('sha1').update(timestamp+' synthetic-not-a-real-session https://www.youtube.com').digest('hex'));assert.equal(body.playbackContext.contentPlaybackContext.signatureTimestamp,12345);
@@ -64,6 +71,11 @@ const [chrome,out]=process.argv.slice(2).map(x=>path.resolve(x)),repo=path.resol
   mode='feed';await service.evaluate(()=>globalThis.__packets=[]);await page.goto('https://www.youtube.com/watch?v=HyfC9nZvIJM');const before=apiCalls;
   await page.locator('[data-downshift-video] button').click();await page.waitForFunction(()=>document.querySelector('[data-downshift-video]')?.shadowRoot?.querySelector('span')?.textContent==='Choose quality in Downshift.');
   assert.equal(apiCalls,before);const nativeOnly=await service.evaluate(()=>globalThis.__packets);assert.equal(nativeOnly.length,1);assert.equal(nativeOnly[0].url,'https://www.youtube.com/watch?v=HyfC9nZvIJM');assert(!nativeOnly[0].context.youtube);checks+=4;
+  mode='opaque';await page.goto('https://www.youtube.com/opaque-fixture');
+  const opaque=page.frameLocator('iframe');
+  await opaque.locator('body[data-replay-origin="null"]').waitFor();
+  assert(await opaque.locator('[data-downshift-video] button').isVisible());
+  checks+=2;
   const report={checks,scope:'Controlled YouTube origin in real private headless Chrome; optional browser descriptors, native extraction remains available on missing/unusable browser streams, stale player cannot override canonical watch URL, trusted overlay clicks and no session export. Full public native transfer verified separately.',apiCalls,normalProfileOrRegistrationUsed:false,publicYouTubeDownloadVerified:false};
   fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }finally{await context.close();server.close();}

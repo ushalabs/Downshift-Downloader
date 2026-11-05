@@ -3,14 +3,17 @@
 (() => {
   if(globalThis.__downshiftManifestProbe)return;globalThis.__downshiftManifestProbe=true;
   const seen=new Map();let active=0;
-  addEventListener("message",event=>{if(event.source===window && (event.origin===location.origin||location.origin==="null") && event.data?.type==="downshift-manifest-replay")for(const [url,hint] of seen)postMessage({type:"downshift-manifest-observed",url,...hint},location.origin==="null"?"*":location.origin);});
+  // A sandboxed frame can have an HTTPS URL but an opaque document origin.
+  const pageOrigin=globalThis.origin ?? location.origin;
+  const targetOrigin=pageOrigin==="null"?"*":pageOrigin;
+  addEventListener("message",event=>{if(event.source===window && event.origin===pageOrigin && event.data?.type==="downshift-manifest-replay")for(const [url,hint] of seen)postMessage({type:"downshift-manifest-observed",url,...hint},targetOrigin);});
   function report(url,text){
     if(typeof url!=="string" || url.length>32768 || !/^https?:\/\//i.test(url))return;
     const prefix=text.trimStart();const format=prefix.startsWith("#EXTM3U")?"hls":/^(?:<\?xml[^>]*>\s*)?<(?:[\w.-]+:)?MPD(?:\s|>)/i.test(prefix)?"dash":null;
     const master=format==="hls" && /#EXT-X-(?:STREAM-INF|I-FRAME-STREAM-INF|MEDIA):/.test(prefix);
     if(!format || (seen.get(url)?.format===format && seen.get(url)?.master===master))return;
     seen.set(url,{format,master});if(seen.size>32)seen.delete(seen.keys().next().value);
-    postMessage({type:"downshift-manifest-observed",url,format,master},location.origin==="null"?"*":location.origin);
+    postMessage({type:"downshift-manifest-observed",url,format,master},targetOrigin);
   }
   function inspect(response){
     if(active>=8 || !response.ok || !response.body || response.type==="opaque")return;

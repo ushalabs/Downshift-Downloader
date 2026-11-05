@@ -16,29 +16,67 @@ export function eligible(item, ownId) {
 export class HandoffController {
   constructor(api) { this.api = api; this.strict=api.strict!==false;this.state = null; this.chain = Promise.resolve(); this.requestedEnabled = undefined;this.filenameHints=new Map();this.startedAt=api.now?.() ?? Date.now(); }
   serial(action) { const next = this.chain.then(async () => { await this.load(); return action(); }); this.chain = next.catch(() => {}); return next; }
-  async load() { if (!this.state) { const saved = await this.api.load(); this.state = {enabled:true,pending:{},bypass:[],notice:"",...saved}; } }
+  async load() { if (!this.state) { const saved = await this.api.load(); this.state = {enabled:true,pending:{},bypass:[],notice:"",...saved};
+    // Erased Chrome IDs can be reused after a browser restart. Legacy numeric
+    // tombstones cannot identify a download, so never use them to suppress one.
+    const validIdentity=value=>value && Number.isInteger(value.id) && typeof value.startTime==='string' && Number.isFinite(Date.parse(value.startTime));
+    this.state.finished=(this.state.finished || []).filter(validIdentity);
+    this.state.cleanup=(this.state.cleanup || []).filter(validIdentity);
+  } }
   async save() { await this.api.save(this.state); }
   async native(command, values={}) { const answer = await this.api.native({version:1,command,...values}); if (!answer || answer.version !== 1 || !answer.ok) throw new Error(answer?.version===1 && typeof answer.error==='string' ? answer.error.slice(0,240) : "Downshift could not accept this request. Check the extension for recovery options."); return answer; }
   async rememberBypass(id) { if (!this.state.bypass.includes(id)) this.state.bypass.push(id); this.state.bypass = this.state.bypass.slice(-1000); await this.save(); }
-  async finish(id, notice) { delete this.state.pending[id];this.filenameHints.delete(Number(id));this.state.finished=[...new Set([...(this.state.finished || []),Number(id)])].slice(-1000); this.state.notice = notice; await this.save(); }
+  async finish(id, notice, handled=true) {
+    const startTime=this.state.pending[id]?.startTime;
+    delete this.state.pending[id];
+    this.filenameHints.delete(Number(id));
+    if(handled && typeof startTime==='string' && Number.isFinite(Date.parse(startTime))){
+      const identity={id:Number(id),startTime};
+      this.state.finished=this.state.finished
+        .filter(value=>value.id!==identity.id || value.startTime!==identity.startTime)
+        .concat(identity).slice(-1000);
+    }
+    this.state.notice=notice;
+    await this.save();
+  }
+  async detachReused(id) {
+    // The old native receipt still owns its transfer. A reused Chrome ID does
+    // not authorize cancelling that receipt or operating on the new file.
+    delete this.state.pending[id];
+    await this.save();
+  }
   async handed(id) {
     // A committed receipt survives worker restarts. If Chrome was resumed in the
     // meantime, stop it before erasing history; erase alone does not stop bytes.
+    let item=await this.api.item(Number(id));
+    const startTime=this.state.pending[id]?.startTime ?? item?.startTime;
+    if(item?.startTime && item.startTime!==startTime){
+      await this.detachReused(id);
+      return;
+    }
     if(this.strict && this.state.enabled){
-      let item=await this.api.item(Number(id));
       if(item?.state==="in_progress"){
         if(!item.paused)await this.api.pause(Number(id));
         await this.api.cancel(Number(id));item=await this.api.item(Number(id));
         if(item?.state!=="interrupted" || item.error!=="USER_CANCELED")throw Error("Chrome cancellation was not verified");
       }
     }
-    if(this.api.erase)this.state.cleanup=[...new Set([...(this.state.cleanup || []),Number(id)])];
+    if(this.api.erase){
+      if(startTime && Number.isFinite(Date.parse(startTime)))
+        this.state.cleanup.push({id:Number(id),startTime});
+      else if(item)await this.api.erase(Number(id));
+    }
     await this.finish(id,"Handed to Downshift.");
     await this.cleanHistory();
   }
   async cleanHistory() {
     if(!this.api.erase)return;
-    for(const id of this.state.cleanup || [])try{await this.api.erase(id);this.state.cleanup=this.state.cleanup.filter(value=>value!==id);await this.save();}catch{}
+    for(const identity of this.state.cleanup)try{
+      const item=await this.api.item(identity.id);
+      if(item?.startTime===identity.startTime)await this.api.erase(identity.id);
+      this.state.cleanup=this.state.cleanup.filter(value=>value!==identity);
+      await this.save();
+    }catch{}
   }
   direct(url,filename,preferServerFilename=true) {return this.serial(async()=>{
     if(!this.state.enabled)throw Error("Capture is off.");
@@ -61,7 +99,7 @@ export class HandoffController {
   async keep(id, error) {
     const record = this.state.pending[id]; if (!record) return;
     if(record.transport==='browser'){
-      if(!this.state.enabled && !record.browserCommitSent){try{await this.native('abort',{key:record.key});}catch{}const item=await this.api.item(Number(id));if(item?.state==='in_progress' && item.paused)await this.api.resume(Number(id));await this.finish(id,'Capture is off.');return;}
+      if(!this.state.enabled && !record.browserCommitSent){try{await this.native('abort',{key:record.key});}catch{}const item=await this.api.item(Number(id));if(item?.state==='in_progress' && item.paused)await this.api.resume(Number(id));await this.finish(id,'Capture is off.',false);return;}
       await this.api.browserCapture(id,record,await this.api.item(Number(id)),this);return;
     }
     if(this.strict && this.state.enabled){
@@ -87,10 +125,22 @@ export class HandoffController {
       // Abort acknowledgment proves native work has not been committed. Restart keeps Chrome cookies.
       try { await this.api.restart(item); } catch { this.state.notice="Chrome could not restart this link. Retry it from its original page."; await this.save(); return; }
     }
-    await this.finish(id,"Download left in Chrome.");
+    await this.finish(id,"Download left in Chrome.",false);
   }
   async run(id) {
     const record=this.state.pending[id]; if(!record) return;
+    if(record.startTime){
+      const item=await this.api.item(Number(id));
+      if(item?.startTime && record.startTime!==item.startTime){
+        await this.detachReused(id);
+        if(item.state==='in_progress'){
+          this.state.pending[id]={key:this.api.key(),phase:'created',keep:false,startTime:item.startTime};
+          await this.save();
+          await this.run(id);
+        }
+        return;
+      }
+    }
     if(record.transport==='browser'){
       try{await this.api.browserCapture(id,record,await this.api.item(Number(id)),this);}
       catch{const item=await this.api.item(Number(id));if(item?.state==='in_progress' && !item.paused)try{await this.api.pause(Number(id));}catch{}this.state.notice='Connecting your download to Downshift…';await this.save();}
@@ -175,10 +225,17 @@ export class HandoffController {
   }
   candidate(item, event='change') {
     if(item.filename){this.filenameHints.set(item.id,item.filename);if(this.filenameHints.size>1000)this.filenameHints.delete(this.filenameHints.keys().next().value);}
+    // Wake outside the serialized receipt/preflight work, before awaiting Pause.
+    // Never wake the app just because old completed history was restored.
+    if(this.api.wake && ['created','filename'].includes(event) && item.state==='in_progress')void (this.api.captureEnabled ? this.api.captureEnabled():Promise.resolve(this.state?.enabled!==false)).then(enabled=>enabled ? this.api.wake():undefined).catch(()=>{});
     const early=this.strict && this.api.captureEnabled && this.state?.pending[item.id]?.transport!=='browser' && item.state==="in_progress" && !item.paused ? this.api.captureEnabled().then(async enabled=>{if(enabled)try{await this.api.pause(item.id);return true;}catch{}return false;}):Promise.resolve(false);
     return this.serial(async()=>{
-    const held=await early;if(this.state.pending[item.id]?.transport==='browser'){await this.run(String(item.id));return;}if(!this.state.enabled){if(held)try{await this.api.resume(item.id);}catch{}return;}
-    if(!this.state.pending[item.id] && (this.state.finished || []).includes(item.id))return;
+    const held=await early;
+    const prior=this.state.pending[item.id];
+    if(prior?.startTime && item.startTime && prior.startTime!==item.startTime)
+      await this.detachReused(String(item.id));
+    if(this.state.pending[item.id]?.transport==='browser'){await this.run(String(item.id));return;}if(!this.state.enabled){if(held)try{await this.api.resume(item.id);}catch{}return;}
+    if(!this.state.pending[item.id] && (this.state.finished || []).some(value=>value.id===item.id && value.startTime===item.startTime))return;
     // Chrome may announce restored history or update metadata for files saved
     // long ago. Completion is not evidence of a new download. Adopt a tiny
     // completed response only from its fresh creation/filename event; durable
@@ -191,7 +248,7 @@ export class HandoffController {
     // fallback must not exempt a live download after capture is enabled again.
     if(!this.strict && (item.incognito || item.byExtensionId===this.api.ownId || this.state.bypass.includes(item.id)))return;
     if(Object.keys(this.state.pending).length>=20){if(this.strict)try{await this.api.pause(item.id);this.state.overflow=[...new Set([...(this.state.overflow || []),item.id])].slice(-1000);}catch{}this.state.notice="Too many pending handoffs. Downloads are paused; finish existing handoffs or turn the extension off.";await this.save();return;}
-    this.state.pending[item.id]={key:this.api.key(),phase:"created",keep:false};await this.save();await this.run(String(item.id));
+    this.state.pending[item.id]={key:this.api.key(),phase:"created",keep:false,...(typeof item.startTime==='string' ? {startTime:item.startTime}:{})};await this.save();await this.run(String(item.id));
   });}
   retry(){return this.serial(async()=>{for(const [id,record] of Object.entries(this.state.pending))if(record.phase==="blocked"){record.key=this.api.key();record.phase="created";record.keep=false;record.attempts=0;await this.save();await this.run(id);}});}
   reconcile() {

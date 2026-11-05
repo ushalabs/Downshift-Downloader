@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {HandoffController,eligible,safeFilename} from "../extension/handoff.js";
+import {AppLauncher} from '../extension/app-launcher.js';
 let checks=0;
 function fixture(options={}) {
   const f={saved:{enabled:true,pending:{},bypass:[]},item:{id:1,state:"in_progress",paused:false,url:"https://files.example/file.bin",filename:"C:\\Downloads\\file.bin",totalBytes:1048576,mime:"application/octet-stream",danger:"safe"},receipt:"unknown",log:[],commits:0,restarts:0,offline:false};
@@ -111,6 +112,32 @@ for(const event of ['change','created']){
  await f.controller.serial(()=>f.controller.finish('1','Saved'));f.controller=new HandoffController(f.api);
  await f.controller.candidate(f.item,'filename');check(imports===1,'A delayed duplicate event after worker restart cannot recapture a finished response');
 }
+for(const previous of [1,{id:1,startTime:'2026-11-03T10:00:00Z'}]){
+ const f=fixture();f.api.strict=true;f.item.startTime='2026-11-04T10:00:00Z';f.saved.finished=[previous];
+ f.controller=new HandoffController(f.api);
+ await f.controller.candidate(f.item,'created');
+ check(f.commits===1,'A reused Chrome ID hands off the new download on its first event');
+ check(f.saved.finished.some(value=>value.id===1 && value.startTime===f.item.startTime) && !f.saved.finished.includes(1),'Only verified identities survive the legacy upgrade');
+}
+{
+ const f=fixture();f.api.strict=true;f.item.paused=true;f.item.startTime='2026-11-04T10:00:00Z';
+ f.saved.pending[1]={key:f.api.key(),phase:'paused',keep:false,startTime:f.item.startTime};
+ f.controller=new HandoffController(f.api);
+ await f.controller.configure(false);
+ check(!f.item.paused && !f.saved.finished.length,'A live download released with capture off is not marked as handled');
+ await f.controller.configure(true);await f.controller.candidate(f.item);
+ check(f.commits===1,'A released download can be captured when capture is turned back on');
+}
+{
+ const f=fixture();f.api.strict=true;f.item.startTime='2026-11-04T10:00:00Z';
+ f.saved.pending[1]={key:'f'.repeat(32),phase:'browser-streaming',transport:'browser',startTime:'2026-11-03T10:00:00Z'};
+ f.saved.cleanup=[{id:1,startTime:'2026-11-03T10:00:00Z'}];
+ let erased=0;f.api.erase=async()=>{erased++;};
+ f.controller=new HandoffController(f.api);
+ await f.controller.reconcile();
+ check(f.commits===1 && f.lastPrepare.key!==('f'.repeat(32)) && !f.log.includes('abort'),'An old pending identity cannot reuse or abort its receipt for a new download');
+ check(erased===1 && !f.saved.cleanup.length,'Deferred cleanup only erases the owned identity');
+}
 {
  const f=fixture();f.api.strict=true;f.item.state='complete';f.item.startTime='2025-08-14T05:17:36Z';f.saved.pending[1]={key:f.api.key(),phase:'browser-streaming',transport:'browser'};let imports=0;f.api.browserCapture=async()=>{imports++;};f.controller=new HandoffController(f.api);
  await f.controller.candidate(f.item);check(imports===1,'A durable owned receipt still recovers an older completed response');
@@ -122,5 +149,16 @@ for(const event of ['change','created']){
 {
  const f=fixture();f.api.strict=true;f.saved.pending[1]={key:f.api.key(),phase:'browser-streaming',transport:'browser'};f.api.browserCapture=async()=>{throw Error('offline');};f.controller=new HandoffController(f.api);
  await f.controller.reconcile();check(f.item.paused && !f.log.includes('resume'),'An app outage holds its response transport without browser fallback');
+}
+{
+ let now=0,opens=0,pings=0;const launcher=new AppLauncher(async message=>{if(message.command==='open'){opens++;return {ok:true,state:'opening'};}pings++;return now<12000?{ok:false,error:'starting'}:{ok:true,appVersion:'1.0.0',capabilities:{browserTransfer:true}};},'1.0.0',{now:()=>now,sleep:async ms=>{now+=ms;}});
+ const first=launcher.ensure(),second=launcher.ensure();check(first===second,'Concurrent first-download events share one cold start');await first;check(now>=12000&&opens===1&&pings>8,'One click waits for a slow cold startup beyond the former eight checks without relaunching');await launcher.ensure();check(opens===1,'A duplicate filename event reuses the ready startup result');
+}
+{
+ const f=fixture();f.api.strict=true;let wake=0,release;const held=new Promise(resolve=>{release=resolve;});f.api.captureEnabled=async()=>true;f.api.wake=async()=>{wake++;};f.controller=new HandoffController(f.api);f.controller.chain=held;
+ const pending=f.controller.candidate(f.item,'created');await new Promise(resolve=>setTimeout(resolve,0));check(wake===1,'First download wakes the app before serialized preflight work can run');release();await pending;
+}
+{
+ let calls=0;const launcher=new AppLauncher(async()=>{calls++;return {ok:false,error:'not installed'};},'1.0.0');await assert.rejects(launcher.ensure());check(calls===1,'A missing installation fails promptly instead of blocking configuration for a minute');
 }
 console.log(`Extension state checks passed: ${checks}`);

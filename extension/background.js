@@ -2,22 +2,14 @@ import {HandoffController,safeFilename} from "./handoff.js";
 import {MediaSources,publicUrl} from "./media.js";
 import {BrowserTransfers,NativeConnection} from './browser-transfer.js';
 import {saveImage} from './image-capture.js';
+import {AppLauncher} from './app-launcher.js';
 const mediaSources = new MediaSources();
 const connection=new NativeConnection(()=>chrome.runtime.connectNative('org.ushalabs.downshift'));
 const sourceTags=new Map();
 chrome.webRequest.onBeforeSendHeaders.addListener(details=>mediaSources.request(details),{urls:['http://*/*','https://*/*']},['requestHeaders','extraHeaders']);
 chrome.webRequest.onBeforeRequest.addListener(details=>{if(details.method!=='GET')sourceTags.delete(details.url);},{urls:['http://*/*','https://*/*']});
-async function ensureApp() {
-  const request = command=>connection.request({version:1,command});
-  const opened=await request("open");if(!opened?.ok)throw Error("Could not open Downshift");
-  for(let attempt=0;attempt<8;attempt++) {
-    let answer;try{answer=await request("ping");}catch(error){if(opened.state!=="opening")throw error;}
-    if(answer?.ok){if(answer.appVersion!==chrome.runtime.getManifest().version)throw Error("Close the old Downshift window and open the updated Desktop shortcut, then retry.");return answer;}
-    if(answer?.error && opened.state!=="opening")throw Error(answer.error);
-    await new Promise(resolve=>setTimeout(resolve,400));
-  }
-  throw Error("Downshift is still starting");
-}
+const launcher=new AppLauncher(request=>connection.request(request),chrome.runtime.getManifest().version);
+const ensureApp=()=>launcher.ensure();
 chrome.webRequest.onHeadersReceived.addListener(details=>{
   mediaSources.observe(details);
   if(details.method==='GET' && details.statusCode===200){const tag=details.responseHeaders?.find(h=>h.name.toLowerCase()==='etag')?.value;if(tag && /^"[^\r\n]{1,500}"$/.test(tag)){sourceTags.delete(details.url);sourceTags.set(details.url,{tag,at:Date.now()});if(sourceTags.size>1000)sourceTags.delete(sourceTags.keys().next().value);}}
@@ -27,6 +19,7 @@ const controller=new HandoffController({
   ownId:chrome.runtime.id,
   captureEnabled:async()=>(await chrome.storage.local.get("handoffState")).handoffState?.enabled!==false,
   ensureApp,
+  wake:ensureApp,
   load:async()=>(await chrome.storage.local.get("handoffState")).handoffState,
   save:async state=>chrome.storage.local.set({handoffState:state}),
   key:()=>crypto.randomUUID().replaceAll("-",""),
@@ -61,14 +54,17 @@ async function releaseFilenameHolds(){
     // Storage and download events can overlap while search is awaiting. Only
     // the first caller may release this exact callback.
     if(filenameHolds.get(id)!==suggest)continue;
-    if(!enabled || !item || item.state!=="in_progress"){filenameHolds.delete(id);suggest();}
+    if(!item || item.state!=="in_progress"){filenameHolds.delete(id);continue;}
+    if(!enabled){filenameHolds.delete(id);suggest();}
   }
 }
 chrome.downloads.onCreated.addListener(item=>quiet(controller.candidate(item,'created')));
 // Hold filename finalization until the capture decision has settled. Chrome
 // cannot complete even a tiny attachment while this callback is outstanding.
-// Always release it exactly once; failures remain paused, not silently resumed.
+// Suggest exactly once while the request is live. A cancelled/erased request
+// no longer has a filename to finalize.
 chrome.downloads.onDeterminingFilename.addListener((item,suggest)=>{
+  if(item.state!=='in_progress')return false;
   filenameHolds.set(item.id,suggest);
   applyFilenameRoute(item.id);
   quiet(controller.candidate(item,'filename').finally(()=>releaseFilenameHolds()));return true;
@@ -113,6 +109,10 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
       }
     })();
   }
+  else if(message.type==='download-intent'){
+    if(sender.tab?.id===undefined || sender.tab.incognito || !publicUrl(sender.url)){reply({ok:false});return false;}
+    task=(async()=>{if((await chrome.storage.local.get('handoffState')).handoffState?.enabled===false)return {state:'capture-off'};await ensureApp();return {state:'opening'};})();
+  }
   else if(message.type==="magnet") {
     task=(async()=>{
       const url=message.url;
@@ -142,7 +142,18 @@ quiet(controller.reconcile());
 
 // Explicit image capture uses Chrome only as an authenticated response transport.
 // The app chooses the destination and verifies the exact received bytes.
-function installImageAction(){chrome.contextMenus.removeAll(()=>{void chrome.runtime.lastError;chrome.contextMenus.create({id:'downshift-save-image',title:'Save image to Downshift',contexts:['image']});});}
+let installingImageAction=false;
+function installImageAction(){
+  if(installingImageAction)return;
+  installingImageAction=true;
+  chrome.contextMenus.removeAll(()=>{
+    if(chrome.runtime.lastError){installingImageAction=false;return;}
+    chrome.contextMenus.create({id:'downshift-save-image',title:'Save image to Downshift',contexts:['image']},()=>{
+      void chrome.runtime.lastError;
+      installingImageAction=false;
+    });
+  });
+}
 chrome.runtime.onInstalled.addListener(installImageAction);
 chrome.runtime.onStartup.addListener(installImageAction);
 installImageAction();

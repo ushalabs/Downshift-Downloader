@@ -1,5 +1,13 @@
 # Downshift development progress
 
+## Chrome download IDs after restart (2026-11-05)
+
+The repo ZIP reproduced the first-click failure with a closed app and a reused Chrome profile. Chrome assigned ID `1` again after the earlier completed handoff had been erased. The extension opened Downshift but skipped the new file because it had saved `1` as handled. The extension now matches both the ID and start time, ignores old ID-only markers, and checks the same identity before retrying history cleanup. A download released when capture is off can be picked up again after capture is enabled.
+
+The actual repo ZIP passed from a single click with the app closed after Chrome restarted, with both a previously recorded start time and legacy ID-only state. Each test saved 4,987,049 bytes in Downshift with a matching reference SHA-256 and zero retained Chrome download records. The test used private Chrome and native app instances with an eight-second startup delay.
+
+Image menu setup now prevents overlapping registrations. The extension discards filename callbacks after a Chrome download ends, and the player scripts use the document's actual origin for messages within sandboxed frames.
+
 ## Final 1.0.0 presentation and torrent destination controls (2026-10-17)
 
 The Settings footer now shows an italic UshaLabs signature with black Usha and pink Labs. The existing Downshift artwork supplies 16, 32, 48 and 128 pixel Chrome extension and toolbar icons, without changing its identity or permissions.

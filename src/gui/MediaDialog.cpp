@@ -115,7 +115,7 @@ void MediaDialog::inspectSource(bool browserSource){
     // Full info JSON includes every segment URL, subtitles and thumbnails. A
     // normal long video can exceed megabytes even with few quality choices.
     // Request only the fields used by this form, keeping the bounded parser.
-    args << "--output-na-placeholder" << "null" << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live,thumbnail,webpage_url,duration,extractor_key,url,ext,protocol,vcodec,acodec,height})j,\"formats\":%(formats.:.{height,vcodec,protocol,has_drm,url})j}" << "--skip-download";
+    args << "--output-na-placeholder" << "null" << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live,thumbnail,webpage_url,duration,extractor_key,url,ext,protocol,vcodec,acodec,height})j,\"formats\":%(formats.:.{height,vcodec,acodec,protocol,has_drm,url})j}" << "--skip-download";
     if(youtubeHost(QUrl(url_).host()))args << "--socket-timeout" << "10" << "--retries" << "0" << "--extractor-retries" << "0";
     if(browserFormats())args << "--check-formats" << "--load-info-json" << "-";else args << "--" << sourceUrl();launch(args,true);
 }
@@ -174,21 +174,22 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
         if(!video || duration<=0 || (expected>0 && (!audio || std::abs(duration-expected)>std::max(.5,expected*.01)))) {settle(QueueStatus::Failed,"The saved output is not a complete recorded video with the expected streams and duration. Retry the download.");return;}
         settle(QueueStatus::Completed);return;
     }else if(metadata_) {
-        QJsonParseError parseError{};const auto document=QJsonDocument::fromJson(output_,&parseError);const auto summary=document.object(),info=summary.value("meta").toObject();QSet<int> heights;bool playable=false;
+        QJsonParseError parseError{};const auto document=QJsonDocument::fromJson(output_,&parseError);const auto summary=document.object(),info=summary.value("meta").toObject();QSet<int> heights;bool playable=false,audioAvailable=false,silentVideo=false;
         if(parseError.error!=QJsonParseError::NoError || !document.isObject() || info.isEmpty()){retryable("The site returned an invalid video summary. Retry the check.");return;}
         auto formats=summary.value("formats").toArray();
         // Some extractors expose one real stream with no formats/resolution list.
         // Accept that stream as default; missing quality metadata is not a failure.
         if(formats.isEmpty() && !info.value("url").toString().isEmpty())formats.append(info);
-        for(const auto& value:formats) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString();const QUrl source(format.value("url").toString());if(format.value("has_drm").toBool() || codec=="none" || codec=="images" || format.value("protocol")=="mhtml" || !source.isValid() || source.host().isEmpty() || !source.userInfo().isEmpty() || (source.scheme()!="https" && source.scheme()!="http"))continue;playable=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
+        for(const auto& value:formats) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString(),audio=format.value("acodec").toString();const QUrl source(format.value("url").toString());if(format.value("has_drm").toBool() || codec=="images" || format.value("protocol")=="mhtml" || !source.isValid() || source.host().isEmpty() || !source.userInfo().isEmpty() || (source.scheme()!="https" && source.scheme()!="http"))continue;if(!audio.isEmpty() && audio!="none")audioAvailable=true;if(codec=="none")continue;playable=true;if(!codec.isEmpty() && audio=="none")silentVideo=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
         if(info.isEmpty() || info.value("_type")=="playlist" || info.value("_type")=="multi_video" || !playable || info.value("has_drm").toBool() || info.value("is_live").toBool()) {
             retryable(info.value("_type")=="playlist" || info.contains("entries") ? "This address is a feed or playlist, not one video. Open the video and use its player button, or paste its watch link.":"No downloadable video formats were found. Try a public recorded video link.");
         }
         else {
-            metadataInfo_=info;metadataInfo_["requestContext"]=context_;metadataInfo_["browserSource"]=browserSource_;if(!title_->isModified())title_->setText(suggestedDownloadName(info.value("title").toString(title_->text())));
+            metadataInfo_=info;metadataInfo_["videoOnly"]=silentVideo&&!audioAvailable;metadataInfo_["requestContext"]=context_;metadataInfo_["browserSource"]=browserSource_;if(!title_->isModified())title_->setText(suggestedDownloadName(info.value("title").toString(title_->text())));
             quality_->addItem(heights.size()>1 ? "Best available":heights.isEmpty() ? "Default quality":QString::number(*heights.begin())+"p",heights.size()==1?*heights.begin():0);
             if(heights.size()>1){auto sorted=heights.values();std::sort(sorted.begin(),sorted.end(),std::greater<int>());for(int height:sorted)quality_->addItem(QString::number(height)+"p",height);}
             quality_->setEnabled(quality_->count()>1);browse_->setEnabled(true);ready_=true;download_->setText("Download video");download_->setEnabled(true);status_->setText(quality_->count()>1 ? "Choose quality and press Download video. Separate streams are merged automatically.":heights.isEmpty()?"Ready to download at the player's default quality.":"Ready to download at "+quality_->currentText()+".");
+            if(metadataInfo_.value("videoOnly").toBool())status_->setText("Choose quality and press Download video. This source reports video-only streams with no audio track.");
         }
     }else {verify();return;}
     if(closeAfter_)QTimer::singleShot(0,this,[this]{close();});
@@ -251,7 +252,7 @@ QStringList MediaDialog::transferArguments() const {
     auto args=baseArguments();const auto height=metadataInfo_.value("resumeRecipe").toObject().value("height").toInt();const QString cap=height>0 ? "[height="+QString::number(height)+"]":"";
     // All helpers are mandatory and verified by setup. Missing helpers report errors
     // asynchronously; avoid filesystem probes on the GUI thread.
-    const auto regular="bv*"+cap+"+ba/b"+cap;
+    const auto regular=metadataInfo_.value("videoOnly").toBool() ? "bv*"+cap:"bv*"+cap+"+ba/b"+cap;
     // Public YouTube can advertise direct HTTPS formats that GVS rejects with
     // 403. Prefer its available HLS formats, then checked direct alternatives.
     const auto format=youtubeHost(QUrl(url_).host()) && !browserSource_ ? "bv*"+cap+"[protocol^=m3u8]+ba[protocol^=m3u8]/b"+cap+"[protocol^=m3u8]/"+regular:regular;

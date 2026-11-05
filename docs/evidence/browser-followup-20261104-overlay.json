@@ -1,0 +1,7 @@
+{
+  "checks": 69,
+  "scope": "Controlled YouTube/LinkedIn/Loom origins in real private headless Chrome; optional browser descriptors, native extraction on missing browser streams, stable thumbnail overlays across preview removal, clicked multi-player feed source, canonical Loom page, trusted clicks and no session export. Full public transfers verified separately.",
+  "apiCalls": 4,
+  "normalProfileOrRegistrationUsed": false,
+  "publicYouTubeDownloadVerified": false
+}

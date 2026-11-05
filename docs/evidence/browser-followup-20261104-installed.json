@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "files": [
+    "Downshift.exe",
+    "build-source.json",
+    "extension/app-launcher.js",
+    "extension/background.js",
+    "extension/file-links.js",
+    "extension/handoff.js",
+    "extension/media.js",
+    "extension/video-button.js"
+  ],
+  "backupRetained": true,
+  "installedHashesMatch": true,
+  "smokeTestExit": 0,
+  "normalUserDataOpenedForSmoke": false,
+  "extensionReloadRequired": true
+}

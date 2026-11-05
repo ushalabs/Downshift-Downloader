@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {MediaSources,publicUrl,youtubePage} from "../extension/media.js";
+import {MediaSources,publicUrl,youtubePage,loomPage,linkedinPage} from "../extension/media.js";
 import {HandoffController} from "../extension/handoff.js";
 import {youtubeDescriptor,youtubeStreamUrl} from '../extension/youtube-streams.js';
 let checks=0;const check=(value)=>{assert(value);checks++;};
@@ -77,4 +77,14 @@ check(sources.resolve({page:embedded.url,playerCount:1},embedded)==="https://cdn
 for(let i=0;i<300;i++)observe(`https://cdn.example.com/${i}.mp4`,0,i);check(sources.tabs.size===128);
 let saved;const controller=new HandoffController({load:async()=>undefined,save:async state=>saved=structuredClone(state)});await controller.load();check(controller.summary().enabled===true);
 const disabled=new HandoffController({load:async()=>({enabled:false})});await disabled.load();check(disabled.summary().enabled===false);
+{
+ const page='https://www.loom.com/embed/0123456789abcdef0123456789abcdef',sender={url:page,frameId:0,documentId:'loom',tab:{id:400}},sources=new MediaSources();
+ sources.observe({tabId:400,frameId:0,documentId:'loom',url:'https://cdn.example/segment.mp4',statusCode:206,responseHeaders:[{name:'Content-Type',value:'video/mp4'}]});
+ check(sources.resolveRequest({page,source:'https://cdn.example/segment.mp4',playerCount:3},sender).url==='https://www.loom.com/share/0123456789abcdef0123456789abcdef');check(Object.keys(sources.resolveRequest({page},sender).context).length===0);
+ check(!loomPage(page.replace('loom.com','loom.com.evil.test')));
+ const feed='https://www.linkedin.com/feed/',post='https://www.linkedin.com/feed/update/urn:li:activity:1234567890',linkedin={url:feed,frameId:0,documentId:'feed',tab:{id:401}};
+ check(sources.resolveRequest({page:feed,videoPage:post,source:'blob:player',playerCount:8},linkedin).url===post);
+ check(sources.resolveRequest({page:feed,videoPage:post,source:'https://cdn.example/clicked.mp4',playerCount:8},linkedin).url==='https://cdn.example/clicked.mp4');
+ check(!linkedinPage(post.replace('linkedin.com','linkedin.com.evil.test')));check(!sources.resolveRequest({page:feed,videoPage:post,protected:true},linkedin));
+}
 console.log(`Media extension checks passed: ${checks}`);

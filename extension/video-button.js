@@ -20,8 +20,19 @@
   postMessage({type:"downshift-manifest-replay"},pageOrigin==="null"?"*":pageOrigin);
   let scheduled = false;
   function requestLayout() { if (!scheduled) { scheduled = true; requestAnimationFrame(layout); } }
-  function attach(video) {
-    if (players.has(video) || players.size >= 48) return;
+  const cardSelector='ytd-rich-item-renderer,ytd-video-renderer,ytd-reel-item-renderer,ytd-compact-video-renderer,yt-lockup-view-model';
+  function youtubeLink(card){return [...card.querySelectorAll('a[href]')].map(a=>a.href).find(value=>{try{const u=new URL(value);return /(^|\.)youtube\.com$/.test(u.hostname) && (/^[\w-]{11}$/.test(u.searchParams.get('v') || '') || /^\/shorts\/[\w-]{11}(?:\/|$)/.test(u.pathname));}catch{return false;}}) || '';}
+  function clickedSource(video){
+    if(!video)return '';
+    const current=video.currentSrc || video.src;if(/^https?:\/\//i.test(current))return current;
+    const sources=[...video.querySelectorAll('source[src]')].map(source=>({src:source.src}));
+    const encoded=video.getAttribute('data-sources');if(encoded && encoded.length<=65536)try{const list=JSON.parse(encoded);if(Array.isArray(list))sources.push(...list.slice(0,32));}catch{}
+    return sources.filter(source=>typeof source?.src==='string' && /^https?:\/\//i.test(source.src) && source.src.length<=32768).sort((a,b)=>(Number(b.height)||Number(b['data-bitrate'])||0)-(Number(a.height)||Number(a['data-bitrate'])||0))[0]?.src || current || '';
+  }
+  function attach(target,cardMode=false) {
+    if (players.has(target) || players.size >= 96) return;
+    if(!cardMode && target.closest(cardSelector) && /(^|\.)youtube\.com$/.test(location.hostname))return;
+    if(!cardMode && /(^|\.)youtube\.com$/.test(location.hostname) && target.closest('ytd-video-preview,#inline-preview-player') && document.querySelector(cardSelector))return;
     const host = document.createElement("div"); host.dataset.downshiftVideo = "true";
     host.style.cssText = "all:initial;position:fixed;z-index:2147483647;display:none;pointer-events:none";
     const root = host.attachShadow({mode:"closed"});
@@ -31,17 +42,25 @@
     button.title = "Choose quality and download with Downshift";
     const notice = document.createElement("span"); notice.setAttribute("role","status");
     root.append(style,button,notice); document.documentElement.append(host);
-    const record = {host, button, notice}; players.set(video,record);
+    const record = {host, button, notice,cardMode}; players.set(target,record);
     button.addEventListener("click", async event => {
       // A page script cannot silently ask the native application to download a video.
       if (!event.isTrusted) return;
       event.preventDefault(); event.stopPropagation(); button.disabled = true; notice.textContent = "Opening Downshift…";
       try {
-        const card = video.closest("ytd-rich-item-renderer,ytd-video-renderer,ytd-reel-item-renderer,ytd-compact-video-renderer");
-        const player = video.closest(".html5-video-player");
-        let videoPage = card?.querySelector('a[href*="/watch?v="],a[href^="/shorts/"]')?.href || player?.querySelector("a.ytp-title-link[href]")?.href || "";
+        const video=cardMode ? target.querySelector('video'):target;
+        const card = cardMode ? target:video.closest(cardSelector);
+        const player = video?.closest(".html5-video-player");
+        let videoPage = (card ? youtubeLink(card):'') || player?.querySelector("a.ytp-title-link[href]")?.href || "";
+        if(/(^|\.)linkedin\.com$/.test(location.hostname)){
+          for(let post=video?.parentElement,depth=0;post && depth<12;post=post.parentElement,depth++){
+            const urn=['data-urn','data-activity-urn','data-id','data-entity-urn'].map(name=>post.getAttribute(name)||'').join(' ').match(/urn:li:activity:(\d+)/);
+            if(urn){videoPage='https://www.linkedin.com/feed/update/urn:li:activity:'+urn[1];break;}
+            if(post.matches('.feed-shared-update-v2,.occludable-update')){videoPage=[...post.querySelectorAll('a[href]')].map(a=>a.href).find(href=>/^https:\/\/(?:www\.)?linkedin\.com\/(?:feed\/update\/urn:li:activity:\d+|posts\/)/.test(href)) || '';break;}
+          }
+        }
         let browserPrepared=false;
-        if(window===top && /(^|\.)youtube\.com$/.test(location.hostname) && !video.mediaKeys){
+        if(video && !cardMode && window===top && /(^|\.)youtube\.com$/.test(location.hostname) && !video.mediaKeys){
           notice.textContent='Reading the playing video…';
           let videoId;try{const u=new URL(videoPage||location.href);videoId=u.searchParams.get('v')||u.pathname.match(/^\/(?:shorts|live)\/([\w-]{11})/)?.[1];}catch{}
           const prepared=await new Promise(resolve=>{const nonce=crypto.randomUUID(),timer=setTimeout(()=>{pendingYouTube.delete(nonce);resolve(undefined);},12000);video.setAttribute('data-downshift-request',nonce);pendingYouTube.set(nonce,value=>{clearTimeout(timer);resolve(value);});postMessage({type:'downshift-youtube-prepare',nonce,videoId},location.origin);});
@@ -51,28 +70,30 @@
           // SABR, has no standard stream, or the page bridge did not respond.
           if(prepared){videoPage='https://www.youtube.com/watch?v='+prepared.id;browserPrepared=true;}
         }
-        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, browserPrepared, source:video.currentSrc || video.src || video.querySelector("source")?.src || "", userAgent:navigator.userAgent, playerCount:players.size, protected:!!video.mediaKeys, title:document.title.slice(0,200)});
+        const playerCount=[...document.querySelectorAll('video')].filter(v=>v.isConnected && v.getBoundingClientRect().width>=120 && v.getBoundingClientRect().height>=70).length;
+        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, browserPrepared, source:clickedSource(video), userAgent:navigator.userAgent, playerCount, protected:!!video?.mediaKeys, title:document.title.slice(0,200)});
         notice.textContent = answer?.ok ? "Choose quality in Downshift." : answer?.error || "Open Downshift and try again.";
       } catch(error) { notice.textContent = error?.message || "Reload this page after reloading the Downshift extension."; }
       button.disabled = false;
     });
-    video.addEventListener("loadedmetadata",requestLayout); video.addEventListener("emptied",requestLayout);
+    if(!cardMode){target.addEventListener("loadedmetadata",requestLayout); target.addEventListener("emptied",requestLayout);}
   }
   function discover() {
     for (const [video, record] of players) if (!video.isConnected) { record.host.remove(); players.delete(video); }
     // Include players inside open shadow roots without injecting code into the page's main world.
-    function scan(root) { for (const video of root.querySelectorAll("video")) attach(video); for (const node of root.querySelectorAll("*")) if (node.shadowRoot) scan(node.shadowRoot); }
+    function scan(root) {if(/(^|\.)youtube\.com$/.test(location.hostname))for(const card of root.querySelectorAll(cardSelector))if(!card.parentElement?.closest(cardSelector) && youtubeLink(card))attach(card,true);for (const video of root.querySelectorAll("video")) attach(video); for (const node of root.querySelectorAll("*")) if (node.shadowRoot) scan(node.shadowRoot); }
     scan(document); requestLayout();
   }
   function layout() {
     scheduled = false;
-    for (const [video, {host}] of players) {
-      const rect = video.getBoundingClientRect(), style = getComputedStyle(video);
-      const visible = video.isConnected && rect.width >= 120 && rect.height >= 70 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && style.visibility !== "hidden" && style.display !== "none";
+    for (const [target, {host,cardMode}] of players) {
+      const anchor=cardMode ? target.querySelector('a#thumbnail,yt-thumbnail-view-model,yt-thumbnail-view-model a,a[href*="/watch?v="],a[href*="/shorts/"]') || target:target;
+      const rect = anchor.getBoundingClientRect(), style = getComputedStyle(anchor);
+      const visible = target.isConnected && rect.width >= 120 && rect.height >= 70 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && style.visibility !== "hidden" && style.display !== "none";
       host.style.display = visible ? "block" : "none";
       if (!visible) continue;
       const fullscreen = document.fullscreenElement;
-      const container = fullscreen && fullscreen.contains(video) && fullscreen !== video ? fullscreen : document.documentElement;
+      const container = fullscreen && fullscreen.contains(target) && fullscreen !== target ? fullscreen : document.documentElement;
       if (host.parentNode !== container) container.append(host);
       host.style.top = `${Math.max(8,rect.top + 8)}px`;
       host.style.left = `${Math.max(8,Math.min(innerWidth - 200,rect.right - 196))}px`;
@@ -82,6 +103,7 @@
   observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["src"]});
   addEventListener("scroll",requestLayout,true); addEventListener("resize",requestLayout);
   document.addEventListener("fullscreenchange",requestLayout);
+  document.addEventListener('pointerover',requestLayout,true);document.addEventListener('pointerout',requestLayout,true);
   // Covers SPA navigation, resized players, and additions inside existing open shadow roots.
   setInterval(discover,2000); discover();
 })();

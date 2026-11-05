@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-04",
+  "version": "1.0.0 local repair",
+  "installed": true,
+  "changes": [
+    "Shared 60-second single-launch readiness outside serialized preflight and before Pause; explicit trusted download anchors warm the app without intercepting navigation.",
+    "Persistent YouTube card overlays survive preview removal and nested renderer updates.",
+    "Clicked LinkedIn source attributes/activity identity replace ambiguous feed-wide selection; Loom canonical pages use native extraction.",
+    "Explicit video-only metadata no longer requires a nonexistent audio stream; the choice persists in encrypted resume metadata."
+  ],
+  "validation": {
+    "releaseAffectedCtest": {
+      "passed": 8,
+      "failed": 0,
+      "seconds": 177.47
+    },
+    "assertions": {
+      "extension": 77,
+      "browserBridge": 16,
+      "mediaSource": 60,
+      "nativeProtocol": 43,
+      "nativeBrowserTransfer": 25,
+      "mediaGui": 155,
+      "queue": 51
+    },
+    "actualNativeChrome": 33,
+    "finalControlledSiteChrome": 69,
+    "privateUpdaterChecks": 33,
+    "installedPrivateStartup": true,
+    "realSuppliedLoom": {
+      "selected": "720p",
+      "bytes": 9148337,
+      "duration": 112.468744,
+      "sha256": "d80cc923d7b62064fe92007719cf9f6e6e6c5b7fa431c831f70bc7016aace69c",
+      "audio": false,
+      "qualities": [
+        "Best available",
+        "1080p",
+        "720p"
+      ]
+    }
+  },
+  "preservation": {
+    "capturedPrivateStorageFilesByteIdentical": 31,
+    "databaseImplementationOrSchemaChanges": false,
+    "browserProfileOrRegistryChanges": false,
+    "torrentSourceChanges": false,
+    "commitsOrPushes": false,
+    "originalInstalledFilesBackedUp": true
+  },
+  "limits": [
+    "The cold-start fixture uses twelve seconds of simulated native startup; it is not a measured PC reboot.",
+    "Generic opaque/POST/blob downloads still require the browser response; no claim of pre-response capture for every navigation.",
+    "LinkedIn is tested with controlled multi-player feed sources and post identity; the user signed-in feed was not accessed.",
+    "The supplied Loom clip advertises video-only formats and the final file has no audio track.",
+    "Normal Chrome UI automation stopped on active-URL verification. Reloading the existing extension and refreshing pages remains manual.",
+    "Initial hidden-player locator, video-only selector, overlong private fixture path and updater compatibility failures are excluded from acceptance."
+  ],
+  "sources": {
+    "extension/app-launcher.js": "f8d013880ce1c4c99dfb3f4f136323bfd294ffa59a268c469870451dd5e8e20e",
+    "extension/background.js": "621362fb03885e7d44a4ad32bf250f0cf021b92782e601feedc06f8eb0e6d956",
+    "extension/handoff.js": "9f6426e1138766f6eec2f26feb4cd66d8464bfd08acb0dac761ed1c4a5652d4e",
+    "extension/file-links.js": "168d79d76731e4127e4b9c3dba9ec56e63ff9fc2239605d1abb7a20bf1e16dc2",
+    "extension/media.js": "7fbe7c2140dc2736c36f6c35e4eb7c37f8a26ccb909267a7f8cd1cdb7996d536",
+    "extension/video-button.js": "9ed75ee66d7d71849e1e8611af1498f4c003a71147ae3bbf80d53625f6322cbe",
+    "src/gui/MediaDialog.cpp": "cbd84f0a3130fc1b3d898afde724672397dcca42563830d118a3ec08b9db6b0a",
+    "src/core/DownloadQueue/QueueManager.cpp": "5779a453947cef782505d389c27e2901e1df3a45d2a47b31349709ce5836a538",
+    "scripts/Apply-BrowserRepair.ps1": "6fac42157d6840c008a003c72e873ca59230fa76a65745aff34e2108b2452bc4",
+    "tests/BrowserRepairTests.py": "b352f08ba4290eabc4f9a2d8a9419d4af78412ba3883135594114215b3bcb095",
+    "tests/YouTubeChromeTests.cjs": "243e5ba759395f3d4992c9eaebbe421105cdfbcb1cdf1f08bd33ad248d318e8d",
+    "tests/LiveSiteVideoCheck.cjs": "62c84d70b763f66c6ea8f9613f73bdf6dfb0f713b166671f2fa738b1294ef6d4"
+  }
+}

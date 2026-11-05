@@ -17,6 +17,8 @@ export function youtubePage(value) {
   const id = url.searchParams.get("v") || match?.[1];
   return id && /^[\w-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
 }
+export function loomPage(value){const address=publicUrl(value);if(!address)return null;const url=new URL(address),match=url.pathname.match(/^\/(?:share|embed)\/([a-f\d]{32})(?:\/|$)/i);return /^(?:www\.)?loom\.com$/.test(url.hostname)&&match ? `https://www.loom.com/share/${match[1]}`:null;}
+export function linkedinPage(value){const address=publicUrl(value);if(!address)return null;const url=new URL(address);return /(^|\.)linkedin\.com$/.test(url.hostname) && (/^\/posts\/[^/]+/.test(url.pathname)||/^\/feed\/update\/urn:li:activity:\d+/.test(url.pathname)) ? address:null;}
 export class MediaSources {
   constructor(now = () => Date.now()) { this.tabs = new Map(); this.requests = new Map(); this.youtube = new Map(); this.youtubeMedia = new Map(); this.now = now; }
   request(details) {
@@ -86,7 +88,11 @@ export class MediaSources {
       const player = youtubePage(message.videoPage);
       return player || youtubePage(page);
     }
+    // Loom's native extractor resolves full qualities from its canonical page;
+    // an incidental playback request can be only a segment or video-only track.
+    if(loomPage(page))return loomPage(page);
     const direct = publicUrl(message.source); if (direct) return direct;
+    if(/(^|\.)linkedin\.com$/.test(new URL(page).hostname) && linkedinPage(message.videoPage))return linkedinPage(message.videoPage);
     const candidates = this.candidates(sender,page);
     // Adaptive players request a master and one or more variants. That is one
     // player, not an unsupported page. Prefer its earliest manifest, not a segment.
@@ -121,6 +127,7 @@ export class MediaSources {
       if(referer?.length<=8192)context.referer=referer;
       if(publicUrl(candidate?.headers.origin))context.origin=candidate.headers.origin;
       if(candidate?.headers.userAgent)context.userAgent=candidate.headers.userAgent;
+      else if(typeof message.userAgent==='string' && message.userAgent.length<=2048 && !/[\x00-\x1f\x7f]/.test(message.userAgent))context.userAgent=message.userAgent;
       context.detectedStream=true;
     }
     return {url,context};

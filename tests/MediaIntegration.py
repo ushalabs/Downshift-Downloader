@@ -37,6 +37,8 @@ def main():
         # Use an explicit working directory rather than Windows backslashes in that name.
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-filter_complex','[0:v]split=2[full][small];[small]scale=160:120[scaled]','-map','[full]','-map','[scaled]','-map','0:a','-c:v','mpeg4','-c:a','copy','-f','dash','-remove_at_exit','0','stream.mpd'],cwd=source,check=True,timeout=30,capture_output=True)
         assert (source/'init-stream0.m4s').exists() and (source/'init-stream1.m4s').exists(),'DASH fixture initialization files missing'
+        silent=source/'silent';silent.mkdir()
+        subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i',str(source/'fixture.mp4'),'-an','-c:v','copy','-f','dash','-remove_at_exit','0','stream.mpd'],cwd=silent,check=True,timeout=30,capture_output=True)
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-c:v','mpeg2video','-c:a','mp2','-f','hls','-hls_playlist_type','vod','-hls_segment_filename','hls-%03d.ts','hls-default.txt'],cwd=source,check=True,timeout=30,capture_output=True)
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-vf','scale=160:120','-c:v','mpeg2video','-c:a','mp2','-f','hls','-hls_playlist_type','vod','-hls_segment_filename','hls-small-%03d.ts','hls-small.txt'],cwd=source,check=True,timeout=30,capture_output=True)
         (source/'hls-master.txt').write_text('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100000,RESOLUTION=160x120\nhls-small.txt\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=320x240\nhls-default.txt\n',encoding='utf-8')

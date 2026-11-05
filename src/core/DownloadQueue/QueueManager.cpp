@@ -267,7 +267,8 @@ std::future<QString> QueueManager::beginMedia(QString url,QString folder,QString
         const auto browser=metadata.value("requestContext").toObject().value("youtube").toObject();if(!browser.isEmpty()&&youtubeVideo(url)!="https://www.youtube.com/watch?v="+browser.value("id").toString())invalid("The browser source does not match this video.");
         if(metadata.contains("resumeRecipe")&&!validMediaResume(metadata.value("resumeRecipe").toObject()))invalid("Invalid video resume selection.");
         if(metadata.contains("browserSource") && (!metadata.value("browserSource").isBool() || (metadata.value("browserSource").toBool()&&browser.isEmpty())))invalid("Invalid video source selection.");
-        for(const auto& field:QStringList{"title","thumbnail","originalPage","webpage_url","extractor_key","duration","height","requestContext","downloadName","resumeRecipe","browserSource"})if(metadata.contains(field))e.videoMetadata.insert(field,metadata.value(field));
+        if(metadata.contains("videoOnly") && !metadata.value("videoOnly").isBool())invalid("Invalid video stream selection.");
+        for(const auto& field:QStringList{"title","thumbnail","originalPage","webpage_url","extractor_key","duration","height","requestContext","downloadName","resumeRecipe","browserSource","videoOnly"})if(metadata.contains(field))e.videoMetadata.insert(field,metadata.value(field));
         if(QJsonDocument(e.videoMetadata).toJson(QJsonDocument::Compact).size()>65536)invalid("Video preview metadata exceeds its limit.");
         const auto stage=ownedMedia::workspace(e.mediaFolder,e.id);ordinaryParents(path(stage));if(!QDir().mkdir(stage))invalid("Cannot create a private video staging folder.");e.mediaIdentity=ownedMedia::identity(stage);
         e.status=QueueStatus::Running;e.created=QDateTime::currentSecsSinceEpoch();save(e);entries_.push_back(e);return e.id;

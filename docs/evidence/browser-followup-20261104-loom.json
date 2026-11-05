@@ -1,0 +1,31 @@
+{
+  "source": "Public Loom clip supplied for reproduction",
+  "selected": "720p",
+  "qualities": [
+    "Best available",
+    "1080p",
+    "720p"
+  ],
+  "bytes": 9148337,
+  "sha256": "d80cc923d7b62064fe92007719cf9f6e6e6c5b7fa431c831f70bc7016aace69c",
+  "duration": 112.468744,
+  "streams": [
+    {
+      "type": "video",
+      "codec": "h264",
+      "height": 720
+    }
+  ],
+  "status": "Completed",
+  "chromeVersion": "155.0.8059.39",
+  "normalProfileOrRegistrationUsed": false,
+  "sources": {
+    "extension/app-launcher.js": "f8d013880ce1c4c99dfb3f4f136323bfd294ffa59a268c469870451dd5e8e20e",
+    "extension/background.js": "621362fb03885e7d44a4ad32bf250f0cf021b92782e601feedc06f8eb0e6d956",
+    "extension/handoff.js": "9f6426e1138766f6eec2f26feb4cd66d8464bfd08acb0dac761ed1c4a5652d4e",
+    "extension/file-links.js": "168d79d76731e4127e4b9c3dba9ec56e63ff9fc2239605d1abb7a20bf1e16dc2",
+    "extension/media.js": "7fbe7c2140dc2736c36f6c35e4eb7c37f8a26ccb909267a7f8cd1cdb7996d536",
+    "extension/video-button.js": "9ed75ee66d7d71849e1e8611af1498f4c003a71147ae3bbf80d53625f6322cbe",
+    "tests/LiveSiteVideoCheck.cjs": "62c84d70b763f66c6ea8f9613f73bdf6dfb0f713b166671f2fa738b1294ef6d4"
+  }
+}

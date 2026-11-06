@@ -1,6 +1,8 @@
 #include "MainWindow.h"
 #include "DownloadName.h"
+#include "DownloadSize.h"
 #include "MediaDialog.h"
+#include "packaging/MsixSetup.h"
 #include "core/DownloadQueue/Categories.h"
 #include "core/DownloadQueue/VideoUrl.h"
 #include <QApplication>
@@ -40,6 +42,11 @@ void MainWindow::openAdd(QString address,QString filename) {
     auto* dialog=new QDialog(this);dialog->setObjectName("addDialog");dialog->setAttribute(Qt::WA_DeleteOnClose);dialog->setWindowTitle("Add download");dialog->setMinimumWidth(560);auto* layout=new QVBoxLayout(dialog);layout->setContentsMargins(24,24,24,24);layout->setSpacing(16);auto* form=new QFormLayout;layout->addLayout(form);
     auto* name=new QLineEdit;name->setObjectName("addFilename");form->addRow("Name",name);
     auto* url=new QLineEdit;url->setObjectName("addUrl");url->setPlaceholderText("https://example.com/file.zip");form->addRow("Download link",url);
+    auto* size=new QLabel(downloadSizeText({}));size->setObjectName("addSize");form->addRow("File size",size);
+    auto* probe=new DownloadSizeProbe(size);
+    connect(url,&QLineEdit::textChanged,dialog,[probe](const QString& text){
+        probe->inspect(youtubeVideo(text.trimmed()).isEmpty()?QUrl(text.trimmed()):QUrl());
+    });
     auto* dest=new QLineEdit;dest->setObjectName("addDestination");auto* browse=makeButton("Browse…","addBrowse");auto* pathRow=new QHBoxLayout;pathRow->addWidget(dest,1);pathRow->addWidget(browse);form->addRow("Save as",pathRow);
     connect(url,&QLineEdit::textChanged,dialog,[this,url,dest]{if(!dest->isModified()){auto name=QUrl(url->text()).fileName();if(name.isEmpty())name="download.bin";dest->setText(QDir(current_.settings.directory).filePath(downloadCategory(name)+"/"+name));}});
     dest->setText(QDir(current_.settings.directory).filePath("Programs/download.bin"));url->setText(address);if(!filename.isEmpty())dest->setText(QDir(current_.settings.directory).filePath(downloadCategory(filename)+"/"+filename));connect(browse,&QPushButton::clicked,dialog,[dialog,dest]{const auto name=QFileDialog::getSaveFileName(dialog,"Save download",dest->text());if(!name.isEmpty()){dest->setText(name);dest->setModified(true);}});
@@ -64,7 +71,8 @@ void MainWindow::openAdd(QString address,QString filename) {
 void MainWindow::confirmDownload(const QueueEntry& row) {
     if(findChild<QDialog*>("captureDialog-"+row.id))return;
     auto* dialog=new QDialog(this);dialog->setAttribute(Qt::WA_DeleteOnClose);dialog->setObjectName("captureDialog-"+row.id);dialog->setWindowTitle("Save download — Downshift");dialog->resize(560,220);
-    auto* layout=new QVBoxLayout(dialog);auto* fields=new QFormLayout;auto* name=new QLineEdit(QFileInfo(row.destination).fileName());name->setObjectName("captureFilename");fields->addRow("Name",name);auto* path=new QLineEdit(row.destination);path->setObjectName("captureDestination");fields->addRow("Save as",path);layout->addLayout(fields);
+    auto* layout=new QVBoxLayout(dialog);auto* fields=new QFormLayout;auto* name=new QLineEdit(QFileInfo(row.destination).fileName());name->setObjectName("captureFilename");fields->addRow("Name",name);auto* path=new QLineEdit(row.destination);path->setObjectName("captureDestination");fields->addRow("Save as",path);
+    auto* size=new QLabel(downloadSizeText(row.progress.totalBytes));size->setObjectName("captureSize");fields->addRow("File size",size);layout->addLayout(fields);
     connect(path,&QLineEdit::textChanged,dialog,[name](const QString& value){const QSignalBlocker block(name);name->setText(QFileInfo(value).fileName());});
     connect(name,&QLineEdit::textChanged,dialog,[name,path]{const QSignalBlocker block(path);path->setText(QDir(QFileInfo(path->text()).absolutePath()).filePath(name->text()));});
     auto* browse=new QPushButton("Choose location…");layout->addWidget(browse);connect(browse,&QPushButton::clicked,dialog,[dialog,path]{const auto file=QFileDialog::getSaveFileName(dialog,"Save download",path->text());if(!file.isEmpty())path->setText(file);});
@@ -91,6 +99,10 @@ void MainWindow::openSettings() {
     auto* cap=new QLineEdit(QString::number(static_cast<double>(saved.speedLimit)/1024.,'g',12));cap->setObjectName("settingsSpeedLimit");cap->setValidator(new QDoubleValidator(0,10485760,10,cap));cap->setPlaceholderText("0 = Unlimited");downloadForm->addRow("Total speed limit (KB/s)",cap);auto* capNote=new QLabel("0 means Unlimited. Fractions are supported; 1024 KiB/s is 1 MiB/s.");capNote->setWordWrap(true);capNote->setObjectName("muted");downloads->addWidget(capNote);downloads->addStretch();
     auto* appearance=page("Appearance","Neutral surfaces, clear text and Downshift's pink accents.");auto* appearanceForm=form(appearance);auto* themeChoice=new QComboBox;themeChoice->setObjectName("settingsTheme");themeChoice->addItems({"Light","Dark"});themeChoice->setCurrentIndex(saved.dark ? 1:0);modernCombo(themeChoice);appearanceForm->addRow("Theme",themeChoice);appearance->addStretch();connect(themeChoice,&QComboBox::currentIndexChanged,dialog,[this](int choice){theme(choice==1);});connect(dialog,&QDialog::rejected,this,[this]{theme(current_.settings.dark);});
     auto* integration=page("Integration","Use the Chrome extension to send downloads to this desktop app.");auto* chrome=new QLabel("Chrome integration: "+chromeStatus_);chrome->setObjectName("chromeStatus");chrome->setWordWrap(true);integration->addWidget(chrome);auto* native=new QLabel(ready_ ? "Saved history: loaded. Native Messaging is available when the extension reports Ready.":"Saved history is unavailable. Existing data has not been cleared; close Downshift and retry.");native->setWordWrap(true);integration->addWidget(native);auto* instruction=new QLabel("After an app update, reload Downshift at chrome://extensions and refresh open pages. Check that both app and extension versions match.");instruction->setWordWrap(true);instruction->setObjectName("muted");integration->addWidget(instruction);
+    if(msix::chromeSetupAvailable()){
+        auto* setup=makeButton("Set up Chrome","msixSetup");integration->addWidget(setup);
+        connect(setup,&QPushButton::clicked,dialog,[dialog]{msix::showSetup(dialog);});
+    }
     auto* diagnosticsCopy=makeButton("Copy integration diagnostics","integrationDiagnostics");diagnosticsCopy->setIcon(lineIcon(Symbol::Copy));integration->addWidget(diagnosticsCopy);connect(diagnosticsCopy,&QPushButton::clicked,dialog,[this]{QApplication::clipboard()->setText(QString("Downshift %1\nHistory loaded: %2\nDownloads: %3\nChrome: %4\nData folder: %5").arg(QApplication::applicationVersion(),ready_ ? "Yes":"No",QString::number(current_.entries.size()),chromeStatus_,QFileInfo(queue_.databasePath()).absolutePath()));});integration->addStretch();
     auto* advanced=page("Advanced","History and settings stay on this computer. Backups retain encrypted data.");auto* diagnostics=checkbox(advanced,"settingsDiagnostics","Save basic activity logs (no links or credentials)",saved.diagnostics);auto* dataLocation=new QLabel("Data folder: "+QFileInfo(queue_.databasePath()).absolutePath());dataLocation->setObjectName("dataFolder");dataLocation->setWordWrap(true);dataLocation->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);advanced->addWidget(dataLocation);auto* dataFolder=makeButton("Open data folder","dataFolderButton");dataFolder->setIcon(lineIcon(Symbol::Folder));advanced->addWidget(dataFolder);connect(dataFolder,&QPushButton::clicked,dialog,[this]{QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(queue_.databasePath()).absolutePath()));});auto* backupNote=new QLabel("Up to eight encrypted snapshots are kept after successful startup, Pause and clean shutdown. Download files and resume journals remain in their chosen folders.");backupNote->setWordWrap(true);backupNote->setObjectName("muted");advanced->addWidget(backupNote);
     auto* licenses=makeButton("Licenses and library source","licensesButton");advanced->addWidget(licenses);connect(licenses,&QPushButton::clicked,dialog,[]{QDesktopServices::openUrl(QUrl("https://github.com/ushalabs/Downshift-Download-Manager/blob/main/docs/THIRD_PARTY_NOTICES.md"));});auto* version=new QLabel("Downshift "+QApplication::applicationVersion()+" · Qt / LGPLv3");version->setObjectName("muted");advanced->addWidget(version);advanced->addStretch();

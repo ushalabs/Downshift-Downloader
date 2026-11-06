@@ -32,6 +32,22 @@ namespace {
 int checks=0;
 void check(bool value,const char* message){if(!value)throw std::runtime_error(message);++checks;std::cerr<<"Media check "<<checks<<": "<<message<<'\n';}
 template<class F> void wait(F condition,int timeout=90000,const std::source_location location=std::source_location::current()){const auto end=std::chrono::steady_clock::now()+std::chrono::milliseconds(timeout);while(std::chrono::steady_clock::now()<end){QApplication::processEvents();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);if(condition())return;QThread::msleep(5);}throw std::runtime_error("Video test timed out at line "+std::to_string(location.line()));}
+downshift::QueueEntry waitForVideo(downshift::QueueManager& queue,int expectedCount=0){
+    downshift::QueueEntry result;
+    wait([&]{
+        const auto rows=queue.snapshot().get().entries;
+        if(rows.empty() || (expectedCount && rows.size()!=expectedCount))return false;
+        result=rows.back();
+        using downshift::QueueStatus;
+        return result.status==QueueStatus::Completed || result.status==QueueStatus::Failed || result.status==QueueStatus::Cancelled;
+    });
+    return result;
+}
+void checkCompleted(downshift::QueueManager& queue,int expectedCount=0){
+    const auto row=waitForVideo(queue,expectedCount);
+    check(row.status==downshift::QueueStatus::Completed,row.error.toUtf8().constData());
+}
+
 }
 int main(int argc,char** argv) {
     QApplication app(argc,argv);QApplication::setApplicationName("Downshift");HiddenTestWindows hidden;app.installEventFilter(&hidden);if(argc!=4)return 2;
@@ -51,14 +67,13 @@ int main(int argc,char** argv) {
             check(submit->text()=="Download video",status->text().toUtf8().constData());check(dialog->findChild<QLineEdit*>("mediaDestination")->text()==QDir(root).filePath("Videos"),"Uses the video category folder");
             if(file=="stream.mpd")check(dialog->findChild<QComboBox*>("mediaQuality")->count()>1,"DASH qualities resolved");
             else{auto* quality=dialog->findChild<QComboBox*>("mediaQuality");check(quality->count()==1 && !quality->isEnabled(),"Single quality uses default without requiring selection");}
-            QDir().mkpath(shots);dialog->grab().save(QDir(shots).filePath(file+".bmp"),"BMP");submit->click();wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete" || submit->isEnabled();});
-            check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",status->text().toUtf8().constData());check(status->text().startsWith("Saved:"),"Actual output filename displayed");
-            ++completedCount;wait([&]{return std::count_if(window.current().entries.begin(),window.current().entries.end(),[](const auto& e){return e.media && e.status==downshift::QueueStatus::Completed;})==completedCount;});
-            check(dialog->findChild<QPushButton*>("mediaOpenFolder")->isVisible(),"Completed video has an open-folder action");
+            QDir().mkpath(shots);dialog->grab().save(QDir(shots).filePath(file+".bmp"),"BMP");submit->click();
+            checkCompleted(queue,++completedCount);
+            wait([&]{return !window.findChild<QDialog*>("mediaDialog") && window.current().entries.size()==completedCount &&
+                window.current().entries.back().status==downshift::QueueStatus::Completed;});
             check(window.findChild<QTableWidget*>("downloadTable")->rowCount()==static_cast<int>(window.current().entries.size()),"Videos appear in main history table");
             const auto& record=window.current().entries.back();check(QFile::exists(record.destination) && record.progress.totalBytes.value_or(0)>0,"History records the actual saved file and size");
             if(completedCount==1){auto* list=window.findChild<QTableWidget*>("downloadTable");for(int row=0;row<list->rowCount();++row)if(list->item(row,0)->data(Qt::UserRole).toString()==record.id)list->selectRow(row);wait([&]{return window.findChild<QLabel*>("previewFallback")->toolTip()=="Local video preview";},15000);check(!window.findChild<QLabel*>("previewFallback")->pixmap().isNull(),"Completed video supplies a real first-frame preview");}
-            dialog->close();wait([&]{return window.findChild<QDialog*>("mediaDialog")==nullptr;});
         }
         check(beats>10,"GUI heartbeat runs during media work");
         // Long recordings must not fail quality lookup because of unused
@@ -74,12 +89,19 @@ int main(int argc,char** argv) {
         window.openVideo(base+"/missing.mp4","Missing");auto* failed=window.findChild<QDialog*>("mediaDialog");auto* retry=failed->findChild<QPushButton*>("mediaDownload");wait([&]{return retry->isEnabled();});check(retry->text()=="Retry check","Unsupported/error is explicit");failed->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         // Resolve successfully, then fail the actual transfer. Unrelated old
         // files in the destination must never be reused or removed by staging.
-        window.openVideo(base+"/broken.mp4","Broken");auto* broken=window.findChild<QDialog*>("mediaDialog");auto* submit=broken->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video","Broken fixture metadata resolved");{QFile marker(QDir(root).filePath("../source/.fail-broken"));check(marker.open(QIODevice::WriteOnly),"Arm private transfer failure");}submit->click();wait([&]{return submit->isEnabled();});
-        check(broken->findChild<QLabel*>("mediaRate")->text()!="Complete","Zero-exit helper cannot complete invalid output");
-        wait([&]{return window.current().entries.size()==4 && window.current().entries.back().status==downshift::QueueStatus::Failed;});check(!window.current().entries.back().error.isEmpty(),"Failure persisted with explanation");check(!QFileInfo::exists(QDir(window.current().entries.back().mediaFolder).filePath(".downshift-video-"+window.current().entries.back().id)),"Failed video staging is removed");broken->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        window.openVideo(base+"/broken.mp4","Broken");auto* broken=window.findChild<QDialog*>("mediaDialog");auto* submit=broken->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video","Broken fixture metadata resolved");{QFile marker(QDir(root).filePath("../source/.fail-broken"));check(marker.open(QIODevice::WriteOnly),"Arm private transfer failure");}submit->click();
+        const auto failedVideo=waitForVideo(queue,4);check(failedVideo.status==downshift::QueueStatus::Failed,"Zero-exit helper cannot complete invalid output");
+        check(!failedVideo.error.isEmpty(),"Failure persisted with explanation");check(!QFileInfo::exists(QDir(failedVideo.mediaFolder).filePath(".downshift-video-"+failedVideo.id)),"Failed video staging is removed");
+        wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
         const auto customFolder=QDir(root).filePath("chosen folder");QDir().mkpath(customFolder);
-        window.openVideo(base+"/fixture.mp4","Cancel fixture",customFolder);auto* stopped=window.findChild<QDialog*>("mediaDialog");auto* start=stopped->findChild<QPushButton*>("mediaDownload");wait([&]{return start->isEnabled();});start->click();auto* stop=stopped->findChild<QPushButton*>("mediaCancel");wait([&]{return stop->isEnabled() && stop->text()=="Cancel";});stop->click();wait([&]{return start->isEnabled();});
-        wait([&]{return window.current().entries.size()==5 && window.current().entries.back().status==downshift::QueueStatus::Cancelled;});check(stopped->findChild<QLabel*>("mediaRate")->text()!="Complete","Stopped helper is not complete");check(!QFileInfo::exists(QDir(customFolder).filePath(".downshift-video-"+window.current().entries.back().id)),"Cancelled video staging is removed");stopped->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        window.openVideo(base+"/pause.mp4","Cancel fixture",customFolder);auto* stopped=window.findChild<QDialog*>("mediaDialog");auto* start=stopped->findChild<QPushButton*>("mediaDownload");wait([&]{return start->isEnabled();});start->click();
+        wait([&]{return window.current().entries.size()==5 && window.current().entries.back().status==downshift::QueueStatus::Running;});
+        auto* cancelTable=window.findChild<QTableWidget*>("downloadTable");const auto cancelId=window.current().entries.back().id;
+        for(int row=0;row<cancelTable->rowCount();++row)if(cancelTable->item(row,0)->data(Qt::UserRole).toString()==cancelId)cancelTable->selectRow(row);
+        window.findChild<QPushButton*>("cancelButton")->click();
+        const auto stoppedVideo=waitForVideo(queue,5);check(stoppedVideo.status==downshift::QueueStatus::Cancelled,"The dashboard cancels the hidden video transfer");
+        check(!QFileInfo::exists(QDir(customFolder).filePath(".downshift-video-"+cancelId)),"Cancelled video staging is removed");
+        wait([&]{return !window.findChild<QDialog*>("mediaDialog") && window.current().entries.back().status==downshift::QueueStatus::Cancelled;});
         auto* table=window.findChild<QTableWidget*>("downloadTable");const auto retryId=window.current().entries.back().id;int retryRow=-1;for(int row=0;row<table->rowCount();++row)if(table->item(row,0)->data(Qt::UserRole).toString()==retryId)retryRow=row;check(retryRow>=0,"Sorted table retains the cancelled video's ID");table->selectRow(retryRow);window.findChild<QPushButton*>("startButton")->click();auto* retryVideo=window.findChild<QDialog*>("mediaDialog");check(retryVideo!=nullptr,"Main-list retry opens video window");wait([&]{return retryVideo->findChild<QPushButton*>("mediaDownload")->isEnabled();});check(retryVideo->findChild<QLineEdit*>("mediaDestination")->text()==customFolder,"Retry preserves selected video folder");retryVideo->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         auto missing=queue.beginMedia(base+"/absent.mp4",root,"Missing output").get();bool rejected=false;try{queue.finishMedia(missing,downshift::QueueStatus::Completed,QDir(root).filePath("absent.mp4"),{}).get();}catch(...){rejected=true;}check(rejected,"No completion for missing output");queue.finishMedia(missing,downshift::QueueStatus::Failed,{},"No final output").get();
         auto cancelled=queue.beginMedia(base+"/cancel.mp4",root,"Cancelled video").get();queue.finishMedia(cancelled,downshift::QueueStatus::Cancelled,{},"Stopped").get();
@@ -97,12 +119,11 @@ int main(int argc,char** argv) {
         for(const auto height:{120,240}) {
             window.openVideo(base+"/stream.mpd","Quality fixture",folder);auto* dialog=window.findChild<QDialog*>("mediaDialog");auto* submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video","Quality fixture resolves");
             auto* quality=dialog->findChild<QComboBox*>("mediaQuality");const auto index=quality->findData(height);check(index>=0,"Specific resolution is offered");quality->setCurrentIndex(index);submit->click();
-            wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete" || submit->isEnabled();});check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());
+            checkCompleted(queue,height==120?1:2);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
             const auto record=queue.snapshot().get().entries.back();check(record.destination.contains("["+QString::number(height)+"p]"),"Actual resolution appears in the final filename");
             if(first.isEmpty()){first=record.destination;firstSize=QFileInfo(first).size();}else {check(first!=record.destination,"A different quality has its own output");check(QFileInfo(first).size()==firstSize,"Higher quality preserves the earlier file");}
-            dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         }}
-        {const auto folder=QDir(root).filePath("silent video");QDir().mkpath(folder);downshift::QueueManager queue(QDir(root).filePath("silent.sqlite"));downshift::MainWindow window(queue);window.show();window.openVideo(base+"/silent/stream.mpd","Silent fixture",folder);auto* dialog=window.findChild<QDialog*>("mediaDialog");auto* submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());submit->click();wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete" || submit->isEnabled();});check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());const auto row=queue.snapshot().get().entries.back();check(row.videoMetadata.value("videoOnly").toBool(),"Silent source selection persists for resume");dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);}
+        {const auto folder=QDir(root).filePath("silent video");QDir().mkpath(folder);downshift::QueueManager queue(QDir(root).filePath("silent.sqlite"));downshift::MainWindow window(queue);window.show();window.openVideo(base+"/silent/stream.mpd","Silent fixture",folder);auto* dialog=window.findChild<QDialog*>("mediaDialog");auto* submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());submit->click();checkCompleted(queue);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});const auto row=queue.snapshot().get().entries.back();check(row.videoMetadata.value("videoOnly").toBool(),"Silent source selection persists for resume");}
         {const auto folder=QDir(root).filePath("default hls");QDir().mkpath(folder);downshift::QueueManager queue(QDir(root).filePath("hls.sqlite"));downshift::MainWindow window(queue);window.show();
         const QJsonObject context{{"detectedStream",true},{"referer",base+"/embed/player"},{"origin","https://player.fixture.test"},{"userAgent","DownshiftMediaFixture/1.0"}};
         downshift::browser::validate({{"version",1},{"command","media"},{"url",base+"/hls-default.txt"},{"title","Default stream"},{"context",context}});++checks;
@@ -110,39 +131,46 @@ int main(int argc,char** argv) {
             bool rejected=false;try{const QJsonObject invalid{{bad,bad=="referer"?"https://player.test/\r\nCookie: forbidden":bad=="userAgent"?"bad\nHeader":"forbidden"}};downshift::browser::validate({{"version",1},{"command","media"},{"url",base+"/hls-default.txt"},{"title","Default"},{"context",invalid}});}catch(...){rejected=true;}check(rejected,"Unsafe media context rejected");}
         window.openVideo(base+"/hls-default.txt","Default stream",folder,context);auto* dialog=window.findChild<QDialog*>("mediaDialog");auto* submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());
         auto* quality=dialog->findChild<QComboBox*>("mediaQuality");check(quality->count()==1 && quality->currentData().toInt()==0 && !quality->isEnabled(),"Unknown resolution can download at default quality");
-        submit->click();wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete" || submit->isEnabled();});check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());
-        const auto entry=queue.snapshot().get().entries.back();check(entry.videoMetadata.value("requestContext").toObject()==context,"Retry context retained in encrypted history");dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);}
+        submit->click();checkCompleted(queue);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
+        const auto entry=queue.snapshot().get().entries.back();check(entry.videoMetadata.value("requestContext").toObject()==context,"Retry context retained in encrypted history");}
         for(const auto kind:QStringList{"direct","hls"}){
             const auto folder=QDir(root).filePath("pause-"+kind),database=QDir(root).filePath("pause-"+kind+".sqlite");QDir().mkpath(folder);
             auto queue=std::make_unique<downshift::QueueManager>(database);auto window=std::make_unique<downshift::MainWindow>(*queue);window->show();wait([&]{return window->ready();});auto settings=window->current().settings;settings.directory=folder;settings.notifications=false;settings.automatic=false;settings.connections=1;queue->configure(settings).get();
             const auto address=base+(kind=="direct"?"/pause.mp4":"/pause-stream.m3u8");window->openVideo(address,"Pause test",folder);auto* media=dynamic_cast<downshift::MediaDialog*>(window->findChild<QDialog*>("mediaDialog"));auto* submit=media->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});submit->click();
             wait([&]{const auto rows=queue->snapshot().get().entries;return rows.size()==1&&rows[0].progress.downloadedBytes>32768&&media->canPause();});const auto id=queue->snapshot().get().entries[0].id;auto* table=window->findChild<QTableWidget*>("downloadTable");wait([&]{return table->rowCount()==1;});table->selectRow(0);wait([&]{return window->findChild<QPushButton*>("pauseButton")->isEnabled();});
-            window->findChild<QPushButton*>("pauseButton")->click();wait([&]{return queue->snapshot().get().entries[0].status==downshift::QueueStatus::Paused&&media->paused();});check(media->paused(),"Media controller enters paused state");
+            window->findChild<QPushButton*>("pauseButton")->click();wait([&]{return queue->snapshot().get().entries[0].status==downshift::QueueStatus::Paused;});
             const auto paused=queue->snapshot().get().entries[0];check(paused.id==id&&paused.progress.downloadedBytes>0&&paused.progress.smoothedBytesPerSecond==0,"Pause retains received count and clears speed on same task");
             const auto stage=QDir(folder).filePath(".downshift-video-"+id);const auto files=[&]{QMap<QString,qint64> result;for(const auto& file:QDir(stage).entryInfoList(QDir::Files|QDir::Hidden))result[file.fileName()]=file.size();return result;};const auto held=files();check(!held.isEmpty(),"Video partial files retained on pause");
             for(int tick=0;tick<80;++tick){QApplication::processEvents();QThread::msleep(5);}check(files()==held,"Paused helper stops writing partial files");wait([&]{return window->current().entries[0].status==downshift::QueueStatus::Paused;});check(window->findChild<QPushButton*>("startButton")->text()=="Resume"&&window->findChild<QPushButton*>("startButton")->isEnabled(),"Main toolbar offers Resume instead of Retry video");
-            media->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);check(!window->findChild<QDialog*>("mediaDialog"),"Paused view closes without cancelling retained task");window.reset();queue.reset();
+            wait([&]{return !window->findChild<QDialog*>("mediaDialog");});window.reset();queue.reset();
             queue=std::make_unique<downshift::QueueManager>(database);window=std::make_unique<downshift::MainWindow>(*queue);window->show();wait([&]{return window->ready();});check(queue->snapshot().get().entries[0].status==downshift::QueueStatus::Paused&&files()==held,"Paused media and its partial files survive queue/app-owner restart");table=window->findChild<QTableWidget*>("downloadTable");wait([&]{return table->rowCount()==1;});table->selectRow(0);window->findChild<QPushButton*>("startButton")->click();
             wait([&]{const auto rows=queue->snapshot().get().entries;return rows[0].status==downshift::QueueStatus::Completed||rows[0].status==downshift::QueueStatus::Failed;});const auto result=queue->snapshot().get().entries[0];check(result.status==downshift::QueueStatus::Completed,result.error.toUtf8().constData());check(result.id==id&&queue->snapshot().get().entries.size()==1,"Resume completes the same history entry without duplicating it");check(!QFileInfo::exists(stage),"Verified resumed completion removes only owned staging");
         }
         {
         const auto folder=QDir(root).filePath("browser-youtube");QDir().mkpath(folder);downshift::QueueManager queue(QDir(root).filePath("browser-youtube.sqlite"));downshift::MainWindow window(queue);window.show();
         const QJsonArray formats{QJsonObject{{"url",base+"/browser-video.mp4"},{"format_id","137"},{"ext","mp4"},{"vcodec","unknown"},{"acodec","none"},{"height",240},{"filesize",static_cast<double>(QFileInfo(QDir(root).filePath("../source/browser-video.mp4")).size())}},QJsonObject{{"url",base+"/browser-audio.m4a"},{"format_id","140"},{"ext","m4a"},{"vcodec","none"},{"acodec","unknown"},{"filesize",static_cast<double>(QFileInfo(QDir(root).filePath("../source/browser-audio.m4a")).size())}}};
-        const QJsonObject context{{"youtube",QJsonObject{{"id","FQmqRVK3kHg"},{"duration",2.0},{"formats",formats}}}};
+        auto qualitiesWithSizes=formats;
+        qualitiesWithSizes.append(QJsonObject{{"url",base+"/fixture.mp4"},{"format_id","18"},{"ext","mp4"},{"vcodec","unknown"},{"acodec","unknown"},{"height",120},{"filesize",QFileInfo(QDir(root).filePath("../source/fixture.mp4")).size()}});
+        const QJsonObject context{{"youtube",QJsonObject{{"id","FQmqRVK3kHg"},{"duration",2.0},{"formats",qualitiesWithSizes}}}};
         downshift::browser::validate({{"version",1},{"command","media"},{"url","https://www.youtube.com/watch?v=FQmqRVK3kHg"},{"title","Browser source"},{"context",context}});++checks;
         bool rejected=false;try{downshift::browser::validate({{"version",1},{"command","media"},{"url","https://www.youtube.com/watch?v=HyfC9nZvIJM"},{"title","Other video"},{"context",context}});}catch(...){rejected=true;}check(rejected,"Browser descriptor cannot be attached to a different YouTube video");
         auto unsafe=context;auto video=unsafe["youtube"].toObject();auto injected=formats;auto item=injected[0].toObject();item["url"]="file:///C:/Windows/win.ini";injected[0]=item;video["formats"]=injected;unsafe["youtube"]=video;
         rejected=false;try{downshift::browser::validate({{"version",1},{"command","media"},{"url","https://www.youtube.com/watch?v=FQmqRVK3kHg"},{"title","Unsafe"},{"context",unsafe}});}catch(...){rejected=true;}check(rejected,"Browser descriptors reject local-file protocols");
         window.openVideo("https://www.youtube.com/watch?v=FQmqRVK3kHg",QString::fromUtf8("Browser source 日本語"),folder,context);auto* dialog=window.findChild<QDialog*>("mediaDialog");auto* submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());
-        check(dialog->findChild<QComboBox*>("mediaQuality")->currentText().contains("240p"),"Browser's actual resolution is offered without a YouTube webpage check");submit->click();wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete"||submit->isEnabled();});check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());
-        const auto saved=queue.snapshot().get().entries[0];check(saved.status==downshift::QueueStatus::Completed,"Browser audio/video transfer becomes durably completed only after verification");check(saved.destination.contains(QString::fromUtf8("日本語")),"Browser descriptor preserves Unicode names through Windows helper stdin/stdout");check(saved.videoMetadata.value("requestContext")==context,"Browser media descriptors persist inside encrypted video history");check(saved.videoMetadata.value("browserSource")==QJsonValue(true),"Actual browser fallback source mode persists for restart/resume");dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        auto* measured=dialog->findChild<QComboBox*>("mediaQuality");auto* size=dialog->findChild<QLabel*>("mediaSize");
+        check(measured->findData(120)>=0&&measured->findData(240)>=0,"Browser's actual resolutions are offered");
+        measured->setCurrentIndex(measured->findData(120));const auto lowerSize=size->text();
+        measured->setCurrentIndex(measured->findData(240));const auto higherSize=size->text();
+        check(lowerSize.startsWith("About ")&&higherSize.startsWith("About ")&&lowerSize!=higherSize,"Quality selection changes the reported transfer size before Start");
+        submit->click();checkCompleted(queue,1);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
+        const auto saved=queue.snapshot().get().entries[0];check(saved.status==downshift::QueueStatus::Completed,"Browser audio/video transfer becomes durably completed only after verification");check(saved.destination.contains(QString::fromUtf8("日本語")),"Browser descriptor preserves Unicode names through Windows helper stdin/stdout");check(saved.videoMetadata.value("requestContext")==context,"Browser media descriptors persist inside encrypted video history");check(saved.videoMetadata.value("browserSource")==QJsonValue(true),"Actual browser fallback source mode persists for restart/resume");
         const auto hlsFolder=QDir(root).filePath("browser-youtube-hls");QDir().mkpath(hlsFolder);const QJsonObject hlsContext{{"youtube",QJsonObject{{"id","HyfC9nZvIJM"},{"duration",2.0},{"formats",QJsonArray{}},{"manifest",base+"/hls-default.txt"}}},{"referer",base+"/embed/player"},{"origin","https://player.fixture.test"},{"userAgent","DownshiftMediaFixture/1.0"}};
-        window.openVideo("https://www.youtube.com/watch?v=HyfC9nZvIJM","Browser HLS",hlsFolder,hlsContext);dialog=window.findChild<QDialog*>("mediaDialog");submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());submit->click();wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete"||submit->isEnabled();});check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        window.openVideo("https://www.youtube.com/watch?v=HyfC9nZvIJM","Browser HLS",hlsFolder,hlsContext);dialog=window.findChild<QDialog*>("mediaDialog");submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());submit->click();checkCompleted(queue,2);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
         for(const auto height:{120,240}){
             const auto selectedFolder=QDir(root).filePath("browser-quality-"+QString::number(height));QDir().mkpath(selectedFolder);
             auto master=hlsContext;auto descriptor=master["youtube"].toObject();descriptor["manifest"]=base+"/hls-master.txt";master["youtube"]=descriptor;
             window.openVideo("https://www.youtube.com/watch?v=HyfC9nZvIJM","Browser master quality",selectedFolder,master);dialog=window.findChild<QDialog*>("mediaDialog");submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});
-            auto* qualities=dialog->findChild<QComboBox*>("mediaQuality");check(qualities->findData(120)>=0&&qualities->findData(240)>=0&&qualities->isEnabled(),"Browser master exposes both real selectable resolutions");qualities->setCurrentIndex(qualities->findData(height));submit->click();wait([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete"||submit->isEnabled();});check(dialog->findChild<QLabel*>("mediaRate")->text()=="Complete",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+            auto* qualities=dialog->findChild<QComboBox*>("mediaQuality");check(qualities->findData(120)>=0&&qualities->findData(240)>=0&&qualities->isEnabled(),"Browser master exposes both real selectable resolutions");qualities->setCurrentIndex(qualities->findData(height));submit->click();checkCompleted(queue,height==120?3:4);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
         }
         // Reproduce the user's format-18 failure: it passes metadata, then the
         // source refuses the helper's transfer preflight. This used to crash
@@ -153,9 +181,11 @@ int main(int argc,char** argv) {
         window.openVideo("https://www.youtube.com/watch?v=FQmqRVK3kHg","Denied browser source",deniedFolder,deniedContext);dialog=window.findChild<QDialog*>("mediaDialog");submit=dialog->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});check(submit->text()=="Download video",dialog->findChild<QLabel*>("mediaStatus")->text().toUtf8().constData());
         check(dialog->findChild<QComboBox*>("mediaQuality")->currentText()=="240p","Known single resolution is labeled explicitly, without Default quality");
         {QFile reject(QDir(root).filePath("../source/.reject-browser"));check(reject.open(QIODevice::WriteOnly),"Private expired-source marker opens");reject.write("reject");}
-        submit->click();wait([&]{return submit->isEnabled();});const auto failure=dialog->findChild<QLabel*>("mediaStatus")->text();check(failure.contains("YouTube rejected")&&!failure.contains("KeyError")&&!failure.contains("Traceback"),failure.toUtf8().constData());
-        check(dialog->findChild<QComboBox*>("mediaQuality")->count()==0,"Rejected browser formats are cleared rather than offered as downloadable");
-        check(queue.snapshot().get().entries.back().status==downshift::QueueStatus::Failed,"Rejected source never becomes a completed download");dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        submit->click();
+        const auto rejectedVideo=waitForVideo(queue,5);const auto failure=rejectedVideo.error;
+        check(rejectedVideo.status==downshift::QueueStatus::Failed && failure.contains("YouTube rejected") &&
+            !failure.contains("KeyError") && !failure.contains("Traceback"),failure.toUtf8().constData());
+        wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
         }
         {const auto folder=QDir(root).filePath("lifecycle");QDir().mkpath(folder);const auto database=QDir(root).filePath("lifecycle.sqlite");downshift::QueueManager queue(database);downshift::MainWindow window(queue);window.show();wait([&]{return window.ready();});
         auto settings=window.current().settings;settings.directory=folder;settings.notifications=false;queue.configure(settings).get();
@@ -165,10 +195,11 @@ int main(int argc,char** argv) {
         name->setText("Renamed 100% video.mp4");name->setModified(true);
         {QFile existing(QDir(folder).filePath("Renamed 100% video.mp4"));check(existing.open(QIODevice::WriteOnly),"Collision fixture opens");existing.write("preserve existing file");}
         {QFile gate(QDir(root).filePath("../source/.hold-background"));check(gate.open(QIODevice::WriteOnly),"Hold private media response");}
-        submit->click();wait([&]{return !queue.snapshot().get().entries.empty()&&dialog->findChild<QPushButton*>("mediaCancel")->isEnabled();});
-        dialog->showMinimized();check(dialog->isMinimized(),"Active video window minimizes");dialog->present();dialog->close();check(dialog&&!dialog->isVisible(),"Closing active video hides its window");
-        check(queue.snapshot().get().entries[0].status==downshift::QueueStatus::Running,"Closing video does not cancel history");
-        window.openVideo(base+"/background.mp4","Same task",folder);check(dialog&&window.findChildren<QDialog*>("mediaDialog").size()==1&&dialog->isVisible(),"Hidden active video reopens without a duplicate task");dialog->reject();check(dialog&&!dialog->isVisible(),"Escape/reject hides an active video without deleting it");
+        submit->click();wait([&]{return dialog&&!dialog->isVisible()&&!queue.snapshot().get().entries.empty();});
+        check(queue.snapshot().get().entries[0].status==downshift::QueueStatus::Running,"The popup closes as soon as the queue accepts the running video");
+        window.openVideo(base+"/background.mp4","Same task",folder);
+        check(dialog&&window.findChildren<QDialog*>("mediaDialog").size()==1&&!dialog->isVisible(),
+            "A duplicate capture leaves the same transfer running in the dashboard");
         if(QSystemTrayIcon::isSystemTrayAvailable()){
             wait([&]{return window.current().entries.size()==1;});window.close();check(!window.isVisible()&&dialog,"Main close keeps active media alive in tray mode");check(!QApplication::quitOnLastWindowClosed(),"Closing all windows keeps the application event loop alive");
             check(window.findChild<QMenu*>("trayMenu")->actions().last()->objectName()=="trayExit","Tray provides explicit Exit action");

@@ -74,6 +74,7 @@ target_link_libraries(downshift_native_host PRIVATE downshift_browser)
 target_compile_options(downshift_native_host PRIVATE /W4 /permissive- /utf-8)
 
 add_library(downshift_gui STATIC
+    src/packaging/MsixSetup.cpp src/packaging/MsixSetup.h
     src/gui/Brand.cpp
     src/gui/Design.cpp
     src/gui/Controls.cpp
@@ -88,7 +89,7 @@ add_library(downshift_gui STATIC
     src/gui/TorrentDialogs.cpp
     src/gui/TorrentDialogs.h
 )
-target_link_libraries(downshift_gui PUBLIC downshift_queue downshift_torrent Qt6::Widgets PRIVATE Qt6::Network dwmapi)
+target_link_libraries(downshift_gui PUBLIC downshift_queue downshift_torrent Qt6::Widgets PRIVATE Qt6::Network dwmapi shell32 ole32)
 qt_add_resources(downshift_gui "branding" PREFIX "/branding" BASE "assets"
     FILES assets/downshift.rgba assets/chevron.xpm)
 target_compile_options(downshift_gui PRIVATE /W4 /permissive- /utf-8)

@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "DownloadSize.h"
 #include "MediaDialog.h"
 #include "TorrentDialogs.h"
 #include <QCloseEvent>
@@ -98,7 +99,7 @@ void MainWindow::showDownloads(){showNormal();raise();activateWindow();for(auto*
 void MainWindow::resumeVideo(const QueueEntry& entry){
     for(auto* child:findChildren<QDialog*>("mediaDialog"))if(child->property("mediaId").toString()==entry.id)if(auto* media=dynamic_cast<MediaDialog*>(child)){media->resume();return;}
     if(!validMediaResume(entry.videoMetadata.value("resumeRecipe").toObject())){openVideo(entry.url,entry.mediaTitle,entry.mediaFolder,entry.videoMetadata.value("requestContext").toObject(),entry.videoMetadata.value("downloadName").toString());return;}
-    auto* media=new MediaDialog(queue_,entry.url,entry.mediaTitle,this,entry.mediaFolder,entry.videoMetadata.value("requestContext").toObject(),entry);media->resume();media->present();
+    auto* media=new MediaDialog(queue_,entry.url,entry.mediaTitle,this,entry.mediaFolder,entry.videoMetadata.value("requestContext").toObject(),entry);media->resume();
 }
 void MainWindow::requestExit(){
     if(exitRequested_){close();return;}
@@ -182,6 +183,9 @@ void MainWindow::apply(const QueueSnapshot& snapshot) {
     for(const auto& e:snapshot.entries)if(!e.handoffKey.isEmpty() && e.status==QueueStatus::Paused && e.error=="Choose where to save this download."){
         const auto old=std::find_if(current_.entries.begin(),current_.entries.end(),[&](const auto& row){return row.id==e.id;});
         if(old==current_.entries.end() || old->status==QueueStatus::Prepared)QTimer::singleShot(0,this,[this,e]{confirmDownload(e);});
+        else if(old->progress.totalBytes!=e.progress.totalBytes)
+            if(auto* dialog=findChild<QDialog*>("captureDialog-"+e.id))
+                if(auto* size=dialog->findChild<QLabel*>("captureSize"))size->setText(downloadSizeText(e.progress.totalBytes));
     }
     if(!ready_ || current_.settings.dark!=snapshot.settings.dark) theme(snapshot.settings.dark);
     if(ready_ && snapshot.settings.notifications) for(const auto& e:snapshot.entries) if(e.status==QueueStatus::Completed) {

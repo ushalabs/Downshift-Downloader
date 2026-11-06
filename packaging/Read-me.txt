@@ -2,21 +2,20 @@ Downshift - Windows 10/11 x64 (version in package-manifest.json)
 Developed by UshaLabs
 
 WINDOWS SETUP
-Run Downshift-1.0.0-Setup-x64.exe. It installs the application, required native
-runtime files and video support for all Windows users. Keep internet on:
-setup automatically downloads about 136 MiB of pinned, verified video tools.
-No separate Enable-video step is needed with the EXE setup. If a download
-fails, setup reports failure; reconnect and run setup again to retry.
-Video tools already installed at the expected hashes are reused offline.
-Successful setup removes its downloaded archives to avoid duplicate storage.
+Run Downshift-1.0.0-Setup-x64.exe. It installs the app for all Windows
+users. Open Downshift from the Desktop or Start menu. On the first launch,
+Downshift automatically downloads and verifies about 135 MiB of required
+video tools. If setup fails, check your connection and choose Retry.
+Later launches reuse the installed tools. Downloads and history are kept.
 
-Leave "Open Chrome setup instructions" selected on the finish page. It opens
-Chrome-setup.txt with simple steps and the exact installed extension folder.
-Enable Developer mode, click Load unpacked and select that folder once.
-Chrome does not permit automatic installation of this unpublished local
-extension on ordinary Windows PCs; a Chrome Web Store listing is required.
-Start > Downshift > Chrome setup reopens the text. Refresh existing video tabs.
+Choose "Set up Chrome" while the tools download. Downshift opens Chrome
+Extensions and copies the exact folder path. Turn on Developer mode, choose
+Load unpacked and paste that path. The Chrome Web Store listing is required
+for the normal "Add to Chrome" flow. Refresh existing video tabs.
+
 Default installation: C:\Program Files\Downshift (Windows x64).
+Downshift opens when you sign in to Windows. Change this in
+Windows Settings > Apps > Startup.
 Approve the Windows administrator prompt. Setup installs for all users and
 creates a Downshift Desktop icon and Start menu shortcuts. Download history,
 preferences and downloads remain in each user's own writable folders.

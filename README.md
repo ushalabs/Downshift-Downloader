@@ -44,7 +44,7 @@ The goal of Downshift is to provide a clean, fast, and reliable download experie
 ## Main Interface
 
 <p align="center">
-  <img src="docs/Downshift%201.png" alt="Downshift Main Interface" width="100%" />
+  <img src="docs/Downshift%201.png" alt="Downshift downloads dashboard in Dark mode" width="100%" />
 </p>
 
 The main dashboard gives a quick overview of:
@@ -119,10 +119,6 @@ This project is focused on native desktop performance, modern UI, and real-world
 ---
 
 ## Settings
-
-<p align="center">
-  <img src="docs/Downshift%202.png" alt="Downshift Settings" width="100%" />
-</p>
 
 The settings screen allows configuration for things like:
 

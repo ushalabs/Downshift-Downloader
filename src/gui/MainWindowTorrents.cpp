@@ -28,9 +28,12 @@ QString amount(qint64 n){double value=static_cast<double>(n);int unit=0;const QS
 }
 void MainWindow::attachTorrents(torrent::TorrentEngine& engine){
     if(torrents_)return;torrents_=&engine;
-    auto* side=qobject_cast<QVBoxLayout*>(sidebar_->layout());auto* navigation=makeButton("Torrents","navigation",sidebar_);navigation->setProperty("navigationTitle","Torrents");navigation->setAccessibleName("Torrents");navigation->setToolTip("Torrents");navigation->setIconSize(QSize(20,20));navigation->setCheckable(true);navigation->setAutoExclusive(true);auto* badge=new QLabel("0",navigation);badge->setObjectName("navigationCount");badge->setAlignment(Qt::AlignCenter);badge->setFixedSize(22,22);badge->setAttribute(Qt::WA_TransparentForMouseEvents);auto* badgeLayout=new QHBoxLayout(navigation);badgeLayout->setContentsMargins(0,0,6,0);badgeLayout->addStretch();badgeLayout->addWidget(badge);side->insertWidget(side->count()-2,navigation);
-    connect(navigation,&QPushButton::clicked,this,[this]{page_=4;if(ready_)apply(current_);else filter();table_->scrollToTop();});
-    auto* settings=makeButton("Torrent limits","torrentSettingsButton",sidebar_);settings->hide();settings->setIcon(lineIcon(Symbol::Settings));side->insertWidget(side->count()-2,settings);connect(settings,&QPushButton::clicked,this,[this]{showTorrentSettings(*torrents_,this);});
+    auto* side=qobject_cast<QVBoxLayout*>(sidebar_->layout());
+    categoryLayout_->addWidget(navigationButton("Torrents",4,Symbol::Torrent));
+    auto* settings=makeButton(sidebar_->property("compact").toBool()?QString():QString("Torrent limits"),"torrentSettingsButton",sidebar_);
+    settings->setProperty("railCommand",true);settings->setAccessibleName("Torrent limits");settings->setToolTip("Torrent limits");
+    settings->setIconSize(QSize(16,16));settings->setIcon(lineIcon(Symbol::Settings,DesignTokens::theme(current_.settings.dark).muted));settings->hide();
+    side->insertWidget(side->count()-2,settings);connect(settings,&QPushButton::clicked,this,[this]{showTorrentSettings(*torrents_,this);});
     connect(&engine,&torrent::TorrentEngine::engineFailed,this,[this](const QString& error){message("Torrent history: "+error,true);},Qt::QueuedConnection);
     auto* timer=new QTimer(this);timer->setObjectName("torrentRefreshTimer");timer->setInterval(250);
     connect(timer,&QTimer::timeout,this,[this,timer]{
@@ -46,26 +49,29 @@ void MainWindow::attachTorrents(torrent::TorrentEngine& engine){
 }
 void MainWindow::openTorrent(QString source){if(!torrents_||torrentClosing_)return;const auto folder=current_.settings.directory.isEmpty()?QStandardPaths::writableLocation(QStandardPaths::DownloadLocation):current_.settings.directory;showAddTorrent(*torrents_,folder,this,std::move(source));}
 const torrent::Snapshot* MainWindow::selectedTorrent()const{
-    const auto row=table_->currentRow();if(row<0||table_->isRowHidden(row)||!table_->item(row,0)||!table_->item(row,0)->data(Qt::UserRole+10).toBool())return nullptr;
+    const auto row=activeSelectedRow();if(row<0||!table_->item(row,0)||!table_->item(row,0)->data(Qt::UserRole+10).toBool())return nullptr;
     const auto id=table_->item(row,0)->data(Qt::UserRole).toString();for(const auto& value:torrentRows_)if(value.id==id)return &value;return nullptr;
 }
 void MainWindow::renderTorrentRow(int row,const torrent::Snapshot& s){
-    const QStringList text={s.name.isEmpty()?QString("Magnet metadata"):s.name,s.metadata?amount(s.selectedBytes):QString("—"),amount(s.verifiedBytes),"",amount(s.downloadBytesPerSecond)+"/s","—",QString::number(s.peers),torrentStateText(s),"Torrent"};
+    const auto eta=s.state==torrent::State::Downloading&&s.downloadBytesPerSecond>0&&s.selectedBytes>s.verifiedBytes
+        ?transferDuration(static_cast<double>(s.selectedBytes-s.verifiedBytes)/s.downloadBytesPerSecond):QString("—");
+    const QStringList text={s.name.isEmpty()?QString("Magnet metadata"):s.name,s.metadata?amount(s.selectedBytes):QString("—"),amount(s.verifiedBytes),"",amount(s.downloadBytesPerSecond)+"/s",eta,QString::number(s.peers),torrentStateText(s),"Torrent"};
     for(int col=0;col<11;++col){auto* item=table_->item(row,col);if(!item){item=new QTableWidgetItem;table_->setItem(row,col,item);}item->setText(col<9?text[col]:col==9?QDateTime::fromSecsSinceEpoch(s.created).toString("dd MMM"):QString());
-        if(col==0){item->setData(Qt::UserRole,s.id);item->setData(Qt::UserRole+10,true);item->setData(Qt::UserRole+1,QString("Torrent · ↑ %1/s · %2 seeds · Ratio %3").arg(amount(s.uploadBytesPerSecond)).arg(s.seeds).arg(s.ratio,0,'f',2));item->setToolTip(s.directory);item->setIcon(lineIcon(Symbol::Torrent,QColor("#EC1680")));}
-        if(col==3){item->setData(Qt::UserRole+3,static_cast<int>(s.state==torrent::State::Complete||s.state==torrent::State::Seeding?QueueStatus::Completed:s.state==torrent::State::Failed?QueueStatus::Failed:s.state==torrent::State::Cancelled?QueueStatus::Cancelled:torrentActive(s)?QueueStatus::Running:QueueStatus::Paused));item->setData(Qt::UserRole+1,s.state==torrent::State::Complete||s.state==torrent::State::Seeding?100.:s.selectedBytes?std::clamp(100.*static_cast<double>(s.verifiedBytes)/static_cast<double>(s.selectedBytes),0.,100.):0.);item->setData(Qt::UserRole+2,!s.metadata||s.verifyingCompletion);item->setToolTip(amount(s.verifiedBytes)+" verified / "+amount(s.selectedBytes)+" selected");}
+        if(col==0){item->setData(Qt::UserRole,s.id);item->setData(Qt::UserRole+10,true);item->setData(Qt::UserRole+1,QString("Torrent · ↑ %1/s · %2 seeds · Ratio %3").arg(amount(s.uploadBytesPerSecond)).arg(s.seeds).arg(s.ratio,0,'f',2));item->setToolTip(QString("<qt>%1<br>%2</qt>").arg(text[0].toHtmlEscaped(),s.directory.toHtmlEscaped()));item->setData(Qt::AccessibleDescriptionRole,item->data(Qt::UserRole+1));item->setIcon(lineIcon(Symbol::Torrent,fileIconColor(Symbol::Torrent,current_.settings.dark)));}
+        if(col==3){item->setData(Qt::UserRole+3,static_cast<int>(s.state==torrent::State::Complete||s.state==torrent::State::Seeding?QueueStatus::Completed:s.state==torrent::State::Failed?QueueStatus::Failed:s.state==torrent::State::Cancelled?QueueStatus::Cancelled:torrentActive(s)?QueueStatus::Running:QueueStatus::Paused));item->setData(Qt::UserRole+1,s.state==torrent::State::Complete||s.state==torrent::State::Seeding?100.:s.selectedBytes?std::clamp(100.*static_cast<double>(s.verifiedBytes)/static_cast<double>(s.selectedBytes),0.,100.):0.);item->setData(Qt::UserRole+2,!s.metadata||s.verifyingCompletion);item->setToolTip(amount(s.verifiedBytes)+" verified / "+amount(s.selectedBytes)+" selected");item->setData(Qt::AccessibleTextRole,item->data(Qt::UserRole+2).toBool()?QString("Progress unavailable"):QString::number(item->data(Qt::UserRole+1).toDouble(),'f',0)+"% complete");}
         if(col==7){const auto state=s.state==torrent::State::Complete?QueueStatus::Completed:s.state==torrent::State::Failed?QueueStatus::Failed:s.state==torrent::State::Cancelled?QueueStatus::Cancelled:torrentActive(s)?QueueStatus::Running:QueueStatus::Paused;item->setData(Qt::UserRole+1,static_cast<int>(state));}
     }
 }
 void MainWindow::torrentDetails(const QString& id){
     auto& panel=torrentPanels_[id];if(!panel){panel=createTorrentDetails(*torrents_,id,torrentDetailsStack_);torrentDetailsStack_->addWidget(panel);}
-    detailTabs_->hide();torrentDetailsStack_->setCurrentWidget(panel);torrentDetailsStack_->show();detailScroll_->setMaximumHeight(220);
+    detailTabs_->hide();torrentDetailsStack_->setCurrentWidget(panel);torrentDetailsStack_->show();
 }
 void MainWindow::torrentMenu(){
     const auto* selected=selectedTorrent();if(!selected)return;const auto row=*selected;auto* menu=new QMenu(this);menu->setObjectName("torrentContextMenu");connect(menu,&QMenu::aboutToHide,menu,&QObject::deleteLater);
-    if(row.state!=torrent::State::Complete)for(const auto& pair:std::vector<std::pair<QPushButton*,QueueAction>>{{start_,QueueAction::Start},{pause_,QueueAction::Pause},{cancel_,QueueAction::Cancel}}){if(pair.second==QueueAction::Start&&row.state==torrent::State::Seeding)continue;auto* action=menu->addAction(pair.first->text(),[this,kind=pair.second]{perform(kind);});action->setEnabled(pair.first->isEnabled());}
-    menu->addSeparator();menu->addAction("Details",[this,row]{table_->setProperty("detailsAllowed",true);detailToggle_->setChecked(true);details();});
-    menu->addAction("Open destination folder",[this,row]{if(!QDesktopServices::openUrl(QUrl::fromLocalFile(row.directory)))message("Windows could not open this folder.",true);});
+    const auto color=DesignTokens::theme(current_.settings.dark).muted;
+    if(row.state!=torrent::State::Complete)for(const auto& pair:std::vector<std::pair<QPushButton*,QueueAction>>{{start_,QueueAction::Start},{pause_,QueueAction::Pause},{cancel_,QueueAction::Cancel}}){if(pair.second==QueueAction::Start&&row.state==torrent::State::Seeding)continue;auto* action=menu->addAction(pair.first->icon(),pair.first->text(),[this,kind=pair.second]{perform(kind);});action->setEnabled(pair.first->isEnabled());}
+    menu->addSeparator();menu->addAction(lineIcon(Symbol::Info,color),"Details",[this]{table_->setProperty("detailsAllowed",true);detailToggle_->setChecked(true);details();});
+    menu->addAction(lineIcon(Symbol::Folder,color),"Open destination folder",[this,row]{if(!QDesktopServices::openUrl(QUrl::fromLocalFile(row.directory)))message("Windows could not open this folder.",true);});
     menu->addAction("Remove torrent…",[this,row,menu]{
         menu->close();
         // Let the popup finish closing before creating another native window.

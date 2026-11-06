@@ -16,7 +16,9 @@ class QTabWidget;
 class QStackedWidget;
 class QNetworkAccessManager;
 class QNetworkReply;
+class QVBoxLayout;
 namespace downshift {
+enum class Symbol;
 class MainWindow final:public QMainWindow {
 public:
     explicit MainWindow(QueueManager& queue,QWidget* parent=nullptr,QNetworkAccessManager* previewNetwork=nullptr);
@@ -35,6 +37,7 @@ public:
     void openTorrent(QString source={});
     void chromeStatus(QString status){chromeStatus_=std::move(status);if(auto* label=findChild<QLabel*>("chromeStatus"))label->setText("Chrome integration: "+chromeStatus_);}
 private:
+    bool eventFilter(QObject* watched,QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
@@ -49,9 +52,17 @@ private:
         }); timer->start();
     }
     void apply(const QueueSnapshot& snapshot);
+    QPushButton* navigationButton(const QString& title,int page,Symbol symbol);
+    void updateNavigationLayout();
+    void updateDetailHeight();
     void theme(bool dark);
     void filter();
     void details();
+    void clearDownloadSelection();
+    void updateDownloadedTotal(const QList<int>& rows);
+    void deleteSelection();
+    QList<int> selectedRows() const;
+    int activeSelectedRow() const;
     void preview(const QueueEntry* entry);
     void localVideoPreview(const QueueEntry& entry);
     void perform(QueueAction action);
@@ -79,9 +90,14 @@ private:
     std::optional<std::future<std::vector<torrent::Snapshot>>> torrentPending_;
     bool torrentClosing_=false,torrentClosed_=false,exitRequested_=false;
     bool torrentBusy_=false;
-    QLabel *summary_=nullptr,*speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
-    QLabel *totalMetric_=nullptr,*activeMetric_=nullptr,*dataMetric_=nullptr,*emptyHelp_=nullptr,*identity_=nullptr;
+    bool deletingSelection_=false;
+    std::uint64_t totalDownloaded_=0;
+    QLabel *speed_=nullptr,*banner_=nullptr,*empty_=nullptr,*detailTitle_=nullptr;
+    QLabel *totalMetric_=nullptr,*activeMetric_=nullptr,*dataMetric_=nullptr,*emptyHelp_=nullptr;
     QWidget *sidebar_=nullptr,*emptyPanel_=nullptr,*detailsContainer_=nullptr;
+    QWidget* categoryNav_=nullptr;
+    QVBoxLayout* categoryLayout_=nullptr;
+    QPushButton* categoryToggle_=nullptr;
     QScrollArea* detailScroll_=nullptr;
     QLabel *thumbnail_=nullptr,*videoInfo_=nullptr,*connectionInfo_=nullptr,*taskLog_=nullptr;
     QPushButton *sourceLink_=nullptr,*detailFolder_=nullptr,*detailCopy_=nullptr,*detailAction_=nullptr;

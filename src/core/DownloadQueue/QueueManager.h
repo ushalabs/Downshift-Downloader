@@ -17,7 +17,7 @@ QString statusText(QueueStatus status);
 struct QueueSettings {
     QString directory;
     int simultaneous = 3, perHost = 2, hostConnections = 16, connections = 16;
-    bool automatic = true, dark = false, startOnLaunch = false, notifications = true, diagnostics = false, closeToTray = true;
+    bool automatic = true, dark = true, startOnLaunch = false, notifications = true, diagnostics = false, closeToTray = true;
     std::uint64_t speedLimit = 0;
     QJsonObject json() const;
     static QueueSettings fromJson(const QJsonObject&);

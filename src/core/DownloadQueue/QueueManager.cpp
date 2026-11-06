@@ -56,7 +56,7 @@ QJsonObject QueueSettings::json() const { return {{"version",1},{"directory",dir
 QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
     QueueSettings s; s.directory = o.value("directory").toString(); s.simultaneous = o.value("simultaneous").toInt(3); s.perHost = o.value("perHost").toInt(2);
     s.hostConnections = o.value("hostConnections").toInt(16); s.connections = o.value("connections").toInt(16);
-    s.automatic = o.value("automatic").toBool(true); s.dark = o.value("dark").toBool(); s.startOnLaunch = o.value("startOnLaunch").toBool();
+    s.automatic = o.value("automatic").toBool(true); s.dark = o.value("dark").toBool(s.dark); s.startOnLaunch = o.value("startOnLaunch").toBool();
     s.notifications = o.value("notifications").toBool(true); s.diagnostics = o.value("diagnostics").toBool(); s.speedLimit = o.value("speedLimit").toString().toULongLong();
     s.closeToTray=o.value("closeToTray").toBool(true);
     if (s.simultaneous < 1 || s.simultaneous > 16 || s.perHost < 1 || s.perHost > 16 || s.hostConnections < 1 || s.hostConnections > 64 || s.connections < 1 || s.connections > 16 || s.speedLimit > 10ULL*1024*1024*1024) invalid("Invalid queue settings.");
@@ -195,7 +195,7 @@ std::future<QString> QueueManager::add(QString url,QString dest,int priority,boo
         if(entries_.size()>=10000 || priority < -1 || priority > 1 || speedLimit > 10ULL*1024*1024*1024) invalid("Queue limit or invalid download options.");
         QueueEntry e; e.url=url; e.origin=origin(url); e.destination=destination(dest); e.sha256=sha256.toLower();
         const auto parent=QFileInfo(e.destination).absolutePath();
-        for(const auto& category:QStringList{"Videos","Audios","Zip","Programs","Pictures"})if(parent.compare(QDir(settings_.directory).filePath(category),Qt::CaseInsensitive)==0 && !QDir().mkpath(parent))invalid("The category folder could not be created.");
+        for(const auto& category:QStringList{"Videos","Audios","Zip","Programs","Pictures","Docs"})if(parent.compare(QDir(settings_.directory).filePath(category),Qt::CaseInsensitive)==0 && !QDir().mkpath(parent))invalid("The category folder could not be created.");
         if(!e.sha256.isEmpty() && (e.sha256.size()!=64 || std::any_of(e.sha256.begin(),e.sha256.end(),[](QChar c){return !QString("0123456789abcdef").contains(c);}))) invalid("SHA-256 must contain 64 hexadecimal characters.");
         for(const auto& old:entries_) if(old.destination.compare(e.destination,Qt::CaseInsensitive)==0) invalid("A download already owns this destination. Choose a different filename.");
         if(QFileInfo::exists(e.destination) || QFileInfo::exists(e.destination+".part") || QFileInfo::exists(e.destination+".part.resume")) invalid("The destination or its partial already exists. Choose a different filename.");

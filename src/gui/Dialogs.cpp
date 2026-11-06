@@ -97,7 +97,7 @@ void MainWindow::openSettings() {
     auto* torrentPage=page("Torrents","Torrent bandwidth, peer limits and seeding controls are managed by the native torrent engine.");auto* torrentSettings=makeButton("Torrent limits and defaults…","settingsTorrentLimits");torrentSettings->setEnabled(torrents_!=nullptr);torrentPage->addWidget(torrentSettings);torrentPage->addStretch();connect(torrentSettings,&QPushButton::clicked,dialog,[this,dialog]{if(torrents_)showTorrentSettings(*torrents_,dialog);});
     connect(sections,&QListWidget::currentRowChanged,pages,&QStackedWidget::setCurrentIndex);sections->setCurrentRow(ready_ ? 0:3);if(!ready_){for(int index:{0,1,2})pages->widget(index)->setEnabled(false);diagnostics->setEnabled(false);}
     auto* feedback=new QLabel;feedback->setObjectName("settingsError");feedback->setWordWrap(true);feedback->setTextFormat(Qt::PlainText);feedback->setStyleSheet("color:#dc4554;");layout->addWidget(feedback);auto* buttons=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);auto* save=buttons->button(QDialogButtonBox::Save);save->setObjectName("settingsSave");save->setProperty("primary",true);save->setEnabled(ready_);layout->addWidget(buttons);connect(buttons,&QDialogButtonBox::rejected,dialog,&QDialog::reject);
-    auto* signature=new QLabel("<span style='font-size:22px;font-weight:600;font-style:italic;color:#111111'>Usha</span><span style='font-size:22px;font-weight:600;font-style:italic;color:#ec1680'>Labs</span>",dialog);signature->setObjectName("settingsDeveloper");signature->setTextFormat(Qt::RichText);QFont signatureFont("Segoe UI");signatureFont.setPointSize(17);signatureFont.setWeight(QFont::DemiBold);signatureFont.setItalic(true);signature->setFont(signatureFont);signature->setStyleSheet("font-family:'Segoe UI';font-size:22px;font-weight:600;font-style:italic;");signature->setAccessibleName("Developed by UshaLabs");auto* footer=new QHBoxLayout;footer->addWidget(signature);footer->addStretch();layout->removeWidget(buttons);footer->addWidget(buttons);layout->addLayout(footer);
+    auto* signature=new QLabel("<span style='font-size:22px;font-weight:600;font-style:italic'>Usha</span><span style='font-size:22px;font-weight:600;font-style:italic;color:#ec1680'>Labs</span>",dialog);signature->setObjectName("settingsDeveloper");signature->setTextFormat(Qt::RichText);QFont signatureFont("Segoe UI");signatureFont.setPointSize(17);signatureFont.setWeight(QFont::DemiBold);signatureFont.setItalic(true);signature->setFont(signatureFont);signature->setStyleSheet("font-family:'Segoe UI';font-size:22px;font-weight:600;font-style:italic;");signature->setAccessibleName("Developed by UshaLabs");auto* footer=new QHBoxLayout;footer->addWidget(signature);footer->addStretch();layout->removeWidget(buttons);footer->addWidget(buttons);layout->addLayout(footer);
     connect(buttons,&QDialogButtonBox::accepted,dialog,[this,dialog,saved,directory,simultaneous,host,hostConnections,connections,cap,themeChoice,startup,notifications,tray,diagnostics,save,feedback]() mutable {
         bool valid=false;const auto speed=cap->text().toDouble(&valid);if(!valid || !std::isfinite(speed) || speed<0 || speed>10485760){feedback->setText("Enter a speed limit from 0 to 10485760 KiB/s.");return;}
         const auto unchanged=QString::number(static_cast<double>(saved.speedLimit)/1024.,'g',12);saved.speedLimit=cap->text()==unchanged ? saved.speedLimit:static_cast<std::uint64_t>(std::llround(speed*1024.));saved.directory=directory->text();saved.simultaneous=simultaneous->currentData().toInt();saved.perHost=host->currentData().toInt();saved.hostConnections=hostConnections->currentData().toInt();const auto count=connections->currentData().toInt();saved.automatic=count==0;if(count)saved.connections=count;saved.dark=themeChoice->currentIndex()==1;saved.startOnLaunch=startup->isChecked();saved.notifications=notifications->isChecked();saved.diagnostics=diagnostics->isChecked();save->setEnabled(false);feedback->clear();
@@ -105,16 +105,87 @@ void MainWindow::openSettings() {
     });dialog->open();
 }
 
+void MainWindow::deleteSelection() {
+    if(deletingSelection_||torrentClosing_)return;
+    struct Target {QString id,name;bool torrent,completed;};
+    std::vector<Target> targets;
+    int skipped=0;
+    for(int row:selectedRows()){
+        const auto display=displayOrder_[row];
+        if(display.torrent){
+            const auto& entry=torrentRows_[display.index];
+            if(torrentActive(entry)||entry.verifyingCompletion||!entry.metadata){++skipped;continue;}
+            targets.push_back({entry.id,entry.name,true,false});
+        }else{
+            const auto& entry=current_.entries[display.index];
+            if(entry.status==QueueStatus::Running||entry.status==QueueStatus::Queued||entry.status==QueueStatus::Prepared){++skipped;continue;}
+            const auto name=entry.status!=QueueStatus::Completed&&entry.media?entry.mediaTitle:QFileInfo(entry.destination).fileName();
+            targets.push_back({entry.id,name,false,entry.status==QueueStatus::Completed});
+        }
+    }
+    if(targets.empty()){
+        if(skipped)message("Pause or cancel active downloads before deleting. Torrents need verified metadata to delete their files.",true);
+        return;
+    }
+    QString prompt=targets.size()==1
+        ?QString("Permanently delete the local data and history for %1?").arg(targets.front().name)
+        :QString("Permanently delete the local data and history for %1 selected downloads?").arg(targets.size());
+    if(skipped)prompt+=QString("\n\n%1 active or unavailable download(s) will be kept.").arg(skipped);
+    auto* confirm=new QMessageBox(QMessageBox::Warning,"Delete downloads",prompt,QMessageBox::Yes|QMessageBox::Cancel,this);
+    confirm->setTextFormat(Qt::PlainText);confirm->button(QMessageBox::Yes)->setText("Delete");confirm->setDefaultButton(QMessageBox::Cancel);
+    confirm->setObjectName("deleteDownloadsConfirmation");confirm->setAttribute(Qt::WA_DeleteOnClose);
+    deletingSelection_=true;
+    connect(confirm,&QMessageBox::finished,this,[this,targets=std::move(targets)](int result){
+        if(result!=QMessageBox::Yes){deletingSelection_=false;return;}
+        struct Pending {QString name;std::future<void> future;};
+        auto batch=std::make_shared<std::vector<Pending>>();
+        for(const auto& target:targets){
+            if(target.torrent){
+                batch->push_back({target.name,torrents_->remove(target.id,true,true)});
+                continue;
+            }
+            if(!target.completed)for(auto* child:findChildren<QDialog*>("mediaDialog"))
+                if(child->property("mediaId").toString()==target.id)
+                    if(auto* media=dynamic_cast<MediaDialog*>(child);media&&media->paused())media->close();
+            batch->push_back({target.name,target.completed?queue_.deleteCompleted(target.id):queue_.action(target.id,QueueAction::Remove)});
+        }
+        auto* timer=new QTimer(this);timer->setInterval(30);
+        connect(timer,&QTimer::timeout,this,[this,timer,batch]{
+            for(auto& task:*batch)if(task.future.wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;
+            timer->stop();timer->deleteLater();deletingSelection_=false;
+            int removed=0,failed=0;
+            QString firstError;
+            for(auto& task:*batch){
+                try{task.future.get();++removed;}
+                catch(const std::exception& error){
+                    if(++failed==1)firstError=task.name+" — "+QString::fromUtf8(error.what());
+                }
+            }
+            if(failed)message(QString("Deleted %1 download(s). Could not delete %2. %3").arg(removed).arg(failed).arg(firstError),true);
+            else message(removed==1?QString("Download deleted."):QString("%1 downloads deleted.").arg(removed));
+            refresh();
+        });timer->start();
+    });confirm->open();
+}
 void MainWindow::more() {
+    if(selectedRows().size()>1){
+        QMenu menu(this);menu.setObjectName("downloadContextMenu");
+        const auto* remove=menu.addAction("Delete selected downloads…");
+        if(menu.exec(QCursor::pos())==remove)deleteSelection();
+        return;
+    }
     if(selectedTorrent()){torrentMenu();return;}
     const auto* e=selected();if(!e)return;const auto row=*e;QMenu menu(this);menu.setObjectName("downloadContextMenu");
+    const auto color=DesignTokens::theme(current_.settings.dark).muted;
     const auto removeHistory=[this,row]{if(QMessageBox::question(this,"Delete download","Delete this download?",QMessageBox::Yes|QMessageBox::No,QMessageBox::No)==QMessageBox::Yes){for(auto* child:findChildren<QDialog*>("mediaDialog"))if(child->property("mediaId").toString()==row.id)if(auto* media=dynamic_cast<MediaDialog*>(child);media&&media->paused())media->close();watch(queue_.action(row.id,QueueAction::Remove),[this,row]{message(row.media&&!row.mediaStaged&&row.status!=QueueStatus::Completed?"History removed. Older video fragments require manual review.":"History removed. Completed files preserved; incomplete data removed.");});}};
     for(const auto& pair:std::vector<std::pair<QPushButton*,QueueAction>>{{start_,QueueAction::Start},{pause_,QueueAction::Pause},{cancel_,QueueAction::Cancel}}){auto* action=menu.addAction(pair.first->icon(),pair.first->text(),[this,kind=pair.second]{perform(kind);});action->setEnabled(pair.first->isEnabled());}menu.addSeparator();
     if(row.status==QueueStatus::Completed) {
-        menu.addAction("Open file",[this,row]{if(QMessageBox::question(this,"Open downloaded file","Open this file with its Windows application?\n\n"+QFileInfo(row.destination).fileName())==QMessageBox::Yes)if(!QDesktopServices::openUrl(QUrl::fromLocalFile(row.destination)))message("Windows could not open this file.",true);});
+        menu.addAction(lineIcon(Symbol::File,color),"Open file",[this,row]{if(QMessageBox::question(this,"Open downloaded file","Open this file with its Windows application?\n\n"+QFileInfo(row.destination).fileName())==QMessageBox::Yes)if(!QDesktopServices::openUrl(QUrl::fromLocalFile(row.destination)))message("Windows could not open this file.",true);});
         menu.addAction("Delete file and remove history…",[this,row]{if(QMessageBox::warning(this,"Delete downloaded file","Permanently delete this downloaded file and its history?\n\n"+row.destination,QMessageBox::Yes|QMessageBox::No,QMessageBox::No)==QMessageBox::Yes)watch(queue_.deleteCompleted(row.id),[this]{message("File deleted.");});});
     }
-    menu.addAction("Open folder",[this,row]{const auto folder=row.media && row.status!=QueueStatus::Completed ? row.mediaFolder:QFileInfo(row.destination).absolutePath();if(!QDesktopServices::openUrl(QUrl::fromLocalFile(folder)))message("Windows could not open this folder.",true);});menu.addAction("Copy source link",[row]{QApplication::clipboard()->setText(row.url);});menu.addAction("Copy destination",[row]{QApplication::clipboard()->setText(row.destination);});menu.addSeparator();
+    menu.addAction(lineIcon(Symbol::Folder,color),"Open folder",[this,row]{const auto folder=row.media && row.status!=QueueStatus::Completed ? row.mediaFolder:QFileInfo(row.destination).absolutePath();if(!QDesktopServices::openUrl(QUrl::fromLocalFile(folder)))message("Windows could not open this folder.",true);});
+    menu.addAction(lineIcon(Symbol::Link,color),"Copy source link",[row]{QApplication::clipboard()->setText(row.url);});
+    menu.addAction(lineIcon(Symbol::Copy,color),"Copy destination",[row]{QApplication::clipboard()->setText(row.destination);});menu.addSeparator();
     if(row.media) {
         if(row.status==QueueStatus::Running)menu.addAction("Show video window",[this,row]{openVideo(row.url,row.mediaTitle,row.mediaFolder,row.videoMetadata.value("requestContext").toObject(),row.videoMetadata.value("downloadName").toString());});
         else {if(row.status!=QueueStatus::Completed&&row.status!=QueueStatus::Paused)menu.addAction("Retry video",[this,row]{openVideo(row.url,row.mediaTitle,row.mediaFolder,row.videoMetadata.value("requestContext").toObject(),row.videoMetadata.value("downloadName").toString());});menu.addAction("Remove from history…",removeHistory);}

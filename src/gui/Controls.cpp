@@ -15,12 +15,12 @@ namespace downshift {
 namespace {
 class ChoiceDelegate final:public QStyledItemDelegate {
 public: using QStyledItemDelegate::QStyledItemDelegate;
-    QSize sizeHint(const QStyleOptionViewItem& option,const QModelIndex& index)const override {auto size=QStyledItemDelegate::sizeHint(option,index);size.setHeight(36);return size;}
+    QSize sizeHint(const QStyleOptionViewItem& option,const QModelIndex& index)const override {auto size=QStyledItemDelegate::sizeHint(option,index);size.setHeight(32);return size;}
 };
 class PopupBounds final:public QObject {
     QComboBox* combo_;
     void roundAfterNativeEvent(){
-        QTimer::singleShot(0,this,[this]{auto* popup=combo_->view()->window();if(auto* frame=qobject_cast<QFrame*>(popup))frame->setFrameShape(QFrame::NoFrame);QPainterPath shape;shape.addRoundedRect(QRectF(popup->rect()),9,9);popup->setMask(QRegion(shape.toFillPolygon().toPolygon()));});
+        QTimer::singleShot(0,this,[this]{auto* popup=combo_->view()->window();if(auto* frame=qobject_cast<QFrame*>(popup))frame->setFrameShape(QFrame::NoFrame);QPainterPath shape;shape.addRoundedRect(QRectF(popup->rect()),DesignTokens::radius,DesignTokens::radius);popup->setMask(QRegion(shape.toFillPolygon().toPolygon()));});
     }
 public:explicit PopupBounds(QComboBox* combo):QObject(combo),combo_(combo){}
     bool eventFilter(QObject* object,QEvent* event)override {
@@ -32,7 +32,7 @@ public:explicit PopupBounds(QComboBox* combo):QObject(combo),combo_(combo){}
         if(event->type()==QEvent::Resize)roundAfterNativeEvent();
         if(event->type()==QEvent::Show){
             auto* popup=combo_->view()->window();if(auto* frame=qobject_cast<QFrame*>(popup))frame->setFrameShape(QFrame::NoFrame);if(popup->layout())popup->layout()->setContentsMargins(6,6,6,6);const auto origin=combo_->mapToGlobal(QPoint(0,combo_->height()+4));auto* screen=QGuiApplication::screenAt(origin);if(!screen)screen=combo_->screen();const auto available=screen->availableGeometry().adjusted(6,6,-6,-6);
-            const int width=qMin(available.width(),qMax(combo_->width(),120));const int height=qMin(available.height(),qMin(combo_->count(),8)*36+12);
+            const int width=qMin(available.width(),qMax(combo_->width(),120));const int height=qMin(available.height(),qMin(combo_->count(),8)*32+12);
             const int x=qBound(available.left(),origin.x(),available.right()-width+1);int y=origin.y();if(y+height>available.bottom())y=combo_->mapToGlobal(QPoint(0,0)).y()-height-4;y=qBound(available.top(),y,available.bottom()-height+1);
             popup->setMinimumSize(0,0);popup->setMaximumSize(available.size());popup->setGeometry(x,y,width,height);combo_->view()->setMinimumWidth(0);roundAfterNativeEvent();
         }return false;

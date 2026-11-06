@@ -85,6 +85,15 @@ def main():
                 if row["status"] in (3,4):break
                 time.sleep(.05)
             assert row["status"]==3 and file_sha256(root/"Zip"/"server-file.zip")==expected_sha256(server.size);checks+=1
+            server.suggested_filename="report.pdf";document=uuid.uuid4().hex
+            request(exe,"prepare",key=document,url=url,filename="download",serverFilename=True)
+            assert rows(p)[-1]["destination"]==str(root/"Docs"/"report.pdf");checks+=1
+            request(exe,"commit",key=document,browserNotStarted=True);end=time.monotonic()+10
+            while time.monotonic()<end:
+                row=next(r for r in rows(p) if r["handoffKey"]==document)
+                if row["status"] in (3,4):break
+                time.sleep(.05)
+            assert row["status"]==3 and file_sha256(root/"Docs"/"report.pdf")==expected_sha256(server.size);checks+=1
             close(p);p=None
             for file in root.glob("queue.sqlite*"):
                 if file.is_file():assert url.encode() not in file.read_bytes()

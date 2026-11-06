@@ -53,8 +53,20 @@ def main():
             # A full received source survives cancellation/removal decisions and
             # can complete locally after restart without the browser worker.
             local_key=uuid.uuid4().hex;local_source=root/'retained.source';local_source.write_bytes(b'received data to retain')
-            local_id=request(exe,'browser-prepare',key=local_key,url='blob:https://example.com/retained',filename='retained.bin',total=str(local_source.stat().st_size),mime='application/octet-stream')['downloadId']
-            request(exe,'commit',key=local_key,browserTransport=True,prompt=True);request(exe,'browser-update',key=local_key,file=str(local_source),complete=True,total=str(local_source.stat().st_size),received=str(local_source.stat().st_size));command('cancel '+local_id)
+            local_id=request(exe,'browser-prepare',key=local_key,url='blob:https://example.com/retained',filename='retained.bin',total='-1',mime='application/octet-stream')['downloadId']
+            request(exe,'commit',key=local_key,browserTransport=True,prompt=True)
+            def capture_size():
+                return next((dialog['size'] for dialog in command('captures') if dialog['filename']=='retained.bin'), '')
+            for _ in range(60):
+                if capture_size()=='Size unavailable':break
+                time.sleep(.05)
+            assert capture_size()=='Size unavailable';checks+=1
+            request(exe,'browser-update',key=local_key,file=str(local_source),complete=True,total=str(local_source.stat().st_size),received=str(local_source.stat().st_size))
+            for _ in range(60):
+                if capture_size() not in ('','Size unavailable'):break
+                time.sleep(.05)
+            assert capture_size() not in ('','Size unavailable');checks+=1
+            command('cancel '+local_id)
             close(p);p=start(driver,root);command('resume '+local_id);retained=finished(local_id);assert pathlib.Path(retained['destination']).read_bytes()==local_source.read_bytes();checks+=1
         finally:close(p)
     print(f'Native browser transfer checks passed: {checks}')

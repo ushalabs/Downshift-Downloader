@@ -21,6 +21,7 @@ $installLines=[Collections.Generic.List[string]]::new();$uninstallLines=[Collect
 $files=@(Get-ChildItem -LiteralPath $payload -File -Recurse)
 foreach($file in $files){
     $relative=$file.FullName.Substring($payload.Length+1)
+    if($relative -eq 'Enable-video.cmd'){continue}
     $directory=Split-Path $relative -Parent
     $installLines.Add('SetOutPath "$INSTDIR'+$(if($directory){'\'+(Quote-Nsis $directory)}else{''})+'"')
     $installLines.Add('File "'+(Quote-Nsis $file.FullName)+'"')
@@ -42,7 +43,7 @@ if($VerificationSetupPath){
 }
 $manifest=Get-Content -LiteralPath (Join-Path $payload 'package-manifest.json') -Raw | ConvertFrom-Json
 $bytes=($files|Measure-Object Length -Sum).Sum
-@{version=$version;compression='NSIS solid LZMA, 32 MiB dictionary';payloadBytes=$bytes;setupBytes=(Get-Item -LiteralPath $setup).Length;setupSha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLower();compilerSha256=(Get-FileHash -LiteralPath $NsisCompiler -Algorithm SHA256).Hash.ToLower();localPreview=$manifest.localPreview;sourceDirty=$manifest.sourceDirty;signed=$false;architecture='x64';requiresAdministrator=$true;defaultInstallDirectory='ProgramFiles64/Downshift';desktopShortcut=$true;installationScope='all users';nativeHostRegistryHive='HKLM (64-bit)';videoTools='automatically downloaded from pinned upstream releases during setup';internetRequiredForVideoSetup=$true;chromeIntegration='native host registration and guided Load unpacked; no Chrome Web Store listing yet'}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $OutputDirectory 'setup-manifest.json') -Encoding utf8
+@{version=$version;compression='NSIS solid LZMA, 32 MiB dictionary';payloadBytes=$bytes;setupBytes=(Get-Item -LiteralPath $setup).Length;setupSha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLower();compilerSha256=(Get-FileHash -LiteralPath $NsisCompiler -Algorithm SHA256).Hash.ToLower();localPreview=$manifest.localPreview;sourceDirty=$manifest.sourceDirty;signed=$false;architecture='x64';requiresAdministrator=$true;defaultInstallDirectory='ProgramFiles64/Downshift';desktopShortcut=$true;installationScope='all users';nativeHostRegistryHive='HKLM (64-bit)';videoTools='automatically downloaded from pinned upstream releases on first launch';internetRequiredForVideoSetup=$true;chromeIntegration='native host registration and guided Load unpacked; no Chrome Web Store listing yet'}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $OutputDirectory 'setup-manifest.json') -Encoding utf8
 Get-ChildItem -LiteralPath $OutputDirectory -File | Where-Object {$_.Name -match '^Downshift-.*\.(zip|exe)$'} | Sort-Object Name | ForEach-Object {"$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"}|Set-Content -LiteralPath (Join-Path $OutputDirectory 'SHA256SUMS.txt') -Encoding ascii
 $resolved=[IO.Path]::GetFullPath($stage)
 if(!$resolved.StartsWith($OutputDirectory+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $resolved -Leaf) -notlike 'setup-stage-*'){throw 'Unsafe staging cleanup path.'}

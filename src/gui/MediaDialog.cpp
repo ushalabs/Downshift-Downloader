@@ -1,6 +1,8 @@
 #include "MediaDialog.h"
+#include "packaging/MsixSetup.h"
 #include "Controls.h"
 #include "DownloadName.h"
+#include "DownloadSize.h"
 #include "core/DownloadQueue/VideoUrl.h"
 #include "core/DownloadQueue/MediaResume.h"
 #define NOMINMAX
@@ -10,7 +12,6 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDir>
-#include <QDesktopServices>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -40,22 +41,24 @@ QString byteSize(double value) {
     return value>=1048576 ? QString::number(value/1048576.0,'f',2)+" MiB":QString::number(value/1024.0,'f',1)+" KiB";
 }
 }
-MediaDialog::MediaDialog(QueueManager& queue,QString url,QString title,QWidget* parent,QString initialFolder,QJsonObject context,std::optional<QueueEntry> retained):QDialog(parent),queue_(queue),url_(std::move(url)),tools_(QDir(QCoreApplication::applicationDirPath()).filePath("media-tools")),folder_(std::move(initialFolder)),context_(std::move(context)),retained_(std::move(retained)) {
+MediaDialog::MediaDialog(QueueManager& queue,QString url,QString title,QWidget* parent,QString initialFolder,QJsonObject context,std::optional<QueueEntry> retained):QDialog(parent),queue_(queue),url_(std::move(url)),tools_(msix::mediaToolsDirectory()),folder_(std::move(initialFolder)),context_(std::move(context)),retained_(std::move(retained)) {
     setAttribute(Qt::WA_DeleteOnClose);setWindowFlags(Qt::Window|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowCloseButtonHint);setWindowTitle("Download video — Downshift");resize(580,370);
     setProperty("mediaUrl",url_);if(retained_)setProperty("mediaId",retained_->id);setObjectName("mediaDialog");
     auto* layout=new QVBoxLayout(this);layout->setContentsMargins(24,22,24,22);layout->setSpacing(14);auto* nameLabel=new QLabel("Name");layout->addWidget(nameLabel);title_=new QLineEdit(suggestedDownloadName(title));title_->setObjectName("mediaTitle");title_->setAccessibleName("Video filename");title_->setToolTip("Edit before starting. The video format supplies the extension.");nameLabel->setBuddy(title_);layout->addWidget(title_);
     auto* source=new QLabel(QUrl(url_).host());source->setTextFormat(Qt::PlainText);layout->addWidget(source);
     auto* form=new QFormLayout;quality_=new QComboBox;modernCombo(quality_);quality_->setObjectName("mediaQuality");quality_->setEnabled(false);form->addRow("Quality",quality_);
+    size_=new QLabel(downloadSizeText({}));size_->setObjectName("mediaSize");form->addRow("Download size",size_);
+    sizeProbe_=new DownloadSizeProbe(size_);
+    connect(quality_,&QComboBox::currentIndexChanged,this,[this]{if(ready_ && !paused_)updateSize();});
     destination_=new QLineEdit;destination_->setObjectName("mediaDestination");destination_->setReadOnly(true);
     auto* folder=new QHBoxLayout;folder->addWidget(destination_);browse_=new QPushButton("Choose folder");browse_->setEnabled(false);folder->addWidget(browse_);form->addRow("Save to",folder);layout->addLayout(form);
     status_=new QLabel("Checking video…");status_->setObjectName("mediaStatus");status_->setWordWrap(true);status_->setTextFormat(Qt::PlainText);layout->addWidget(status_);
     progress_=new QProgressBar;progress_->setObjectName("mediaProgress");progress_->setRange(0,0);layout->addWidget(progress_);
     rate_=new QLabel;rate_->setObjectName("mediaRate");layout->addWidget(rate_);
-    auto* note=new QLabel("Closing this window keeps an active download running. Cancel stops it. Protected and login-only videos may be unavailable.");note->setWordWrap(true);layout->addWidget(note);
+    auto* note=new QLabel("After you start the video, follow it in Downloads. Protected and login-only videos may be unavailable.");note->setWordWrap(true);layout->addWidget(note);
     auto* actions=new QHBoxLayout;download_=new QPushButton("Download video");download_->setObjectName("mediaDownload");download_->setProperty("primary",true);download_->setEnabled(false);cancel_=new QPushButton("Cancel");actions->addWidget(download_);pause_=new QPushButton("Pause");pause_->setObjectName("mediaPause");pause_->setEnabled(false);actions->addWidget(pause_);actions->addWidget(cancel_);connect(pause_,&QPushButton::clicked,this,[this]{if(paused_)resume();else pause();});layout->addLayout(actions);
     for(auto* button:{download_,cancel_,browse_,pause_}){button->setMinimumHeight(40);button->setCursor(Qt::PointingHandCursor);}
-    cancel_->setObjectName("mediaCancel");openFolder_=new QPushButton("Open folder");openFolder_->setObjectName("mediaOpenFolder");openFolder_->hide();actions->insertWidget(1,openFolder_);
-    connect(openFolder_,&QPushButton::clicked,this,[this]{QDesktopServices::openUrl(QUrl::fromLocalFile(folder_));});
+    cancel_->setObjectName("mediaCancel");
     connect(download_,&QPushButton::clicked,this,[this]{download();});connect(cancel_,&QPushButton::clicked,this,[this]{if(persisting_)return;if(paused_||process_.state()!=QProcess::NotRunning)cancel();else close();});
     connect(browse_,&QPushButton::clicked,this,[this]{const auto path=QFileDialog::getExistingDirectory(this,"Save video to",folder_);if(!path.isEmpty()){folder_=path;destination_->setText(folder_);}});
     process_.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args){args->flags|=CREATE_NO_WINDOW;});
@@ -111,11 +114,11 @@ void MediaDialog::inspect(){inspectSource(false);}
 void MediaDialog::inspectSource(bool browserSource){
     if(process_.state()!=QProcess::NotRunning || persisting_)return;
     browserSource_=browserSource;
-    verifying_=false;ready_=false;quality_->clear();status_->setText("Checking available qualities…");auto args=baseArguments();
+    verifying_=false;ready_=false;sizeFormats_={};sizeProbe_->inspect(QUrl());size_->setText("Checking size…");quality_->clear();status_->setText("Checking available qualities…");auto args=baseArguments();
     // Full info JSON includes every segment URL, subtitles and thumbnails. A
     // normal long video can exceed megabytes even with few quality choices.
     // Request only the fields used by this form, keeping the bounded parser.
-    args << "--output-na-placeholder" << "null" << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live,thumbnail,webpage_url,duration,extractor_key,url,ext,protocol,vcodec,acodec,height})j,\"formats\":%(formats.:.{height,vcodec,acodec,protocol,has_drm,url})j}" << "--skip-download";
+    args << "--output-na-placeholder" << "null" << "--print" << "{\"meta\":%(.{id,title,_type,has_drm,is_live,thumbnail,webpage_url,duration,extractor_key,url,ext,protocol,vcodec,acodec,height,filesize,filesize_approx})j,\"formats\":%(formats.:.{height,vcodec,acodec,protocol,has_drm,url,filesize,filesize_approx})j}" << "--skip-download";
     if(youtubeHost(QUrl(url_).host()))args << "--socket-timeout" << "10" << "--retries" << "0" << "--extractor-retries" << "0";
     if(browserFormats())args << "--check-formats" << "--load-info-json" << "-";else args << "--" << sourceUrl();launch(args,true);
 }
@@ -180,7 +183,7 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
         // Some extractors expose one real stream with no formats/resolution list.
         // Accept that stream as default; missing quality metadata is not a failure.
         if(formats.isEmpty() && !info.value("url").toString().isEmpty())formats.append(info);
-        for(const auto& value:formats) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString(),audio=format.value("acodec").toString();const QUrl source(format.value("url").toString());if(format.value("has_drm").toBool() || codec=="images" || format.value("protocol")=="mhtml" || !source.isValid() || source.host().isEmpty() || !source.userInfo().isEmpty() || (source.scheme()!="https" && source.scheme()!="http"))continue;if(!audio.isEmpty() && audio!="none")audioAvailable=true;if(codec=="none")continue;playable=true;if(!codec.isEmpty() && audio=="none")silentVideo=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
+        for(const auto& value:formats) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString(),audio=format.value("acodec").toString();const QUrl source(format.value("url").toString());if(format.value("has_drm").toBool() || codec=="images" || format.value("protocol")=="mhtml" || !source.isValid() || source.host().isEmpty() || !source.userInfo().isEmpty() || (source.scheme()!="https" && source.scheme()!="http"))continue;sizeFormats_.append(format);if(!audio.isEmpty() && audio!="none")audioAvailable=true;if(codec=="none")continue;playable=true;if(!codec.isEmpty() && audio=="none")silentVideo=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
         if(info.isEmpty() || info.value("_type")=="playlist" || info.value("_type")=="multi_video" || !playable || info.value("has_drm").toBool() || info.value("is_live").toBool()) {
             retryable(info.value("_type")=="playlist" || info.contains("entries") ? "This address is a feed or playlist, not one video. Open the video and use its player button, or paste its watch link.":"No downloadable video formats were found. Try a public recorded video link.");
         }
@@ -189,12 +192,14 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
             quality_->addItem(heights.size()>1 ? "Best available":heights.isEmpty() ? "Default quality":QString::number(*heights.begin())+"p",heights.size()==1?*heights.begin():0);
             if(heights.size()>1){auto sorted=heights.values();std::sort(sorted.begin(),sorted.end(),std::greater<int>());for(int height:sorted)quality_->addItem(QString::number(height)+"p",height);}
             quality_->setEnabled(quality_->count()>1);browse_->setEnabled(true);ready_=true;download_->setText("Download video");download_->setEnabled(true);status_->setText(quality_->count()>1 ? "Choose quality and press Download video. Separate streams are merged automatically.":heights.isEmpty()?"Ready to download at the player's default quality.":"Ready to download at "+quality_->currentText()+".");
+            updateSize();
             if(metadataInfo_.value("videoOnly").toBool())status_->setText("Choose quality and press Download video. This source reports video-only streams with no audio track.");
         }
     }else {verify();return;}
     if(closeAfter_)QTimer::singleShot(0,this,[this]{close();});
 }
 void MediaDialog::retryable(QString error) {
+    if(!ready_)size_->setText(downloadSizeText({}));
     verifying_=false;persisting_=false;pause_->setEnabled(false);rate_->clear();progress_->setRange(0,100);progress_->setValue(0);status_->setText(error);
     download_->setText(ready_ ? "Retry download":"Retry check");download_->setEnabled(true);cancel_->setEnabled(true);cancel_->setText("Close");
     title_->setReadOnly(false);if(ready_){quality_->setEnabled(quality_->count()>1);browse_->setEnabled(true);}if(closeAfter_)QTimer::singleShot(0,this,[this]{close();});
@@ -206,9 +211,8 @@ void MediaDialog::settle(QueueStatus result,QString error) {
     auto pending=std::make_shared<std::future<QString>>(queue_.finishMedia(historyId_,result,savedFile_,error,metadataInfo_));auto* timer=new QTimer(this);timer->setInterval(30);
     connect(timer,&QTimer::timeout,this,[this,timer,pending,result,error]{
         if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();
-        try {const auto final=pending->get();if(result==QueueStatus::Completed)savedFile_=final;historyId_.clear();persisting_=false;verifying_=false;
-            if(result==QueueStatus::Completed){progress_->setRange(0,100);progress_->setValue(100);rate_->setText("Complete");status_->setText("Saved: "+savedFile_);destination_->setText(savedFile_);openFolder_->show();cancel_->setEnabled(true);cancel_->setText("Close");if(closeAfter_)close();}
-            else retryable(error);
+        try {pending->get();historyId_.clear();persisting_=false;verifying_=false;
+            close();
         }catch(const std::exception& e){
             if(result==QueueStatus::Completed){settle(QueueStatus::Failed,QString::fromUtf8(e.what()));}
             else {historyId_.clear();retryable("Could not save video history. "+QString::fromUtf8(e.what()));}
@@ -244,10 +248,58 @@ void MediaDialog::resume(){
     if(retained_){setProperty("resumeOnLoad",true);return;}if(!paused_||persisting_)return;
     persisting_=true;pause_->setEnabled(false);cancel_->setEnabled(false);status_->setText("Resuming retained video files…");auto pending=std::make_shared<std::future<void>>(queue_.pauseMedia(historyId_,false,context_));auto* timer=new QTimer(this);timer->setInterval(30);
     connect(timer,&QTimer::timeout,this,[this,timer,pending]{if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();persisting_=false;cancel_->setEnabled(true);
-        try{pending->get();paused_=false;pause_->setText("Pause");auto args=transferArguments();args[args.indexOf("--paths")+1]=QDir(folder_).filePath(".downshift-video-"+historyId_);started_=std::chrono::steady_clock::now()-std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(elapsed_));lastProgress_=std::chrono::steady_clock::now()-std::chrono::seconds(1);savedFile_.clear();verifying_=false;launch(args,false);}
+        try{pending->get();paused_=false;closeAfter_=true;hide();pause_->setText("Pause");auto args=transferArguments();args[args.indexOf("--paths")+1]=QDir(folder_).filePath(".downshift-video-"+historyId_);started_=std::chrono::steady_clock::now()-std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(elapsed_));lastProgress_=std::chrono::steady_clock::now()-std::chrono::seconds(1);savedFile_.clear();verifying_=false;launch(args,false);}
         catch(const std::exception& e){pause_->setEnabled(true);status_->setText("Could not resume: "+QString::fromUtf8(e.what()));}
     });timer->start();
 }
+void MediaDialog::updateSize() {
+    sizeProbe_->inspect(QUrl());
+    const auto height=quality_->currentData().toInt();
+    const bool videoOnly=metadataInfo_.value("videoOnly").toBool();
+    // yt-dlp returns formats in preference order, worst first. Apply the same
+    // video/audio and HLS preferences as the transfer. Live format checks can
+    // still select a fallback, so totals from a list of formats are estimates.
+    const auto choose=[&](bool hls) {
+        QJsonObject video,audio,combined;
+        for(const auto& value:sizeFormats_){
+            const auto f=value.toObject();
+            if(hls && !f.value("protocol").toString().startsWith("m3u8"))continue;
+            const auto v=f.value("vcodec").toString(),a=f.value("acodec").toString();
+            if(v=="none"){if(!a.isEmpty() && a!="none")audio=f;continue;}
+            if(height && f.value("height").toInt()!=height)continue;
+            video=f;
+            if(a!="none" && !a.isEmpty())combined=f;
+        }
+        if(videoOnly && !hls && !video.isEmpty())return QList<QJsonObject>{video};
+        if(!video.isEmpty() && !audio.isEmpty())
+            return video.value("acodec")=="none"?QList<QJsonObject>{video,audio}:QList<QJsonObject>{video};
+        if(!combined.isEmpty())return QList<QJsonObject>{combined};
+        return QList<QJsonObject>{};
+    };
+    auto selected=youtubeHost(QUrl(url_).host()) && !browserSource_ ? choose(true):QList<QJsonObject>{};
+    if(selected.isEmpty())selected=choose(false);
+    if(selected.isEmpty() && sizeFormats_.size()==1){
+        const auto f=sizeFormats_.first().toObject();
+        if(f.value("vcodec")!="none")selected={f};
+    }
+    if(selected.isEmpty())return;
+    quint64 total=0;
+    bool approximate=selected.size()>1 || sizeFormats_.size()>1;
+    for(const auto& f:selected){
+        qint64 value=f.value("filesize").toInteger();
+        if(value<=0){value=f.value("filesize_approx").toInteger();approximate=true;}
+        if(value<=0){
+            const auto protocol=f.value("protocol").toString();
+            if(selected.size()==1 && sizeFormats_.size()==1 && (protocol=="http" || protocol=="https"))
+                sizeProbe_->inspect(QUrl(f.value("url").toString()));
+            return;
+        }
+        if(static_cast<quint64>(value)>static_cast<quint64>(std::numeric_limits<qint64>::max())-total)return;
+        total+=static_cast<quint64>(value);
+    }
+    size_->setText((approximate?QString("About "):QString())+downloadSizeText(total));
+}
+
 QStringList MediaDialog::transferArguments() const {
     auto args=baseArguments();const auto height=metadataInfo_.value("resumeRecipe").toObject().value("height").toInt();const QString cap=height>0 ? "[height="+QString::number(height)+"]":"";
     // All helpers are mandatory and verified by setup. Missing helpers report errors
@@ -276,11 +328,11 @@ void MediaDialog::download() {
     title_->setReadOnly(true);
     metadataInfo_["resumeRecipe"]=QJsonObject{{"version",1},{"height",height},{"filename",title_->isModified()?metadataInfo_.value("downloadName").toString():QString()}};
     if(title_->isModified()){auto name=title_->text();const auto suffix=QFileInfo(name).suffix().toLower();if(QStringList{"mp4","mkv","webm","mov","avi","m4v"}.contains(suffix))name.chop(suffix.size()+1);auto recipe=metadataInfo_["resumeRecipe"].toObject();recipe["filename"]=name;metadataInfo_["resumeRecipe"]=recipe;}
-    auto args=transferArguments();status_->setText("Saving video to download history…");persisting_=true;download_->setEnabled(false);cancel_->setEnabled(false);browse_->setEnabled(false);quality_->setEnabled(false);savedFile_.clear();openFolder_->hide();destination_->setText(folder_);
+    auto args=transferArguments();status_->setText("Saving video to download history…");persisting_=true;download_->setEnabled(false);cancel_->setEnabled(false);browse_->setEnabled(false);quality_->setEnabled(false);savedFile_.clear();destination_->setText(folder_);
     metadataInfo_["height"]=height;metadataInfo_["originalPage"]=url_;
     auto pending=std::make_shared<std::future<QString>>(queue_.beginMedia(url_,folder_,title_->text(),metadataInfo_));auto* timer=new QTimer(this);timer->setInterval(30);
     connect(timer,&QTimer::timeout,this,[this,timer,pending,args]() mutable {if(pending->wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;timer->stop();timer->deleteLater();persisting_=false;cancel_->setEnabled(true);
-        try{historyId_=pending->get();setProperty("mediaId",historyId_);const auto index=args.indexOf("--paths");if(index>=0)args[index+1]=QDir(folder_).filePath(".downshift-video-"+historyId_);started_=std::chrono::steady_clock::now();lastProgress_=started_-std::chrono::seconds(1);status_->setText("Starting video download…");verifying_=false;launch(args,false);}catch(const std::exception& e){retryable(QString::fromUtf8(e.what()));}
+        try{historyId_=pending->get();setProperty("mediaId",historyId_);closeAfter_=true;hide();const auto index=args.indexOf("--paths");if(index>=0)args[index+1]=QDir(folder_).filePath(".downshift-video-"+historyId_);started_=std::chrono::steady_clock::now();lastProgress_=started_-std::chrono::seconds(1);verifying_=false;launch(args,false);}catch(const std::exception& e){retryable(QString::fromUtf8(e.what()));}
     });timer->start();
 }
 void MediaDialog::cancel(){if(paused_){paused_=false;settle(QueueStatus::Cancelled,"Cancelled. Incomplete video files were removed.");return;}cancelled_=true;status_->setText("Stopping…");if(job_)TerminateJobObject(job_,1);else process_.kill();}

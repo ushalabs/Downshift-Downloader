@@ -4,6 +4,7 @@
 #include "browser/PipeServer.h"
 #include "browser/NativeProtocol.h"
 #include "core/DownloadQueue/StorageLocation.h"
+#include "packaging/MsixSetup.h"
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -37,6 +38,7 @@ int main(int argc, char* argv[]) {
                 return application.exec();
             }
         }
+        if(!smokeTest && !downshift::msix::finishFirstLaunchSetup())return 0;
         (void)downshift::checkDependencies();
         QTemporaryDir temporary;
         if(smokeTest && !temporary.isValid())throw std::runtime_error("The temporary startup-check folder is unavailable. Saved history was not opened.");

@@ -400,6 +400,11 @@ std::future<QJsonObject> QueueManager::browserUpdate(QString key,QString file,bo
         const auto found=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.id==id;});
         if(found==entries_.end())return QJsonObject{{"downloadStatus","Removed"}};
         auto& e=*found;if(!e.browserTransfer)invalid("This entry uses the direct download engine.");
+        if(size>=0 && (e.status==QueueStatus::Prepared || e.status==QueueStatus::Paused || e.status==QueueStatus::Queued) &&
+            e.progress.totalBytes!=static_cast<std::uint64_t>(size)){
+            e.progress.totalBytes=static_cast<std::uint64_t>(size);
+            save(e);
+        }
         if(complete && (!e.browserComplete || e.requiredTotal!=static_cast<std::uint64_t>(size))){e.browserComplete=true;e.requiredTotal=static_cast<std::uint64_t>(size);save(e);}
         if(!file.isEmpty()) {
             if(!QFileInfo(file).isAbsolute() || file.size()>32768 || file.contains(QChar(0)))invalid("Invalid browser transfer path.");

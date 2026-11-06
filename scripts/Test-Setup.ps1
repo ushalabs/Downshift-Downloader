@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$SetupPath,[Parameter(Mandatory=$true)][string]$PackagePath,[string]$ReportPath='', [string]$VideoTestDriver='', [string]$PythonExecutable='', [string]$MediaArchiveCache='', [string]$VerificationSetupPath='', [switch]$InstallerOnly, [string]$PreviousMediaReport='', [string]$PreviousPortableReport='', [switch]$ElevatedProduction, [string]$YouTubeTestDriver='', [string]$YouTubeReportPath='')
+param([Parameter(Mandatory=$true)][string]$SetupPath,[Parameter(Mandatory=$true)][string]$PackagePath,[string]$ReportPath='', [string]$VideoTestDriver='', [string]$PythonExecutable='', [string]$MediaArchiveCache='', [string]$FirstLaunchTestDriver='', [string]$VerificationSetupPath='', [switch]$InstallerOnly, [string]$PreviousMediaReport='', [string]$PreviousPortableReport='', [switch]$ElevatedProduction, [string]$YouTubeTestDriver='', [string]$YouTubeReportPath='')
 $ErrorActionPreference='Stop'
 $setup=(Resolve-Path -LiteralPath $SetupPath).Path
 $testSetup=if($ElevatedProduction){$setup}elseif($VerificationSetupPath){(Resolve-Path -LiteralPath $VerificationSetupPath).Path}else{$setup}
@@ -15,7 +15,15 @@ $normalHost='Software\Google\Chrome\NativeMessagingHosts\org.ushalabs.downshift'
 $testHost='Software\Google\Chrome\NativeMessagingHosts\org.ushalabs.downshift.packaging-test'
 $aliasHost=$testHost+'.user-override'
 $testUninstall='Software\Microsoft\Windows\CurrentVersion\Uninstall\Downshift.PackagingTest'
+$testStartup='Software\UshaLabs\Downshift.PackagingTest\Run'
+$startupValue='UshaLabs.Downshift'
+$startupCommand='"'+(Join-Path $install 'Downshift.exe')+'"'
 function Read-Default([string]$path){$key=$registry.OpenSubKey($path);try{if($key){return $key.GetValue('')}}finally{if($key){$key.Dispose()}};return $null}
+function Read-TestStartup {
+    $key=$registry.OpenSubKey($testStartup)
+    try{if($key){return $key.GetValue($startupValue)}}finally{if($key){$key.Dispose()}}
+    return $null
+}
 function Run-Hidden([string]$file,[string]$arguments){
     $process=Start-Process -FilePath $file -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(1860000)){throw 'Private setup process timed out.'}
@@ -23,6 +31,7 @@ function Run-Hidden([string]$file,[string]$arguments){
 }
 $previousNormal=Read-Default $normalHost;$previousTest=Read-Default $testHost
 $existing=$registry.OpenSubKey($testUninstall);if($existing){$existing.Dispose();$registry.Dispose();throw 'A previous isolated setup is registered; refusing to overwrite it.'}
+if($null -ne (Read-TestStartup)){$registry.Dispose();throw 'A previous startup fixture is registered; refusing to overwrite it.'}
 $desktop=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Downshift.lnk'
 $desktopBefore=if(Test-Path -LiteralPath $desktop){(Get-FileHash -LiteralPath $desktop -Algorithm SHA256).Hash}else{$null}
 $pathBefore=$env:PATH;$pluginBefore=$env:QT_PLUGIN_PATH;$platformBefore=$env:QT_QPA_PLATFORM
@@ -58,11 +67,13 @@ public static class DownshiftSetupManifest {
     $legacyDesktop=Join-Path $legacyRoot 'Downshift.lnk';$legacyShell=New-Object -ComObject WScript.Shell;$legacyLink=$legacyShell.CreateShortcut($legacyDesktop);$legacyLink.TargetPath=Join-Path $legacyRoot 'Downshift.exe';$legacyLink.Save();$legacyDesktopHash=(Get-FileHash -LiteralPath $legacyDesktop).Hash
     @{name='org.ushalabs.downshift.packaging-test';type='stdio';path=$legacyHost;allowed_origins=@('chrome-extension://empnpdkfnffpcgnfgdndkbielplcoioe/')}|ConvertTo-Json|Set-Content -LiteralPath $legacyManifest -Encoding utf8
     $aliasKey=$registry.CreateSubKey($aliasHost);try{$aliasKey.SetValue('',$legacyManifest)}finally{$aliasKey.Dispose()}
+    $videoHome=Join-Path $install 'test-video-support'
+    $videoTools=Join-Path $videoHome 'media-tools'
     if($MediaArchiveCache){
         # Verification-only cache seeding avoids re-downloading immutable archives
-        # while still exercising the installer's actual extraction/hash path.
+        # while still exercising the application's first-launch extraction/hash path.
         $archiveLock=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'media-tools-lock.json') -Raw | ConvertFrom-Json
-        $cache=Join-Path $install '.setup-media-cache';New-Item -ItemType Directory -Path $cache -Force | Out-Null
+        $cache=Join-Path $videoHome 'media-cache';New-Item -ItemType Directory -Path $cache -Force | Out-Null
         foreach($asset in $archiveLock.assets){
             $source=Join-Path $MediaArchiveCache $asset.name
             if((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLower() -ne $asset.sha256){throw 'Fixture archive checksum differs.'}
@@ -70,13 +81,40 @@ public static class DownshiftSetupManifest {
         }
     }
     Run-Hidden $testSetup "/S /ISOLATEDTEST /D=$install"
+    if((Read-TestStartup) -cne $startupCommand){throw 'The sign-in startup command is missing or points elsewhere.'};$checks++
     if((Read-Default $aliasHost) -ne (Join-Path $install 'org.ushalabs.downshift.packaging-test.json')){throw 'The older per-user host still overrides the installed host.'};$checks++
     if($legacyShell.CreateShortcut($legacyDesktop).TargetPath -ne (Join-Path $install 'Downshift.exe')){throw 'The older user Desktop icon still opens the development app.'};$checks++
     $manifest=Get-Content -LiteralPath (Join-Path $install 'package-manifest.json') -Raw | ConvertFrom-Json
-    foreach($file in $manifest.files){if($file.path -eq 'Chrome-setup.txt'){continue};if((Get-FileHash -LiteralPath (Join-Path $install $file.path) -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "Installed file differs: $($file.path)"}};$checks++
+    foreach($file in $manifest.files){if($file.path -in @('Chrome-setup.txt','Enable-video.cmd')){continue};if((Get-FileHash -LiteralPath (Join-Path $install $file.path) -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "Installed file differs: $($file.path)"}};$checks++
     $mediaLock=Get-Content -LiteralPath (Join-Path $install 'scripts/media-tools-lock.json') -Raw|ConvertFrom-Json
-    foreach($file in $mediaLock.files){if((Get-FileHash -LiteralPath (Join-Path $install ('media-tools/'+$file.name)) -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "Automatic video install differs: $($file.name)"}};$checks++
-    if(Test-Path -LiteralPath (Join-Path $install '.setup-media-cache')){throw 'Successful setup retained video download cache.'};$checks++
+    if((Test-Path -LiteralPath $videoTools) -or (Test-Path -LiteralPath (Join-Path $install 'media-tools')) -or (Test-Path -LiteralPath (Join-Path $install 'Enable-video.cmd'))){throw 'The installer must defer tools until first launch.'};$checks++
+    if(!$FirstLaunchTestDriver){throw 'Pass -FirstLaunchTestDriver with the path to downshift_gui_tests.exe.'}
+    $firstLaunch=Join-Path $install 'downshift_gui_tests.exe'
+    Copy-Item -LiteralPath $FirstLaunchTestDriver -Destination $firstLaunch
+    $chromeScript=Join-Path $install 'scripts/Open-ChromeSetup.ps1'
+    $chromeOriginal=[IO.File]::ReadAllBytes($chromeScript)
+    try{
+        # Exercise the setup button with an isolated Qt clipboard and a mock Chrome launch.
+        @('param([switch]$OpenChrome)','if(!$OpenChrome){exit 1}','Start-Sleep -Milliseconds 450',"Write-Output 'DOWNSHIFT_UNPACKED_READY'") |
+            Set-Content -LiteralPath $chromeScript -Encoding utf8
+        $env:QT_QPA_PLATFORM='minimal'
+        Run-Hidden $firstLaunch '--first-launch-setup --mock-chrome'
+    }finally{
+        $env:QT_QPA_PLATFORM=$platformBefore
+        [IO.File]::WriteAllBytes($chromeScript,$chromeOriginal)
+        Remove-Item -LiteralPath $firstLaunch -Force
+    };$checks++
+    foreach($file in $mediaLock.files){if((Get-FileHash -LiteralPath (Join-Path $videoTools $file.name) -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "First-launch video install differs: $($file.name)"}};$checks++
+    if(Test-Path -LiteralPath (Join-Path $videoHome 'media-cache')){throw 'Successful first launch retained the download cache.'};$checks++
+    # Standalone media drivers use app-local tools. Also create an older-install
+    # receipt here to exercise legacy cleanup without touching per-user helpers.
+    $legacyTools=Join-Path $install 'media-tools'
+    New-Item -ItemType Directory -Path $legacyTools | Out-Null
+    Get-ChildItem -LiteralPath $videoTools -File | Copy-Item -Destination $legacyTools
+    $legacyReceipt=Join-Path $legacyTools 'installed-files.json'
+    $legacyVideo=Get-Content -LiteralPath $legacyReceipt -Raw | ConvertFrom-Json
+    $legacyVideo.root=$legacyTools
+    $legacyVideo | ConvertTo-Json | Set-Content -LiteralPath $legacyReceipt -Encoding utf8
     $guide=Get-Content -LiteralPath (Join-Path $install 'Chrome-setup.txt') -Raw
     $expectedGuide=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'chrome-setup-template.txt') -Raw -Encoding utf8).Replace('{{EXTENSION_PATH}}',(Join-Path $install 'extension'))
     if($guide -cne $expectedGuide -or $guide.Contains('{{EXTENSION_PATH}}')){throw 'Chrome text instructions differ.'};$checks++
@@ -101,6 +139,7 @@ public static class DownshiftSetupManifest {
     $historyHash=(Get-FileHash -LiteralPath $history -Algorithm SHA256).Hash
     $mediaUnknown=Join-Path $install 'media-tools/user-video.keep';[IO.File]::WriteAllText($mediaUnknown,'Unknown content must be preserved.')
     Run-Hidden $testSetup "/S /ISOLATEDTEST /D=$install"
+    if((Read-TestStartup) -cne $startupCommand){throw 'Reinstall changed the sign-in startup command.'};$checks++
     if((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash -or (Get-FileHash -LiteralPath $history -Algorithm SHA256).Hash -ne $historyHash){throw 'Reinstall changed private user data.'};$checks++
     $env:PATH="$env:WINDIR\System32;$env:WINDIR";$env:QT_PLUGIN_PATH='';$env:QT_QPA_PLATFORM='windows'
     Run-Hidden (Join-Path $install 'Downshift.exe') '--smoke-test';$checks++
@@ -158,9 +197,11 @@ public static class DownshiftSetupManifest {
     $modifiedLicense=Join-Path $install 'media-tools/FFMPEG-LICENSE.txt';[IO.File]::WriteAllText($modifiedLicense,'Modified file must be preserved by uninstall.')
     $modifiedHash=(Get-FileHash -LiteralPath $modifiedLicense -Algorithm SHA256).Hash
     Run-Hidden (Join-Path $install 'Uninstall.exe') "/S _?=$install"
+    if($null -ne (Read-TestStartup)){throw 'Uninstall retained the sign-in startup command.'};$checks++
     foreach($file in $mediaLock.files){if($file.name -ne 'FFMPEG-LICENSE.txt' -and (Test-Path -LiteralPath (Join-Path $install ('media-tools/'+$file.name)))){throw 'Uninstall retained an unchanged owned video runtime.'}};$checks++
     if((Get-FileHash -LiteralPath $modifiedLicense -Algorithm SHA256).Hash -ne $modifiedHash){throw 'Uninstall changed a modified video file.'};$checks++
     if(!(Test-Path -LiteralPath $mediaUnknown)){throw 'Video uninstall removed unknown content.'};$checks++
+    if(!(Test-Path -LiteralPath (Join-Path $videoTools 'installed-files.json'))){throw 'Uninstall modified first-launch user storage.'};$checks++
     if(Test-Path -LiteralPath (Join-Path $install 'Downshift.exe')){throw 'Uninstall left the application executable.'};$checks++
     if(Test-Path -LiteralPath $desktopFixture){throw 'Uninstall retained the owned Desktop shortcut.'};$checks++
     if((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash -or (Get-FileHash -LiteralPath $history -Algorithm SHA256).Hash -ne $historyHash){throw 'Uninstall changed private user data.'};$checks++
@@ -172,7 +213,7 @@ public static class DownshiftSetupManifest {
     $desktopAfter=if(Test-Path -LiteralPath $desktop){(Get-FileHash -LiteralPath $desktop -Algorithm SHA256).Hash}else{$null}
     if($desktopAfter -ne $desktopBefore){throw 'Normal Desktop shortcut changed.'};$checks++
     $report=@{checks=$checks;automaticVideoInstallVerified=$true;freshUpstreamDownloadsVerified=(!$MediaArchiveCache);verifiedArchiveCacheSeeded=([bool]$MediaArchiveCache);videoGuiChecks=[int]$videoChecks;videoRuntimeFiles=$mediaLock.files.Count;videoCacheCleaned=$true;chromeGuideVerified=$true;chromeExtensionAutomaticallyLoaded=$false;setupSha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLower();packageSha256=(Get-FileHash -LiteralPath $PackagePath -Algorithm SHA256).Hash.ToLower();version=$manifest.version;localPreview=$manifest.localPreview;normalRegistrationWritten=$false;normalDesktopChanged=$false;userDataPreserved=$true;reinstallVerified=$true;uninstallVerified=$true;runtimePath='Windows system directories only';limitations='Local Windows development machine, not a clean VM or signed release. Chrome text instructions verified without launching/changing normal Chrome; unpublished extension still requires Load unpacked. Fresh upstream downloads are not established when verifiedArchiveCacheSeeded is true.'}
-    $report.desktopShortcutVerified=$true;$report.administratorManifestVerified=$true;$report.elevatedProgramFilesInstallVerified=[bool]$ElevatedProduction
+    $report.desktopShortcutVerified=$true;$report.signInStartupVerified=$true;$report.administratorManifestVerified=$true;$report.elevatedProgramFilesInstallVerified=[bool]$ElevatedProduction
     $report.publicYouTubeTransfersVerified=$publicYouTubeVerified;$report.publicYouTubeReport=$YouTubeReportPath
     $report.legacyUserHostMigrationVerified=$true
     $report.legacyDesktopMigrationVerified=$true
@@ -189,7 +230,10 @@ public static class DownshiftSetupManifest {
     $env:PATH=$pathBefore;$env:QT_PLUGIN_PATH=$pluginBefore;$env:QT_QPA_PLATFORM=$platformBefore
     if($null -ne $previousTest){$key=$registry.CreateSubKey($testHost);try{$key.SetValue('',$previousTest)}finally{$key.Dispose()}}else{$registry.DeleteSubKey($testHost,$false)}
     if($null -ne $previousAlias){$aliasKey=$registry.CreateSubKey($aliasHost);try{$aliasKey.SetValue('',$previousAlias)}finally{$aliasKey.Dispose()}}else{$registry.DeleteSubKey($aliasHost,$false)}
-    $registry.DeleteSubKeyTree($testUninstall,$false);$registry.Dispose()
+    $registry.DeleteSubKeyTree($testUninstall,$false)
+    $key=$registry.OpenSubKey($testStartup,$true)
+    if($key){try{$key.DeleteValue($startupValue,$false)}finally{$key.Dispose()}}
+    $registry.Dispose()
     $resolved=[IO.Path]::GetFullPath($testRoot)
     if(!$resolved.StartsWith($temporary,[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $resolved -Leaf) -notlike 'Downshift setup test *'){throw 'Unsafe private setup cleanup path.'}
     if($succeeded -and (Test-Path -LiteralPath $resolved)){Remove-Item -LiteralPath $resolved -Recurse -Force}

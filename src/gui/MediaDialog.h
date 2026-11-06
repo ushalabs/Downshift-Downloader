@@ -1,6 +1,7 @@
 #pragma once
 #include "core/DownloadQueue/QueueManager.h"
 #include <QDialog>
+#include <QJsonArray>
 #include <QProcess>
 #include <QTimer>
 #include <optional>
@@ -10,6 +11,7 @@ class QLineEdit;
 class QProgressBar;
 class QPushButton;
 namespace downshift {
+class DownloadSizeProbe;
 // Site extraction and stream merging are delegated to pinned, local media helpers.
 // QProcess is asynchronous: no network or file work blocks the desktop event loop.
 class MediaDialog final : public QDialog {
@@ -22,7 +24,7 @@ public:
     void resume();
     bool canPause() const {return !metadata_&&!verifying_&&!transferFinished_&&!paused_&&!pauseRequested_&&!persisting_&&!historyId_.isEmpty()&&process_.state()==QProcess::Running;}
     bool paused() const {return paused_;}
-    void present(){closeAfter_=false;showNormal();raise();activateWindow();}
+    void present(){if(!historyId_.isEmpty()||retained_)return;closeAfter_=false;showNormal();raise();activateWindow();}
     bool active() const {return persisting_||(!paused_&&!historyId_.isEmpty())||process_.state()!=QProcess::NotRunning;}
     void setDownloadName(const QString& name);
     void refreshBrowserSource(const QJsonObject& context);
@@ -42,6 +44,7 @@ private:
     void restorePaused(const QueueEntry& entry);
     void pausedResult();
     QStringList transferArguments() const;
+    void updateSize();
     QString sourceUrl() const;
     bool browserFormats() const;
     QByteArray browserInfo() const;
@@ -50,6 +53,7 @@ private:
     QString url_,tools_,lastError_,folder_,historyId_,savedFile_;
     QueueSettings settings_;
     QJsonObject metadataInfo_,context_;
+    QJsonArray sizeFormats_;
     QProcess process_;
     QTimer deadline_;
     QByteArray output_,errors_,helperInput_;
@@ -60,10 +64,11 @@ private:
     std::optional<QueueEntry> retained_;
     std::chrono::steady_clock::time_point started_,lastProgress_;
     void* job_=nullptr;
-    QLabel *status_=nullptr,*rate_=nullptr;
+    QLabel *status_=nullptr,*rate_=nullptr,*size_=nullptr;
+    DownloadSizeProbe* sizeProbe_=nullptr;
     QComboBox* quality_=nullptr;
     QLineEdit *destination_=nullptr,*title_=nullptr;
     QProgressBar* progress_=nullptr;
-    QPushButton *download_=nullptr,*cancel_=nullptr,*browse_=nullptr,*openFolder_=nullptr,*pause_=nullptr;
+    QPushButton *download_=nullptr,*cancel_=nullptr,*browse_=nullptr,*pause_=nullptr;
 };
 }

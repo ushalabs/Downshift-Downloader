@@ -31,4 +31,8 @@ yt-dlp, Deno and FFmpeg executables are **not** included in the binary archive. 
 
 No proprietary IDM source, artwork, or implementation is included.
 
+## MSIX distribution
+
+The MSIX and NSIS setups fetch the pinned upstream media tools on first launch and verify archive and extracted-file SHA-256 hashes. The installed FFmpeg license and upstream release links are kept with the downloaded tools. The corresponding unpacked Downshift ZIP remains available for installing compatible modified libraries or helpers.
+
 The compressed Windows setup uses the unmodified NSIS 3.12 installer/uninstaller stub, nsExec plug-in and LZMA module. The complete upstream copyright/license and LZMA linking exception are included as NSIS-LICENSE.txt. NSIS is separate from the application and does not change the application's MIT license or Qt library replacement rights. Upstream sources and documentation: [NSIS 3.12](https://sourceforge.net/projects/nsis/files/NSIS%203/3.12/) and [NSIS license](https://nsis.sourceforge.io/License).

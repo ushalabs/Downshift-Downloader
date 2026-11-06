@@ -2,10 +2,12 @@
 #include "gui/Brand.h"
 #include "core/Runtime.h"
 #include "database/QueueStore.h"
+#include "packaging/MsixSetup.h"
 #include "TestWindows.h"
 #include <QScreen>
 #include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QDialog>
 #include <QDir>
@@ -50,10 +52,78 @@ template<class F> void wait(F condition,int timeout=15000) {
     while(std::chrono::steady_clock::now()<end) {QApplication::processEvents();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);if(condition())return;QThread::msleep(5);}
     throw std::runtime_error("GUI condition timed out");
 }
+int testFirstLaunch(bool testChrome) {
+    using namespace downshift::msix;
+    const QDir tools(mediaToolsDirectory());
+    check(tools.path().contains("/test-video-support/") || familyName().startsWith("UshaLabs.Downshift.SetupValidation_"),
+        "First launch verification requires an isolated installation");
+    check(!tools.exists("installed-files.json"),"No media tools are installed before first launch");
+    QTimer controls;
+    bool sawGate=false, sawDark=false, sawDownloadSize=false, sawChromeSteps=false, chromeStarted=false, chromeFinished=false, retryOffered=false;
+    controls.setInterval(30);
+    QObject::connect(&controls,&QTimer::timeout,&controls,[&]{
+        for(auto* window:QApplication::topLevelWidgets()){
+            if(window->objectName()!="firstLaunchSetup")continue;
+            auto* dialog=static_cast<QDialog*>(window);
+            sawDark=qApp->property("downshiftDark").toBool();
+            const auto size=widget<QLabel>(*dialog,"videoSetupDownloadSize")->text();
+            if(size.contains(" of ") && size.contains("%") && size.contains(" remaining"))sawDownloadSize=true;
+            if(auto* steps=dialog->findChild<QLabel*>("chromeSetupSteps")){
+                const auto text=steps->text();
+                sawChromeSteps=text.contains("1. Click Open Chrome Extensions") && text.contains("2. Click Load unpacked") && text.contains("3. Press Ctrl+V");
+            }
+            if(!sawGate){
+                dialog->reject();
+                sawGate=dialog->isVisible() && QApplication::activeModalWidget()==dialog;
+                if(testChrome){
+                    auto* chrome=widget<QPushButton>(*dialog,"setupChromeButton");
+                    chromeStarted=chrome->isEnabled();
+                    chrome->click();
+                }
+            }
+            if(testChrome && QApplication::clipboard()->text().endsWith("\\extension"))chromeFinished=true;
+            if(widget<QPushButton>(*dialog,"retryVideoSetup")->isVisible()){
+                retryOffered=true;
+                dialog->done(QDialog::Rejected);
+            }
+        }
+    });
+    controls.start();
+    check(finishFirstLaunchSetup(),"First launch finishes only after the verified install");
+    controls.stop();
+    check(sawGate && !retryOffered,"The setup screen was modal, visible and could not be dismissed");
+    check(sawDark,"First-launch video setup uses the default dark appearance");
+    check(sawDownloadSize && sawChromeSteps,"First launch shows download counts, remaining size and the three Chrome steps");
+    if(testChrome){
+        // A fast tool install may close the dialog as soon as the Chrome action completes.
+        check(chromeStarted && (chromeFinished || QApplication::clipboard()->text().endsWith("\\extension")),
+            "Chrome setup could be started before the video tools were ready");
+    }
+    check(tools.exists("installed-files.json") && tools.exists("ffmpeg.exe"),"The verified install is in writable user storage");
+    QTimer reopened;
+    bool unexpectedPrompt=false;
+    QObject::connect(&reopened,&QTimer::timeout,&reopened,[&]{
+        for(auto* window:QApplication::topLevelWidgets()){
+            if(window->objectName()=="firstLaunchSetup"){
+                unexpectedPrompt=true;
+                static_cast<QDialog*>(window)->done(QDialog::Rejected);
+            }
+        }
+    });
+    reopened.start(30);
+    check(finishFirstLaunchSetup() && !unexpectedPrompt,"Later launches skip the setup screen");
+    std::cout<<"First launch setup checks passed: "<<checks<<'\n';
+    return 0;
+}
+
 }
 int main(int argc,char** argv) {
     QApplication app(argc,argv); QApplication::setApplicationName("Downshift");QApplication::setOrganizationName("Usha Labs");QApplication::setApplicationVersion("0.4.2");
     HiddenTestWindows hidden;app.installEventFilter(&hidden);std::cout<<"GUI device pixel ratio: "<<app.primaryScreen()->devicePixelRatio()<<'\n';
+    if(app.arguments().contains("--first-launch-setup")){
+        try{return testFirstLaunch(app.arguments().contains("--mock-chrome"));}
+        catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
+    }
     if(argc!=5)return 2;const auto root=QString::fromLocal8Bit(argv[1]),url=QString::fromLatin1(argv[2]),sha=QString::fromLatin1(argv[3]),shots=QString::fromLocal8Bit(argv[4]);
     QDir().mkpath(shots);downshift::CurlRuntime curl;const auto database=QDir(root).filePath("queue.sqlite"),file=QDir(root).filePath("Verified download.bin");
     int beats=0;double maximumGap=0;bool measuring=false;auto last=std::chrono::steady_clock::now();QTimer heartbeat;heartbeat.setInterval(20);QObject::connect(&heartbeat,&QTimer::timeout,[&]{const auto now=std::chrono::steady_clock::now();if(measuring){maximumGap=std::max(maximumGap,std::chrono::duration<double>(now-last).count());++beats;}last=now;});heartbeat.start();
@@ -75,6 +145,9 @@ int main(int argc,char** argv) {
             check(widget<QLineEdit>(*add,"addDestination")->text()==QDir(window.current().settings.directory).filePath("Docs/report.pdf"),
                 "Manual document download defaults to Docs");
             widget<QLineEdit>(*add,"addUrl")->setText(url);
+            auto* size=widget<QLabel>(*add,"addSize");
+            wait([&]{return size->text().startsWith("2")&&size->text().contains("MiB");});
+            check(window.current().entries.empty(),"Range metadata reveals the full file size before starting a download");
             widget<QLineEdit>(*add,"addDestination")->setText(QDir(root).filePath("original.bin"));widget<QLineEdit>(*add,"addFilename")->setText(QFileInfo(file).fileName());check(widget<QLineEdit>(*add,"addDestination")->text()==file,"Top name field sets manual download filename");widget<QLineEdit>(*add,"addSha256")->setText(sha);widget<QSpinBox>(*add,"addSpeedLimit")->setValue(256);widget<QPushButton>(*add,"addSubmit")->click();
             auto* table=widget<QTableWidget>(window,"downloadTable");wait([&]{return table->rowCount()==1 && window.current().entries[0].progress.downloadedBytes>100000;});
             check(!table->isColumnHidden(5)&&table->isColumnHidden(6),"Compact window keeps ETA and defers optional connection count");

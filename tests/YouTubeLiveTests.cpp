@@ -47,10 +47,14 @@ int main(int argc,char** argv){
         const int choice=quality->findData(height);if(choice<0)throw std::runtime_error("Requested actual live resolution was not offered");quality->setCurrentIndex(choice);
         std::cerr<<"Actual native dialog resolved YouTube qualities and selected "<<height<<"p. Starting full transfer.\n";
         submit->click();
-        waitFor([&]{return dialog->findChild<QLabel*>("mediaRate")->text()=="Complete"||submit->isEnabled();},900,"Live full transfer did not finish");
-        if(dialog->findChild<QLabel*>("mediaRate")->text()!="Complete")throw std::runtime_error(status->text().toUtf8().constData());
-        const auto snapshot=queue.snapshot().get();if(snapshot.entries.size()!=1||snapshot.entries[0].status!=downshift::QueueStatus::Completed)throw std::runtime_error("Live transfer was not durably completed");
-        const auto& entry=snapshot.entries[0];
+        downshift::QueueEntry entry;
+        waitFor([&]{
+            const auto rows=queue.snapshot().get().entries;
+            if(rows.size()!=1)return false;
+            entry=rows.front();
+            return entry.status==downshift::QueueStatus::Completed || entry.status==downshift::QueueStatus::Failed;
+        },900,"Live full transfer did not finish");
+        if(entry.status!=downshift::QueueStatus::Completed)throw std::runtime_error(entry.error.toUtf8().constData());
         const QJsonObject report{{"completed",true},{"file",entry.destination},{"height",height},{"qualities",heights},{"expectedDuration",entry.videoMetadata.value("duration")},{"browserSource",entry.videoMetadata.value("browserSource")},{"privateQueue",true}};
         std::cout<<QJsonDocument(report).toJson(QJsonDocument::Compact).toStdString()<<std::endl;return 0;
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}

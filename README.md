@@ -1,11 +1,11 @@
 <h1 align="center">
-  <a href="https://hub.xerj.org/contributors/ushalabs"><img src="https://hub.xerj.org/contributors/ushalabs/badge.svg" alt="XERJ Corpus Hub contributor" align="middle" /></a>
   <img src="assets/downshift.png" alt="Downshift icon" width="84" height="84" align="middle" />
   <br />
   Downshift
 </h1>
 
 <p align="center">
+  <a href="https://hub.xerj.org/contributors/ushalabs"><img src="https://hub.xerj.org/contributors/ushalabs/badge.svg" alt="XERJ Corpus Hub contributor" align="middle" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D4?logo=windows&logoColor=white" />
   <img src="https://img.shields.io/badge/version-1.0.0-EC1680" />
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B&logoColor=white" />

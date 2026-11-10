@@ -1,5 +1,6 @@
 <h1 align="center">
-  <img src="assets/downshift.png" alt="Downshift icon" width="84" height="84" />
+  <a href="https://hub.xerj.org/contributors/ushalabs"><img src="https://hub.xerj.org/contributors/ushalabs/badge.svg" alt="XERJ Corpus Hub contributor" align="middle" /></a>
+  <img src="assets/downshift.png" alt="Downshift icon" width="84" height="84" align="middle" />
   <br />
   Downshift
 </h1>

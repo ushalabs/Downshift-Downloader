@@ -60,7 +60,7 @@ int testFirstLaunch(bool testChrome) {
         "First launch verification requires an isolated installation");
     check(!tools.exists("installed-files.json"),"No media tools are installed before first launch");
     QTimer controls;
-    bool sawGate=false, sawDark=false, sawDownloadSize=false, sawChromeSteps=false, chromeStarted=false, chromeFinished=false, retryOffered=false;
+    bool sawGate=false, sawDark=false, sawDownloadSize=false, sawChromeSteps=false, chromeStarted=false, chromeFinished=false, retryOffered=false, repeatedOpenBlocked=false;
     controls.setInterval(30);
     QObject::connect(&controls,&QTimer::timeout,&controls,[&]{
         for(auto* window:QApplication::topLevelWidgets()){
@@ -76,6 +76,7 @@ int testFirstLaunch(bool testChrome) {
             if(!sawGate){
                 dialog->reject();
                 sawGate=dialog->isVisible() && QApplication::activeModalWidget()==dialog;
+                repeatedOpenBlocked=!finishFirstLaunchSetup() && QApplication::activeModalWidget()==dialog;
                 if(testChrome){
                     auto* chrome=widget<QPushButton>(*dialog,"setupChromeButton");
                     chromeStarted=chrome->isEnabled();
@@ -93,6 +94,7 @@ int testFirstLaunch(bool testChrome) {
     check(finishFirstLaunchSetup(),"First launch finishes only after the verified install");
     controls.stop();
     check(sawGate && !retryOffered,"The setup screen was modal, visible and could not be dismissed");
+    check(repeatedOpenBlocked,"Repeated tray or browser activation keeps a single first-launch setup dialog");
     check(sawDark,"First-launch video setup uses the default dark appearance");
     check(sawDownloadSize && sawChromeSteps,"First launch shows download counts, remaining size and the three Chrome steps");
     if(testChrome){

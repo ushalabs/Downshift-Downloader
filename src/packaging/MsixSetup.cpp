@@ -24,6 +24,7 @@
 #include <QLabel>
 #include <QLocale>
 #include <QProcess>
+#include <QPointer>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
@@ -345,11 +346,19 @@ bool chromeSetupAvailable() {
 }
 
 bool finishFirstLaunchSetup() {
+    static QPointer<QDialog> activeSetup;
+    if(activeSetup){
+        activeSetup->showNormal();
+        activeSetup->raise();
+        activeSetup->activateWindow();
+        return false;
+    }
     if(!installedSetup())return true;
     const QDir destination(mediaToolsDirectory());
     if(toolsReady(destination))return true;
     applyDesign(QueueSettings{}.dark);
     VideoSetupDialog dialog(destination);
+    activeSetup=&dialog;
     return dialog.exec()==QDialog::Accepted;
 }
 

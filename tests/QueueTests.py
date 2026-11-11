@@ -41,6 +41,26 @@ def main():
     url=f"http://127.0.0.1:{server.server_port}/range"
     with workspace() as tmp:
         root=pathlib.Path(tmp); db=root/"queue.sqlite"
+        # Unlimited must start more than the former sixteen-task maximum, including
+        # same-site downloads queued while a user-selected limit was enabled.
+        unlimited_db=root/'unlimited.sqlite'
+        u=Driver(exe,unlimited_db)
+        unlimited=u.call('snapshot')['settings']
+        assert unlimited['simultaneous']==unlimited['perHost']==unlimited['hostConnections']==0
+        unlimited.update(directory=str(root),simultaneous=2,connections=1,automatic=False)
+        u.call('configure',settings=unlimited)
+        unlimited_ids=[u.call('add',url=url,destination=str(root/f'unlimited-{i}.bin'),speedLimit=str(64*1024))['id'] for i in range(20)]
+        held=wait(u,lambda rows:sum(r['status']==1 for r in rows)==2)
+        assert sum(r['status']==0 for r in held)==18
+        unlimited['simultaneous']=0
+        u.call('configure',settings=unlimited)
+        wait(u,lambda rows:len(rows)==20 and all(r['status']==1 and int(r['downloaded'])>0 for r in rows))
+        for identifier in unlimited_ids:
+            u.call('action',id=identifier,action=2)
+        wait(u,lambda rows:all(r['status']==5 for r in rows))
+        u.close();u=Driver(exe,unlimited_db)
+        assert u.call('snapshot')['settings']==unlimited
+        u.close();checks+=4
         import sqlite3
         with sqlite3.connect(db) as sql:
             sql.executescript("CREATE TABLE downloads(id TEXT PRIMARY KEY,payload BLOB NOT NULL);CREATE TABLE settings(id INTEGER PRIMARY KEY,payload BLOB NOT NULL);PRAGMA user_version=1;")

@@ -16,7 +16,7 @@ enum class QueueStatus { Queued, Running, Paused, Completed, Failed, Cancelled, 
 QString statusText(QueueStatus status);
 struct QueueSettings {
     QString directory;
-    int simultaneous = 3, perHost = 2, hostConnections = 16, connections = 16;
+    int simultaneous = 0, perHost = 0, hostConnections = 0, connections = 16;
     bool automatic = true, dark = true, startOnLaunch = false, notifications = true, diagnostics = false, closeToTray = true;
     std::uint64_t speedLimit = 0;
     QJsonObject json() const;

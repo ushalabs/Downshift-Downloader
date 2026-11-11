@@ -37,7 +37,7 @@ ShowUninstDetails show
 !insertmacro MUI_PAGE_LICENSE "${PROJECT_ROOT}\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_TEXT "Downshift will open when you sign in to Windows. You can change this in Settings > Apps > Startup.$\r$\n$\r$\nOpen Downshift to download its video tools and set up Chrome.$\r$\n$\r$\nThis local preview is unsigned. Downloads and history are kept when you uninstall."
+!define MUI_FINISHPAGE_TEXT "Downshift will run in the system tray when you sign in to Windows. Click its tray or Desktop icon to open the window. You can change startup in Settings > Apps > Startup.$\r$\n$\r$\nOpen Downshift to download its video tools and set up Chrome.$\r$\n$\r$\nThis local preview is unsigned. Downloads and history are kept when you uninstall."
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -125,8 +125,10 @@ Section "Downshift" Main
   WriteRegDWORD SHCTX "$RegistryKey" "NoRepair" 1
   ReadRegStr $Result SHCTX "$StartupKey" "${STARTUP_VALUE}"
   ${If} $Result == ""
+  ${OrIf} $Result == '$\"$INSTDIR\Downshift.exe$\"'
+  ${OrIf} $Result == '$\"$INSTDIR\Downshift.exe$\" --background'
     ClearErrors
-    WriteRegStr SHCTX "$StartupKey" "${STARTUP_VALUE}" '$\"$INSTDIR\Downshift.exe$\"'
+    WriteRegStr SHCTX "$StartupKey" "${STARTUP_VALUE}" '$\"$INSTDIR\Downshift.exe$\" --background'
     ${If} ${Errors}
       SetErrorLevel 1
       Abort "Downshift is installed, but Windows sign-in launch could not be registered. Run setup again to retry."
@@ -178,6 +180,7 @@ Section "Uninstall"
   ${EndIf}
   ReadRegStr $Result SHCTX "$StartupKey" "${STARTUP_VALUE}"
   ${If} $Result == '$\"$INSTDIR\Downshift.exe$\"'
+  ${OrIf} $Result == '$\"$INSTDIR\Downshift.exe$\" --background'
     DeleteRegValue SHCTX "$StartupKey" "${STARTUP_VALUE}"
   ${EndIf}
   !include "${UNINSTALL_FILES}"

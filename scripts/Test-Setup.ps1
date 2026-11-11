@@ -17,7 +17,7 @@ $aliasHost=$testHost+'.user-override'
 $testUninstall='Software\Microsoft\Windows\CurrentVersion\Uninstall\Downshift.PackagingTest'
 $testStartup='Software\UshaLabs\Downshift.PackagingTest\Run'
 $startupValue='UshaLabs.Downshift'
-$startupCommand='"'+(Join-Path $install 'Downshift.exe')+'"'
+$startupCommand='"'+(Join-Path $install 'Downshift.exe')+'" --background'
 function Read-Default([string]$path){$key=$registry.OpenSubKey($path);try{if($key){return $key.GetValue('')}}finally{if($key){$key.Dispose()}};return $null}
 function Read-TestStartup {
     $key=$registry.OpenSubKey($testStartup)
@@ -138,11 +138,14 @@ public static class DownshiftSetupManifest {
     $sentinelHash=(Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
     $historyHash=(Get-FileHash -LiteralPath $history -Algorithm SHA256).Hash
     $mediaUnknown=Join-Path $install 'media-tools/user-video.keep';[IO.File]::WriteAllText($mediaUnknown,'Unknown content must be preserved.')
+    $legacyStartup=$registry.OpenSubKey($testStartup,$true)
+    try{$legacyStartup.SetValue($startupValue,'"'+(Join-Path $install 'Downshift.exe')+'"')}finally{$legacyStartup.Dispose()}
     Run-Hidden $testSetup "/S /ISOLATEDTEST /D=$install"
     if((Read-TestStartup) -cne $startupCommand){throw 'Reinstall changed the sign-in startup command.'};$checks++
     if((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash -or (Get-FileHash -LiteralPath $history -Algorithm SHA256).Hash -ne $historyHash){throw 'Reinstall changed private user data.'};$checks++
     $env:PATH="$env:WINDIR\System32;$env:WINDIR";$env:QT_PLUGIN_PATH='';$env:QT_QPA_PLATFORM='windows'
     Run-Hidden (Join-Path $install 'Downshift.exe') '--smoke-test';$checks++
+    Run-Hidden (Join-Path $install 'Downshift.exe') '--smoke-test --background';$checks++
     $previousVideoChecks=0
     $applicationSha=(Get-FileHash -LiteralPath (Join-Path $install 'Downshift.exe') -Algorithm SHA256).Hash.ToLower()
     if($InstallerOnly){

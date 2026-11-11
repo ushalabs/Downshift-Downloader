@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
     QApplication::setOrganizationName(QStringLiteral("Usha Labs"));
     QApplication::setApplicationVersion(QStringLiteral(DOWNSHIFT_VERSION));
     const bool smokeTest = application.arguments().contains(QStringLiteral("--smoke-test"));
+    const bool background = application.arguments().contains(QStringLiteral("--background"));
 
     try {
         downshift::CurlRuntime curl;
@@ -34,11 +35,12 @@ int main(int argc, char* argv[]) {
             const auto name=("Local\\Downshift-"+downshift::browser::userSid()).toStdWString();instance.mutex=CreateMutexW(nullptr,FALSE,name.c_str());
             if(!instance.mutex)throw std::runtime_error("Downshift could not establish its local instance.");
             if(GetLastError()==ERROR_ALREADY_EXISTS) {
+                if(background)return 0;
                 std::jthread activate([&application]{try{(void)downshift::browser::send({{"version",1},{"command","open"}});}catch(...){}QMetaObject::invokeMethod(&application,&QCoreApplication::quit,Qt::QueuedConnection);});
                 return application.exec();
             }
         }
-        if(!smokeTest && !downshift::msix::finishFirstLaunchSetup())return 0;
+        if(!smokeTest && !background && !downshift::msix::finishFirstLaunchSetup())return 0;
         (void)downshift::checkDependencies();
         QTemporaryDir temporary;
         if(smokeTest && !temporary.isValid())throw std::runtime_error("The temporary startup-check folder is unavailable. Saved history was not opened.");
@@ -51,11 +53,13 @@ int main(int argc, char* argv[]) {
         downshift::MainWindow window(queue);
         window.attachTorrents(torrents);
         if(smokeTest)window.setAttribute(Qt::WA_DontShowOnScreen);
-        window.show();
+        if(background)QApplication::setQuitOnLastWindowClosed(false);
+        else window.show();
         std::unique_ptr<downshift::browser::PipeServer> browser;
         if(!smokeTest) {
-            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showNormal();window.raise();window.activateWindow();},Qt::QueuedConnection);},[&window,&queue](QString url,QString title,QJsonObject context){
+            browser=std::make_unique<downshift::browser::PipeServer>(queue,[&window]{QMetaObject::invokeMethod(&window,[&window]{window.showDownloads();},Qt::QueuedConnection);},[&window,&queue](QString url,QString title,QJsonObject context){
                 QMetaObject::invokeMethod(&window,[&window,&queue,url=std::move(url),title=std::move(title),context=std::move(context)]{
+                    if(!downshift::msix::finishFirstLaunchSetup())return;
                     window.openVideo(url,title,{},context);
                 },Qt::QueuedConnection);
             },[&window]{QMetaObject::invokeMethod(&window,[&window]{window.captureError();},Qt::QueuedConnection);},[&window](QString source){QMetaObject::invokeMethod(&window,[&window,source=std::move(source)]{window.openTorrent(source);},Qt::QueuedConnection);});
@@ -63,15 +67,19 @@ int main(int argc, char* argv[]) {
         }
 
         if (smokeTest) {
-            QTimer::singleShot(1000, &window, [&application, &window] {
-                const bool healthy = window.isVisible() && window.centralWidget() != nullptr &&
+            QTimer::singleShot(1000, &window, [&application, &window, background] {
+                bool healthy = window.isVisible() != background && window.centralWidget() != nullptr &&
                     window.windowTitle() == QStringLiteral("Downshift") && window.ready() && !window.grab().isNull();
+                if(background){
+                    window.showDownloads();
+                    healthy=healthy && window.isVisible();
+                }
                 application.exit(healthy ? 0 : 1);
             });
         }
         return application.exec();
     } catch (const std::exception& error) {
-        if (!smokeTest) {
+        if (!smokeTest && !background) {
             QMessageBox::critical(nullptr, QStringLiteral("Downshift could not start"),
                 QString::fromUtf8(error.what()));
         } else {

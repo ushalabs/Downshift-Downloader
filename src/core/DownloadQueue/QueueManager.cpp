@@ -52,14 +52,16 @@ QString statusText(QueueStatus s) {
     case QueueStatus::Paused: return "Paused"; case QueueStatus::Completed: return "Completed"; case QueueStatus::Failed: return "Failed";
     case QueueStatus::Cancelled: return "Cancelled"; case QueueStatus::Prepared: return "Awaiting Chrome"; } return "Unknown";
 }
-QJsonObject QueueSettings::json() const { return {{"version",1},{"directory",directory},{"simultaneous",simultaneous},{"perHost",perHost},{"hostConnections",hostConnections},{"connections",connections},{"automatic",automatic},{"dark",dark},{"startOnLaunch",startOnLaunch},{"notifications",notifications},{"diagnostics",diagnostics},{"closeToTray",closeToTray},{"speedLimit",QString::number(speedLimit)}}; }
+QJsonObject QueueSettings::json() const { return {{"version",1},{"concurrencyVersion",1},{"directory",directory},{"simultaneous",simultaneous},{"perHost",perHost},{"hostConnections",hostConnections},{"connections",connections},{"automatic",automatic},{"dark",dark},{"startOnLaunch",startOnLaunch},{"notifications",notifications},{"diagnostics",diagnostics},{"closeToTray",closeToTray},{"speedLimit",QString::number(speedLimit)}}; }
 QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
-    QueueSettings s; s.directory = o.value("directory").toString(); s.simultaneous = o.value("simultaneous").toInt(3); s.perHost = o.value("perHost").toInt(2);
-    s.hostConnections = o.value("hostConnections").toInt(16); s.connections = o.value("connections").toInt(16);
+    QueueSettings s; s.directory = o.value("directory").toString(); s.simultaneous = o.value("simultaneous").toInt(s.simultaneous); s.perHost = o.value("perHost").toInt(s.perHost);
+    s.hostConnections = o.value("hostConnections").toInt(s.hostConnections); s.connections = o.value("connections").toInt(16);
     s.automatic = o.value("automatic").toBool(true); s.dark = o.value("dark").toBool(s.dark); s.startOnLaunch = o.value("startOnLaunch").toBool();
     s.notifications = o.value("notifications").toBool(true); s.diagnostics = o.value("diagnostics").toBool(); s.speedLimit = o.value("speedLimit").toString().toULongLong();
     s.closeToTray=o.value("closeToTray").toBool(true);
-    if (s.simultaneous < 1 || s.simultaneous > 16 || s.perHost < 1 || s.perHost > 16 || s.hostConnections < 1 || s.hostConnections > 64 || s.connections < 1 || s.connections > 16 || s.speedLimit > 10ULL*1024*1024*1024) invalid("Invalid queue settings.");
+    if (s.simultaneous < 0 || s.simultaneous > 10000 || s.perHost < 0 || s.perHost > 10000 || s.hostConnections < 0 || s.hostConnections > 10000 || s.connections < 1 || s.connections > 16 || s.speedLimit > 10ULL*1024*1024*1024) invalid("Invalid queue settings.");
+    // Older profiles inherit the new unlimited policy once. Future explicit limits persist.
+    if(!o.contains("concurrencyVersion"))s.simultaneous=s.perHost=s.hostConnections=0;
     return s;
 }
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
@@ -103,6 +105,7 @@ struct QueueManager::Worker {
     std::mutex mutex;
     DownloadProgress progress;
     bool done=false, cancel=false;
+    int connectionLimit=1;
     QueueStatus status=QueueStatus::Running;
     QString error,partialIdentity;
     bool browser=false;
@@ -332,14 +335,19 @@ void QueueManager::schedule() {
     std::stable_sort(pending.begin(),pending.end(),[](auto* a,auto* b){return a->priority>b->priority;});
     for(auto* e:pending) {
         if(!youtubeVideo(e->url).isEmpty()){e->status=QueueStatus::Failed;e->error="This is a YouTube webpage. Choose Retry video to download its streams.";save(*e);continue;}
-        if(static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))>=static_cast<std::size_t>(settings_.simultaneous)) break;
-        int host=0; for(const auto& [id,w]:workers_) if(entry(id).origin==e->origin) ++host;
-        if(host>=std::min(settings_.perHost,settings_.hostConnections)) continue;
+        if(settings_.simultaneous>0 && static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))>=static_cast<std::size_t>(settings_.simultaneous)) break;
+        int host=0,reservedConnections=0;
+        for(const auto& [id,w]:workers_)if(entry(id).origin==e->origin){++host;reservedConnections+=w->connectionLimit;}
+        if(settings_.perHost>0 && host>=settings_.perHost) continue;
+        const int availableConnections=settings_.hostConnections>0 ? settings_.hostConnections-reservedConnections:settings_.connections;
+        if(availableConnections<=0)continue;
+        const int connectionShare=settings_.hostConnections>0 ? std::max(1,settings_.hostConnections/std::max(1,settings_.perHost)):settings_.connections;
         auto w=std::make_unique<Worker>(); auto* mailbox=w.get();
         if(e->existing==ExistingDownload::Resume){w->progress=e->progress;w->progress.stage=DownloadStage::Probe;w->progress.activeRanges=0;w->progress.smoothedBytesPerSecond=w->progress.instantaneousBytesPerSecond=0;}
         DownloadOptions options;options.discardIncomplete=true; options.url=e->url.toStdString(); options.destination=path(e->destination); options.existing=e->existing; options.control=&mailbox->control;
         options.requiredEtag=e->requiredEtag.toStdString();options.requiredResolvedUrl=e->requiredResolvedUrl.toStdString();options.requiredTotal=e->requiredTotal;
-        options.automaticConnections=settings_.automatic; options.maxConnections=static_cast<std::uint32_t>(std::min(settings_.connections,std::max(1,settings_.hostConnections/settings_.perHost)));
+        options.automaticConnections=settings_.automatic; options.maxConnections=static_cast<std::uint32_t>(std::min({settings_.connections,availableConnections,connectionShare}));
+        mailbox->connectionLimit=static_cast<int>(options.maxConnections);
         if(!e->sha256.isEmpty()) options.expectedSha256=e->sha256.toStdString();
         auto local=std::make_shared<RateBudget>(); local->configure(e->speedLimit); auto global=budget_;
         options.beforeWrite=[local,global,mailbox](std::size_t n,std::stop_token stop) { local->wait(n,stop,&mailbox->control); global->wait(n,stop,&mailbox->control); };
@@ -419,7 +427,7 @@ std::future<QJsonObject> QueueManager::browserUpdate(QString key,QString file,bo
             if(!sourceError.isEmpty()){{std::lock_guard lock(i->second->mutex);i->second->error="Transfer interrupted: "+sourceError;i->second->browserFailed=true;}}
             if(complete){i->second->browserSize=size;i->second->browserComplete=true;}
         } else if(!sourceError.isEmpty() && e.status!=QueueStatus::Completed && e.status!=QueueStatus::Cancelled){e.status=QueueStatus::Failed;e.error="Transfer interrupted: "+sourceError;try{cleanup(e);}catch(const std::exception& error){e.error+=" Cleanup: "+QString::fromUtf8(error.what());}save(e);
-        } else if(e.status==QueueStatus::Queued && !e.browserFile.isEmpty() && static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))<static_cast<std::size_t>(settings_.simultaneous)) {
+        } else if(e.status==QueueStatus::Queued && !e.browserFile.isEmpty() && (settings_.simultaneous==0 || static_cast<std::size_t>(std::count_if(workers_.begin(),workers_.end(),[this](const auto& pair){return entry(pair.first).status==QueueStatus::Running;}))<static_cast<std::size_t>(settings_.simultaneous))) {
             auto worker=std::make_unique<Worker>();auto* w=worker.get();w->browser=true;w->browserComplete=complete;w->browserSize=size;w->browserReceived=received;w->progress=e.progress;w->progress.resumable=true;
             const auto source=path(e.browserFile),target=path(e.destination);const auto ownedIdentity=e.partialIdentity;ordinaryParents(target);
             e.status=QueueStatus::Running;e.error.clear();save(e);workers_.emplace(id,std::move(worker));

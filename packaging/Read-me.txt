@@ -14,8 +14,9 @@ Load unpacked and paste that path. The Chrome Web Store listing is required
 for the normal "Add to Chrome" flow. Refresh existing video tabs.
 
 Default installation: C:\Program Files\Downshift (Windows x64).
-Downshift opens when you sign in to Windows. Change this in
-Windows Settings > Apps > Startup.
+Downshift runs in the system tray when you sign in to Windows. Click its
+tray or Desktop icon to open the window. Change startup in Windows Settings
+> Apps > Startup.
 Approve the Windows administrator prompt. Setup installs for all users and
 creates a Downshift Desktop icon and Start menu shortcuts. Download history,
 preferences and downloads remain in each user's own writable folders.

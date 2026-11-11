@@ -2,6 +2,7 @@
 #include "DownloadSize.h"
 #include "MediaDialog.h"
 #include "TorrentDialogs.h"
+#include "packaging/MsixSetup.h"
 #include <QCloseEvent>
 #include <QDragEnterEvent>
 #include <QMimeData>
@@ -169,7 +170,11 @@ void MainWindow::openVideo(QString address,QString title,QString folder,QJsonObj
     if(count>=4){message("Finish or cancel an existing video task before opening another.",true);return;}
     auto* dialog=new MediaDialog(queue_,std::move(address),std::move(title),this,std::move(folder),std::move(context));dialog->setDownloadName(filename);dialog->present();
 }
-void MainWindow::showDownloads(){showNormal();raise();activateWindow();for(auto* child:findChildren<QWidget*>(QString(),Qt::FindDirectChildrenOnly))if(child->property("showFromTray").toBool()){child->setProperty("showFromTray",false);child->show();}}
+void MainWindow::showDownloads(){
+    if(!QApplication::arguments().contains("--smoke-test") && !msix::finishFirstLaunchSetup())return;
+    showNormal();raise();activateWindow();
+    for(auto* child:findChildren<QWidget*>(QString(),Qt::FindDirectChildrenOnly))if(child->property("showFromTray").toBool()){child->setProperty("showFromTray",false);child->show();}
+}
 void MainWindow::resumeVideo(const QueueEntry& entry){
     for(auto* child:findChildren<QDialog*>("mediaDialog"))if(child->property("mediaId").toString()==entry.id)if(auto* media=dynamic_cast<MediaDialog*>(child)){media->resume();return;}
     if(!validMediaResume(entry.videoMetadata.value("resumeRecipe").toObject())){openVideo(entry.url,entry.mediaTitle,entry.mediaFolder,entry.videoMetadata.value("requestContext").toObject(),entry.videoMetadata.value("downloadName").toString());return;}
@@ -185,7 +190,7 @@ void MainWindow::requestExit(){
 QPushButton* makeButton(const QString& text,const char* name,QWidget* parent) { auto* b=new QPushButton(text,parent); b->setObjectName(name); b->setMinimumHeight(DesignTokens::controlHeight); return b; }
 MainWindow::MainWindow(QueueManager& queue,QWidget* parent,QNetworkAccessManager* previewNetwork):QMainWindow(parent),queue_(queue) {
     QApplication::setStyle(QStyleFactory::create("Fusion"));QApplication::setWindowIcon(brandIcon());
-    setAcceptDrops(true);setObjectName("downshiftMainWindow"); setWindowTitle("Downshift"); setWindowIcon(brandIcon()); resize(1075,730); setMinimumSize(800,550);
+    setAcceptDrops(true);setObjectName("downshiftMainWindow"); setWindowTitle("Downshift"); setWindowIcon(brandIcon()); resize(1075,630); setMinimumSize(800,550);
     auto* central=new QWidget(this);setCentralWidget(central);
     auto* frame=new QVBoxLayout(central);frame->setContentsMargins(0,0,0,0);frame->setSpacing(0);
     auto* masthead=new QWidget; masthead->setObjectName("masthead");

@@ -37,7 +37,7 @@
                           Square44x44Logo="StoreAssets\Square44x44Logo.png"
                           BackgroundColor="transparent" />
       <Extensions>
-        <desktop:Extension Category="windows.startupTask" Executable="Downshift.exe" EntryPoint="Windows.FullTrustApplication">
+        <desktop:Extension Category="windows.startupTask" Executable="Downshift.exe" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--background">
           <desktop:StartupTask TaskId="DownshiftStartup" Enabled="true" DisplayName="Downshift" />
         </desktop:Extension>
         <desktop7:Extension Category="windows.shortcut">

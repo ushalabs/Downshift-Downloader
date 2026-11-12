@@ -1,5 +1,9 @@
 # Downshift development progress
 
+## NSIS release verification (2026-11-13)
+
+The first two remote release-verification attempts failed at the torrent recovery fixture's Pause assertion, which counted relay socket accepts after requesting asynchronous native Pause. As with the existing completion check, Qt can accept an already-started connection late. The fixture now waits for native paused/disconnected state, then monitors paused intent, peers and both payload counters throughout the accelerated recovery window. It retains verified-progress, resumed final SHA-256 and other-torrent checks, and reports late relay accepts diagnostically. The corrected fixture passed locally. Application, HTTP/media and torrent engine source are unchanged; publication remains gated on remote Release/Debug verification.
+
 ## Four-browser extensions and compact video controls (2026-11-13)
 
 Chrome, Edge and Opera share the existing Manifest V3 worker and restricted Chromium native-host identity. Firefox uses a module background page, fixed `downshift@ushalabs` identity and a separate restricted native manifest. Browser adapters normalize Firefox timestamps and paused/interrupted states, retain original authenticated/POST responses when they cannot safely pause, and preserve native handoff identity across recovery. Setup offers a browser chooser; Windows packages include all four extensions and the registration helpers. Firefox 140+ currently uses an unsigned temporary add-on; permanent installation requires Mozilla signing, and private windows are excluded.

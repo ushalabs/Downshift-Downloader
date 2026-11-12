@@ -85,8 +85,26 @@ try{
         require(recovered.verifiedBytes>=stalled.verifiedBytes,"Automatic reconnect retains already verified pieces");
         std::cout<<"Recovered outage "<<outage+1<<"; accepted peer connections="<<link.bridges.size()<<std::endl;
     }
-    watch=false;engine.pause(id).get();accepted=link.bridges.size();const auto stopped=row(engine,id);idle(3700);
-    require(row(engine,id).state==State::Paused&&row(engine,id).nativePaused&&link.bridges.size()==accepted,"Explicit user Pause remains paused across recovery deadlines");
+    watch=false;accepted=link.bridges.size();engine.pause(id).get();
+    // Pause is asynchronous in libtorrent. A relay socket accepted late by Qt
+    // may belong to a connection started before Pause; it is not resumed data.
+    // Require native quiescence, then monitor the task throughout the recovery
+    // window so a transient automatic restart or payload transfer still fails.
+    wait([&]{const auto value=row(engine,id);return value.state==State::Paused&&value.nativePaused&&value.peers==0;},10);
+    const auto stopped=row(engine,id);
+    const auto pauseDeadline=std::chrono::steady_clock::now()+std::chrono::milliseconds(3700);
+    do{
+        idle(50);const auto value=row(engine,id);
+        if(value.state!=State::Paused||!value.nativePaused||value.peers!=0
+            ||value.downloadedBytes!=stopped.downloadedBytes||value.uploadedBytes!=stopped.uploadedBytes){
+            std::cerr<<"Paused task: state="<<static_cast<int>(value.state)<<" nativePaused="<<value.nativePaused
+                <<" peers="<<value.peers<<" downloaded="<<value.downloadedBytes<<"/"<<stopped.downloadedBytes
+                <<" uploaded="<<value.uploadedBytes<<"/"<<stopped.uploadedBytes<<std::endl;
+            require(false,"Explicit user Pause remains paused without payload transfer across recovery deadlines");
+        }
+    }while(std::chrono::steady_clock::now()<pauseDeadline);
+    require(true,"Explicit user Pause remains paused without payload transfer across recovery deadlines");
+    std::cout<<"Paused native task stayed disconnected; late relay accepts="<<link.bridges.size()-accepted<<std::endl;
     require(row(engine,id).verifiedBytes>=stopped.verifiedBytes,"Paused file progress never goes backwards while queued writes finish");
     engine.resume(id).get();wait([&]{return row(engine,id).state==State::Complete;},35);
     wait([&]{return row(engine,healthy).state==State::Complete;});require(!unexpectedPause,"Other torrent continues independently during reconnects");

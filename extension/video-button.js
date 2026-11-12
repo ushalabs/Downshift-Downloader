@@ -1,4 +1,5 @@
 (() => {
+  const chrome=globalThis.browser ?? globalThis.chrome;
   if (globalThis.__downshiftVideoButtons) return;
   globalThis.__downshiftVideoButtons = true;
   const players = new Map();
@@ -29,6 +30,11 @@
     const encoded=video.getAttribute('data-sources');if(encoded && encoded.length<=65536)try{const list=JSON.parse(encoded);if(Array.isArray(list))sources.push(...list.slice(0,32));}catch{}
     return sources.filter(source=>typeof source?.src==='string' && /^https?:\/\//i.test(source.src) && source.src.length<=32768).sort((a,b)=>(Number(b.height)||Number(b['data-bitrate'])||0)-(Number(a.height)||Number(a['data-bitrate'])||0))[0]?.src || current || '';
   }
+  function identity(target,cardMode){
+    if(cardMode)return youtubeLink(target);
+    if(/(^|\.)youtube\.com$/.test(location.hostname))return location.pathname+'?v='+(new URL(location.href).searchParams.get('v') || '');
+    return clickedSource(target) || location.href;
+  }
   function attach(target,cardMode=false) {
     if (players.has(target) || players.size >= 96) return;
     if(!cardMode && target.closest(cardSelector) && /(^|\.)youtube\.com$/.test(location.hostname))return;
@@ -37,16 +43,25 @@
     host.style.cssText = "all:initial;position:fixed;z-index:2147483647;display:none;pointer-events:none";
     const root = host.attachShadow({mode:"closed"});
     const style = document.createElement("style");
-    style.textContent = ":host{color-scheme:light}button{pointer-events:auto;display:block;max-width:260px;padding:9px 13px;border:1px solid #93c5fd;border-radius:7px;background:#be185d;color:white;box-shadow:0 2px 10px #0007;font:600 13px/18px 'Segoe UI',sans-serif;cursor:pointer}button:hover{background:#db2777}button:focus-visible{outline:3px solid white;outline-offset:2px}button:disabled{cursor:wait;background:#475569}span{pointer-events:auto;display:block;max-width:260px;padding:7px;border-radius:5px;background:#0f172a;color:white;font:12px/16px 'Segoe UI',sans-serif}span:empty{display:none}";
-    const button = document.createElement("button"); button.type = "button"; button.textContent = "↓ Download this video";
+    style.textContent = `:host{color-scheme:light}.controls{position:relative;width:40px;height:40px;pointer-events:auto}button{all:initial;box-sizing:border-box;display:block;cursor:pointer;border:0;border-radius:50%;font-family:'Segoe UI',sans-serif}.download{width:40px;height:40px;background:transparent;transition:filter .15s}.download svg{display:block;width:100%;height:100%;pointer-events:none}.download:hover{filter:brightness(1.08)}button:focus-visible{outline:2px solid white;outline-offset:2px}.download:disabled{cursor:wait;filter:saturate(.5)}.dismiss{position:absolute;right:-5px;top:-5px;width:18px;height:18px;background:#29212b;color:white;text-align:center;font:16px/18px 'Segoe UI',sans-serif;opacity:0;pointer-events:none;transition:opacity .12s}.controls:hover .dismiss,.controls:focus-within .dismiss{opacity:1;pointer-events:auto}.dismiss:hover{background:#a91858}.notice{pointer-events:auto;position:absolute;right:0;top:46px;box-sizing:border-box;width:max-content;max-width:min(260px,calc(100vw - 24px));padding:7px;border-radius:5px;background:#0f172a;color:white;font:12px/16px 'Segoe UI',sans-serif}.notice:empty{display:none}@media(hover:none){.dismiss{opacity:1;pointer-events:auto}}@media(prefers-reduced-motion:reduce){button{transition:none}}`;
+    const controls=document.createElement('div');controls.className='controls';
+    const button = document.createElement("button"); button.type = "button";button.className='download';
+    button.setAttribute('aria-label','Download this video');
+    // Vector rendering of the supplied circular icon: no rectangular background.
+    button.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="disc"><circle cx="32" cy="32" r="32"/></clipPath></defs><circle cx="32" cy="32" r="32" fill="#ff73a5"/><g clip-path="url(#disc)" fill="#e65d8c"><path d="M34 14 64 44V64H32L20 50l8-8-8-11 3-3 7 7V14z"/><path d="m44 46 20 20H40L20 50z"/></g><path fill="white" d="M30 14h4v21l7-7 3 3-12 12-12-12 3-3 7 7V14zM20 46h24v4H20z"/></svg>';
     button.title = "Choose quality and download with Downshift";
-    const notice = document.createElement("span"); notice.setAttribute("role","status");
-    root.append(style,button,notice); document.documentElement.append(host);
-    const record = {host, button, notice,cardMode}; players.set(target,record);
+    const dismiss=document.createElement('button');dismiss.type='button';dismiss.className='dismiss';dismiss.textContent='×';dismiss.title='Hide download control for this video';dismiss.setAttribute('aria-label',dismiss.title);
+    const notice = document.createElement("span"); notice.className='notice';notice.setAttribute("role","status");
+    controls.append(button,dismiss);root.append(style,controls,notice); document.documentElement.append(host);
+    const record = {host, button, notice,cardMode,dismissed:false,identity:identity(target,cardMode)}; players.set(target,record);
+    dismiss.addEventListener('click',event=>{
+      if(!event.isTrusted)return;
+      event.preventDefault();event.stopPropagation();record.dismissed=true;clearTimeout(record.noticeTimer);notice.textContent='';host.style.display='none';
+    });
     button.addEventListener("click", async event => {
       // A page script cannot silently ask the native application to download a video.
       if (!event.isTrusted) return;
-      event.preventDefault(); event.stopPropagation(); button.disabled = true; notice.textContent = "Opening Downshift…";
+      event.preventDefault(); event.stopPropagation(); button.disabled = true;clearTimeout(record.noticeTimer);notice.textContent = "Opening Downshift…";
       try {
         const video=cardMode ? target.querySelector('video'):target;
         const card = cardMode ? target:video.closest(cardSelector);
@@ -73,6 +88,7 @@
         const playerCount=[...document.querySelectorAll('video')].filter(v=>v.isConnected && v.getBoundingClientRect().width>=120 && v.getBoundingClientRect().height>=70).length;
         const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, browserPrepared, source:clickedSource(video), userAgent:navigator.userAgent, playerCount, protected:!!video?.mediaKeys, title:document.title.slice(0,200)});
         notice.textContent = answer?.ok ? "Choose quality in Downshift." : answer?.error || "Open Downshift and try again.";
+        if(answer?.ok)record.noticeTimer=setTimeout(()=>{notice.textContent='';},4000);
       } catch(error) { notice.textContent = error?.message || "Reload this page after reloading the Downshift extension."; }
       button.disabled = false;
     });
@@ -86,17 +102,20 @@
   }
   function layout() {
     scheduled = false;
-    for (const [target, {host,cardMode}] of players) {
+    for (const [target, record] of players) {
+      const {host,cardMode}=record;
+      const currentIdentity=identity(target,cardMode);
+      if(record.identity!==currentIdentity){record.identity=currentIdentity;record.dismissed=false;clearTimeout(record.noticeTimer);record.notice.textContent='';}
       const anchor=cardMode ? target.querySelector('a#thumbnail,yt-thumbnail-view-model,yt-thumbnail-view-model a,a[href*="/watch?v="],a[href*="/shorts/"]') || target:target;
       const rect = anchor.getBoundingClientRect(), style = getComputedStyle(anchor);
-      const visible = target.isConnected && rect.width >= 120 && rect.height >= 70 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && style.visibility !== "hidden" && style.display !== "none";
+      const visible = !record.dismissed && target.isConnected && rect.width >= 120 && rect.height >= 70 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && style.visibility !== "hidden" && style.display !== "none";
       host.style.display = visible ? "block" : "none";
       if (!visible) continue;
       const fullscreen = document.fullscreenElement;
       const container = fullscreen && fullscreen.contains(target) && fullscreen !== target ? fullscreen : document.documentElement;
       if (host.parentNode !== container) container.append(host);
       host.style.top = `${Math.max(8,rect.top + 8)}px`;
-      host.style.left = `${Math.max(8,Math.min(innerWidth - 200,rect.right - 196))}px`;
+      host.style.left = `${Math.max(8,Math.min(innerWidth - 48,rect.right - 48))}px`;
     }
   }
   const observer = new MutationObserver(mutations => { if (mutations.some(m => m.type === "childList" || m.target.tagName === "VIDEO")) { clearTimeout(discover.timer); discover.timer = setTimeout(discover,100); } });

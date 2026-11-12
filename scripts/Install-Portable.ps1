@@ -85,5 +85,6 @@ try {
     foreach($shortcut in @($ShortcutPath,$AdditionalShortcutPath) | Where-Object {$_}){
         $link=$shell.CreateShortcut($shortcut);$link.TargetPath=$exe;$link.WorkingDirectory=$root;$link.IconLocation="$exe,0";$link.Description='Downshift download manager';$link.Save()
     }
-    Write-Host 'Downshift is ready. Open the Desktop shortcut. Load the extension folder from this extracted package in Chrome.'
+    & (Join-Path $PSScriptRoot 'Register-BrowserHosts.ps1') -MachineInstall:$MachineInstall -IsolatedTest:$IsolatedTest
+    Write-Host 'Downshift is ready. Open the Desktop shortcut and set up your browser extension.'
 }finally{$registry.Dispose()}

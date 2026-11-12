@@ -1,5 +1,13 @@
 # Downshift development progress
 
+## Four-browser extensions and compact video controls (2026-11-13)
+
+Chrome, Edge and Opera share the existing Manifest V3 worker and restricted Chromium native-host identity. Firefox uses a module background page, fixed `downshift@ushalabs` identity and a separate restricted native manifest. Browser adapters normalize Firefox timestamps and paused/interrupted states, retain original authenticated/POST responses when they cannot safely pause, and preserve native handoff identity across recovery. Setup offers a browser chooser; Windows packages include all four extensions and the registration helpers. Firefox 140+ currently uses an unsigned temporary add-on; permanent installation requires Mozilla signing, and private windows are excluded.
+
+Video controls now use a 40-pixel circular pink arrow based on the supplied reference, with a transparent button background. Hover or keyboard focus reveals a close button. Closing hides only that video's control through subsequent layout and discovery passes; a new source or page reload restores it. The trusted-click quality/download workflow is preserved, and successful handoff notices clear after four seconds. README includes separate setup instructions for all four browsers.
+
+Local verification includes 83 real Chrome origin/gesture/hover/close checks, 33 Edge and 33 Opera file/media checks, 14 Firefox checks, six browser unit/registration suites and a successful Release build. Tests use private profiles, native hosts and queues. The native HTTP, media and database implementations continue to serve the browser handoff; normal user profiles and active transfers are preserved. Clean Windows packaging and installer acceptance are recorded separately from remote CI and store certification.
+
 ## FFmpeg archive retention (2026-11-05)
 
 Windows CI run #36 compiled Release, then hit HTTP 404 while installing FFmpeg. BtbN had retired the daily build pinned in the media tool lock. The lock now uses the October 2026 month-end build of the same Windows x64 LGPL shared 8.1 series. BtbN keeps month-end builds for two years, so renew this pin before October 2028. Archive and extracted-file SHA-256 checks remain required.

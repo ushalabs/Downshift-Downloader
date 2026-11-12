@@ -15,7 +15,7 @@ async function until(test,timeout=120000){const end=Date.now()+timeout;while(Dat
  assert.equal(await read(),'ready');async function command(value){service.stdin.write(value+'\n');return JSON.parse(await read());}
  context=await chromium.launchPersistentContext(path.join(root,'profile'),{executablePath:chrome,headless:true,ignoreDefaultArgs:['--disable-extensions'],args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run']});
  const page=await context.newPage();await page.goto(target.href,{waitUntil:'domcontentloaded',timeout:60000});
- const overlay=page.locator('[data-downshift-video]:visible').first();await overlay.waitFor({state:'visible',timeout:45000});await overlay.click({position:{x:65,y:18}});
+ const overlay=page.locator('[data-downshift-video]:visible').first();await overlay.waitFor({state:'visible',timeout:45000});await overlay.click({position:{x:20,y:20}});
  let task;await until(async()=>{task=(await command('media'))[0];return task?.ready;});assert.equal(task.button,'Download video',task.status);assert(task.qualities.includes(height+'p'),task.qualities);console.log('Live Loom qualities:',task.qualities.join(', '));
  await command('media-height '+height);await command('media-download');await until(async()=>{task=(await command('media'))[0];if(task?.ready&&task.rate!=='Complete')throw Error(task.status);return task?.rate==='Complete';},600000);
  const rows=await command('snapshot');assert.equal(rows.length,1);assert.equal(rows[0].status,3);assert.equal(rows[0].url,target.href);const file=rows[0].destination;

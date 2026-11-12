@@ -1,6 +1,7 @@
 param([switch]$IsolatedTest,[switch]$MachineInstall)
 $ErrorActionPreference='Stop'
 $root=[System.IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
+& (Join-Path $PSScriptRoot 'Register-BrowserHosts.ps1') -MachineInstall:$MachineInstall -IsolatedTest:$IsolatedTest -Unregister
 $integrationName=if($IsolatedTest){'org.ushalabs.downshift.packaging-test'}else{'org.ushalabs.downshift'}
 $statePath=Join-Path $root $(if($IsolatedTest){'portable-registration.test.json'}else{'portable-registration.json'})
 if(!(Test-Path -LiteralPath $statePath)){Write-Host 'No portable setup registration to remove.';return}

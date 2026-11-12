@@ -3,16 +3,20 @@ import {MediaSources,publicUrl} from "./media.js";
 import {BrowserTransfers,NativeConnection} from './browser-transfer.js';
 import {saveImage} from './image-capture.js';
 import {AppLauncher} from './app-launcher.js';
+import {api as chrome,firefox,downloadItem,FirefoxDownloads} from './platform.js';
+const firefoxDownloads=firefox ? new FirefoxDownloads(chrome.storage.local,chrome.downloads,item=>sourceTags.get(item.finalUrl || item.url)?.ranges===true):null;
+const searchDownloads=query=>firefoxDownloads ? firefoxDownloads.search(query):chrome.downloads.search(query);
+const pauseDownload=id=>firefoxDownloads ? firefoxDownloads.pause(id):chrome.downloads.pause(id);
 const mediaSources = new MediaSources();
 const connection=new NativeConnection(()=>chrome.runtime.connectNative('org.ushalabs.downshift'));
 const sourceTags=new Map();
-chrome.webRequest.onBeforeSendHeaders.addListener(details=>mediaSources.request(details),{urls:['http://*/*','https://*/*']},['requestHeaders','extraHeaders']);
+chrome.webRequest.onBeforeSendHeaders.addListener(details=>mediaSources.request(details),{urls:['http://*/*','https://*/*']},firefox ? ['requestHeaders']:['requestHeaders','extraHeaders']);
 chrome.webRequest.onBeforeRequest.addListener(details=>{if(details.method!=='GET')sourceTags.delete(details.url);},{urls:['http://*/*','https://*/*']});
 const launcher=new AppLauncher(request=>connection.request(request),chrome.runtime.getManifest().version);
 const ensureApp=()=>launcher.ensure();
 chrome.webRequest.onHeadersReceived.addListener(details=>{
   mediaSources.observe(details);
-  if(details.method==='GET' && details.statusCode===200){const tag=details.responseHeaders?.find(h=>h.name.toLowerCase()==='etag')?.value;if(tag && /^"[^\r\n]{1,500}"$/.test(tag)){sourceTags.delete(details.url);sourceTags.set(details.url,{tag,at:Date.now()});if(sourceTags.size>1000)sourceTags.delete(sourceTags.keys().next().value);}}
+  if(details.method==='GET' && details.statusCode===200){const tag=details.responseHeaders?.find(h=>h.name.toLowerCase()==='etag')?.value;if(tag && /^"[^\r\n]{1,500}"$/.test(tag)){const ranges=details.responseHeaders?.some(h=>h.name.toLowerCase()==='accept-ranges'&&h.value?.trim().toLowerCase()==='bytes');sourceTags.delete(details.url);sourceTags.set(details.url,{tag,ranges,at:Date.now()});if(sourceTags.size>1000)sourceTags.delete(sourceTags.keys().next().value);}}
 }, {urls:["http://*/*","https://*/*"]}, ["responseHeaders"]);
 chrome.tabs.onRemoved.addListener(id=>mediaSources.forget(id));
 const controller=new HandoffController({
@@ -20,21 +24,21 @@ const controller=new HandoffController({
   captureEnabled:async()=>(await chrome.storage.local.get("handoffState")).handoffState?.enabled!==false,
   ensureApp,
   wake:ensureApp,
-  load:async()=>(await chrome.storage.local.get("handoffState")).handoffState,
-  save:async state=>chrome.storage.local.set({handoffState:state}),
+  load:async()=>{const state=(await chrome.storage.local.get("handoffState")).handoffState;return firefoxDownloads ? firefoxDownloads.restore(state):state;},
+  save:async state=>firefoxDownloads ? firefoxDownloads.save(state):chrome.storage.local.set({handoffState:state}),
   key:()=>crypto.randomUUID().replaceAll("-",""),
   native:request=>connection.request(request),
-  sourceTag:item=>{const source=sourceTags.get(item.finalUrl || item.url);return source && Date.now()-source.at<60000 ? source.tag:'';},
+  sourceTag:item=>{const source=sourceTags.get(item.finalUrl || item.url);return source && (!firefox || item.paused) && Date.now()-source.at<60000 ? source.tag:'';},
   browserCapture:(id,record,item,owner)=>browserTransfers.run(id,record,item,owner),
-  item:async id=>(await chrome.downloads.search({id}))[0],
-  active:()=>chrome.downloads.search({state:"in_progress"}),
+  item:async id=>downloadItem((await searchDownloads({id}))[0]),
+  active:async()=>(await searchDownloads({state:"in_progress"})).map(downloadItem),
   scheduleRetry:when=>{
     // A short timer handles normal startup/network delays; the alarm survives a
     // suspended MV3 worker. Neither path ever resumes Chrome.
     setTimeout(()=>quiet(controller.reconcile()),Math.max(0,when-Date.now()));
     chrome.alarms.create("downshift-retry",{when});
   },
-  pause:id=>chrome.downloads.pause(id),resume:id=>chrome.downloads.resume(id),cancel:id=>chrome.downloads.cancel(id),
+  pause:pauseDownload,resume:id=>chrome.downloads.resume(id),cancel:id=>chrome.downloads.cancel(id),
   erase:id=>chrome.downloads.erase({id}),
   restart:item=>chrome.downloads.download({url:item.finalUrl || item.url,filename:(item.filename || "download.bin").split(/[\\/]/).pop(),conflictAction:"uniquify",saveAs:false})
 });
@@ -43,9 +47,9 @@ const filenameHolds=new Map();
 const filenameRoutes=new Map();
 function applyFilenameRoute(id){const suggest=filenameHolds.get(id),route=filenameRoutes.get(id);if(suggest && route){filenameHolds.delete(id);filenameRoutes.delete(id);suggest({filename:route.name,conflictAction:'uniquify'});route.resolve(true);}}
 const browserTransfers=new BrowserTransfers({ensureApp,key:()=>crypto.randomUUID().replaceAll('-',''),
-  item:async id=>(await chrome.downloads.search({id}))[0],pause:id=>chrome.downloads.pause(id),resume:id=>chrome.downloads.resume(id),cancel:id=>chrome.downloads.cancel(id),erase:id=>chrome.downloads.erase({id}),
+  item:async id=>downloadItem((await searchDownloads({id}))[0]),pause:pauseDownload,resume:id=>chrome.downloads.resume(id),cancel:id=>chrome.downloads.cancel(id),erase:id=>chrome.downloads.erase({id}),
   removeFile:async id=>{try{await chrome.downloads.removeFile(id);}catch(error){const item=(await chrome.downloads.search({id}))[0];if(item?.exists!==false)throw error;}},
-  route:(id,name)=>new Promise(resolve=>{filenameRoutes.set(id,{name,resolve});applyFilenameRoute(id);setTimeout(()=>{if(filenameRoutes.get(id)?.resolve===resolve){filenameRoutes.delete(id);resolve(false);}},1500);})
+  route:(id,name)=>!chrome.downloads.onDeterminingFilename ? Promise.resolve(false):new Promise(resolve=>{filenameRoutes.set(id,{name,resolve});applyFilenameRoute(id);setTimeout(()=>{if(filenameRoutes.get(id)?.resolve===resolve){filenameRoutes.delete(id);resolve(false);}},1500);})
 });
 async function releaseFilenameHolds(){
   const enabled=(await chrome.storage.local.get("handoffState")).handoffState?.enabled!==false;
@@ -58,12 +62,15 @@ async function releaseFilenameHolds(){
     if(!enabled){filenameHolds.delete(id);suggest();}
   }
 }
-chrome.downloads.onCreated.addListener(item=>quiet(controller.candidate(item,'created')));
+chrome.downloads.onCreated.addListener(item=>{
+  if(firefoxDownloads)quiet(firefoxDownloads.normalize(item,true).then(value=>controller.candidate(value,'created')));
+  else quiet(controller.candidate(item,'created'));
+});
 // Hold filename finalization until the capture decision has settled. Chrome
 // cannot complete even a tiny attachment while this callback is outstanding.
 // Suggest exactly once while the request is live. A cancelled/erased request
 // no longer has a filename to finalize.
-chrome.downloads.onDeterminingFilename.addListener((item,suggest)=>{
+chrome.downloads.onDeterminingFilename?.addListener((item,suggest)=>{
   if(item.state!=='in_progress')return false;
   filenameHolds.set(item.id,suggest);
   applyFilenameRoute(item.id);
@@ -71,8 +78,8 @@ chrome.downloads.onDeterminingFilename.addListener((item,suggest)=>{
 });
 chrome.downloads.onChanged.addListener(change=>{
   if(change.state || change.paused || change.finalUrl || change.url || change.mime || change.filename || change.totalBytes || change.danger)
-    quiet(chrome.downloads.search({id:change.id}).then(async items=>{
-      if(items[0] && ['in_progress','complete'].includes(items[0].state))await controller.candidate(items[0]);
+    quiet(searchDownloads({id:change.id}).then(async items=>{
+      if(items[0] && ['in_progress','complete'].includes(items[0].state))await controller.candidate(downloadItem(items[0]));
       else await controller.serial(()=>controller.run(String(change.id)));
       await releaseFilenameHolds();
     }));
@@ -143,16 +150,16 @@ quiet(controller.reconcile());
 // Explicit image capture uses Chrome only as an authenticated response transport.
 // The app chooses the destination and verifies the exact received bytes.
 let installingImageAction=false;
-function installImageAction(){
+async function installImageAction(){
   if(installingImageAction)return;
   installingImageAction=true;
-  chrome.contextMenus.removeAll(()=>{
-    if(chrome.runtime.lastError){installingImageAction=false;return;}
+  try{
+    await chrome.contextMenus.removeAll();
     chrome.contextMenus.create({id:'downshift-save-image',title:'Save image to Downshift',contexts:['image']},()=>{
       void chrome.runtime.lastError;
       installingImageAction=false;
     });
-  });
+  }catch{installingImageAction=false;}
 }
 chrome.runtime.onInstalled.addListener(installImageAction);
 chrome.runtime.onStartup.addListener(installImageAction);

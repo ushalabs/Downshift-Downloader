@@ -10,7 +10,7 @@ const {host,extension}=require('./IsolatedBrowser.cjs').isolatedBrowser(repo,roo
 // in the isolated extension copy, then dispatch that listener with image info.
 const testWorker=path.join(extension,'background.js');
 fs.writeFileSync(testWorker,"globalThis.__testImageActions=[];const testAddImageListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.__testImageActions.push(listener);testAddImageListener(listener);};\n"+fs.readFileSync(testWorker,'utf8'));
-const registryScript=path.join(repo,'tests','ChromeRegistry.py');let fixture,service,context;const children=[];let checks=0;
+const registryScript=path.join(repo,'tests','ChromeRegistry.py');let fixture,service,context,nativeSnapshot;const children=[];let checks=0;
 function child(exe,args){const p=cp.spawn(exe,args,{stdio:['pipe','pipe','pipe'],env:{...process.env,no_proxy:'localhost,127.0.0.1',NO_PROXY:'localhost,127.0.0.1'}});children.push(p);p.stderr.on('data',d=>process.stderr.write(d));return p;}
 function lineReader(p){
   const reader=readline.createInterface({input:p.stdout}),queued=[],pending=[];let failure;
@@ -34,6 +34,7 @@ const expected=crypto.createHash('sha256');for(let i=0;i<4*1024*1024/256;i++)exp
     const register=cp.spawnSync(python,[registryScript,'install',host,path.join(root,'host.json'),path.join(root,'registry.json'),'--isolated'],{encoding:'utf8'});assert.equal(register.status,0,register.stderr);
     service=child(driver,[native,'--isolated-browser-test']);let serviceLine=lineReader(service);assert.equal(await serviceLine(),'ready');
     async function allRows(){service.stdin.write('snapshot\n');return JSON.parse(await serviceLine());}
+    nativeSnapshot=allRows;
     async function rows(){service.stdin.write('confirm\n');assert.equal(await serviceLine(),'confirmed');return (await allRows()).filter(row=>!row.media);}
     const profile=path.join(root,'profile');fs.mkdirSync(path.join(profile,'Default'),{recursive:true});fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({download:{default_directory:downloads,prompt_for_download:false}}));
     const browserOptions={executablePath:chrome,headless:true,acceptDownloads:true,downloadsPath:downloads,ignoreDefaultArgs:['--disable-extensions'],args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run',`--log-net-log=${path.join(root,'netlog.json')}`]};context=await chromium.launchPersistentContext(profile,browserOptions);
@@ -48,18 +49,18 @@ const expected=crypto.createHash('sha256');for(let i=0;i<4*1024*1024/256;i++)exp
     async function media(command='media'){service.stdin.write(command+'\n');return JSON.parse(await serviceLine());}
     await page.evaluate(base=>{const v=document.createElement('video');v.src=base+'/video.mp4';v.controls=true;v.style.cssText='display:block;width:480px;height:270px;margin-top:35px';document.body.append(v);},base);
     await until(async()=>await page.locator('[data-downshift-video]').isVisible());
-    await page.locator('[data-downshift-video]').click({position:{x:60,y:18}});await until(async()=>{const tasks=await media();return tasks.length===1 && tasks[0].ready && tasks[0].button==='Download video';});checks++;
-    await media('media-download');await until(async()=>{const tasks=await media();return tasks[0]?.rate==='Complete';},45000);
+    await page.locator('[data-downshift-video]').click({position:{x:20,y:20}});await until(async()=>{const tasks=await media();return tasks.length===1 && tasks[0].ready && tasks[0].button==='Download video';});checks++;
+    await media('media-download');await until(async()=>(await allRows()).some(row=>row.media&&row.url.endsWith('/video.mp4')&&row.status===3),45000);
     const videoOutput=fs.readdirSync(path.join(native,'Videos')).filter(name=>name.endsWith('.mp4'));assert.equal(videoOutput.length,1);assert.equal(digest(path.join(native,'Videos',videoOutput[0])),digest(videoFile));checks++;
     const videoHistory=(await allRows()).filter(row=>row.media);assert.equal(videoHistory.length,1);assert.equal(videoHistory[0].status,3);assert.equal(digest(videoHistory[0].destination),digest(videoFile));checks++;
     await media('media-close');await page.evaluate(()=>document.querySelector('video').remove());await until(async()=>await page.locator('[data-downshift-video]').count()===0);checks++;
     await page.goto(base+'/media-root');const frame=page.frameLocator('iframe');
     await until(async()=>await frame.locator('[data-downshift-video]').isVisible());
     // The player exposes a blob, plus master/variant manifests with generic text MIME.
-    await page.waitForTimeout(500);await frame.locator('[data-downshift-video]').click({position:{x:60,y:18}});
+    await page.waitForTimeout(500);await frame.locator('[data-downshift-video]').click({position:{x:20,y:20}});
     await until(async()=>{const tasks=await media();return tasks.length===1 && tasks[0].ready && tasks[0].button==='Download video';});checks++;
     assert.equal((await media())[0].qualities.length,1);assert.match((await media())[0].selected,/Default quality/);checks++;
-    await media('media-download');await until(async()=>(await media())[0]?.rate==='Complete',45000);
+    await media('media-download');await until(async()=>(await allRows()).some(row=>row.media&&row.url.endsWith('/manifest.txt')&&row.status===3),45000);
     const embeddedHistory=(await allRows()).filter(row=>row.media && row.url.endsWith('/manifest.txt'));assert.equal(embeddedHistory.length,1);assert.equal(embeddedHistory[0].status,3);assert.equal(embeddedHistory[0].videoMetadata.requestContext.referer,`http://localhost:${port}/media-embed`);
     const probe=cp.spawnSync(path.join(path.dirname(host),'media-tools','ffprobe.exe'),['-v','error','-show_streams','-of','json',embeddedHistory[0].destination],{encoding:'utf8',timeout:15000});assert.equal(probe.status,0,probe.stderr);assert.deepEqual(new Set(JSON.parse(probe.stdout).streams.map(s=>s.codec_type)),new Set(['audio','video']));checks++;
     await media('media-close');await page.goto(base+'/page');
@@ -151,6 +152,7 @@ const expected=crypto.createHash('sha256');for(let i=0;i<4*1024*1024/256;i++)exp
     fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({chromeVersion:context.browser()?.version(),playwrightVersion:requireTools('playwright/package.json').version,extensionId:id,checks,extensionVersion:manifest.version,nativeFiles:acceptedRows.filter(r=>r.status===3).length,queueRecords:acceptedRows.length,browserTransportRecords:acceptedRows.filter(r=>r.browserTransfer).length,ownedCancelledEntriesRemoved:true,mediaRecords:2,embeddedGenericMimeDefaultQuality:true,independentSha256:checksum,magnetClickToNativeDialog:true,magnetPayloadAutoStarted:false,profile:'isolated',nativeBridge:'separate test host and pipe; normal registration untouched',browserExecutableSha256:fingerprint(chrome),nativeHostSha256:fingerprint(host),nativeGuiDriverSha256:fingerprint(driver),sources:Object.fromEntries(sources.map(file=>[file,fingerprint(path.join(repo,file))])),scope:'Public strong-validator responses use native HTTP; generated blob/data, cookie-required GET, POST, tiny and unlisted-suffix responses finish in Downshift with independently verified bytes. Original browser request is retained for session-bound transfers. Verified transports are cleaned after native completion. Existing video, worker restart, explicit-off and outage regressions remain.'},null,2));
     console.log(`Actual Chrome checks passed: ${checks}`);
   } catch(error) {
+    try{if(nativeSnapshot)fs.writeFileSync(path.join(output,'failure-native.json'),JSON.stringify(await nativeSnapshot(),null,2));}catch{}
     if(context) {try{const worker=context.serviceWorkers()[0];fs.writeFileSync(path.join(output,'failure.json'),JSON.stringify(await worker.evaluate(async()=>({downloads:await chrome.downloads.search({}),storage:await chrome.storage.local.get('handoffState')})),null,2));}catch{}}
     throw error;
   } finally {

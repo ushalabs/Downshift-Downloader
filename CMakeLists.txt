@@ -152,6 +152,8 @@ add_custom_command(TARGET downshift POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME browser.registration COMMAND powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserRegistrationTests.ps1")
+    set_tests_properties(browser.registration PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
     add_executable(downshift_torrent_recovery_tests tests/TorrentRecoveryTests.cpp
         src/torrent/TorrentEngine.cpp src/torrent/TorrentEngine.h src/torrent/StallRecovery.h src/torrent/TorrentStore.cpp src/torrent/TorrentStore.h)
     set_target_properties(downshift_torrent_recovery_tests PROPERTIES AUTOMOC ON)
@@ -220,6 +222,8 @@ if(BUILD_TESTING)
     set_tests_properties(torrent.acceptance PROPERTIES TIMEOUT 200 RUN_SERIAL TRUE)
     find_program(NODE_EXECUTABLE NAMES node)
     if(NODE_EXECUTABLE)
+        add_test(NAME browser.compatibility COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserCompatibilityTests.mjs")
+        set_tests_properties(browser.compatibility PROPERTIES TIMEOUT 45)
         add_test(NAME browser.extension COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/ExtensionTests.mjs")
         add_test(NAME browser.bridge COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/BrowserBridgeTests.mjs")
         add_test(NAME browser.media COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaExtensionTests.mjs")

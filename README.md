@@ -102,6 +102,50 @@ Downshift is designed to work alongside browser download flows to make grabbing 
 
 ---
 
+## Browser extensions: Chrome, Edge, Firefox and Opera
+
+Install the latest Downshift Windows application first. Open **Settings → Integration → Set up browser extension**, select your browser, and click its setup button. Downshift opens the browser's extension page and copies the required folder or manifest path.
+
+### Google Chrome
+
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Click **Load unpacked**.
+3. Press **Ctrl+V** to paste the copied extension folder, then select it.
+4. Pin Downshift and leave **Use Downshift for downloads** enabled.
+
+### Microsoft Edge
+
+1. Select **Edge** in Downshift's browser setup, or open `edge://extensions`.
+2. Enable **Developer mode** and click **Load unpacked**.
+3. Paste the copied Edge extension folder and select it.
+4. Pin Downshift and leave **Use Downshift for downloads** enabled.
+
+### Mozilla Firefox
+
+Firefox **140 or newer** is required. The current local build is unsigned and must be loaded temporarily:
+
+1. Select **Firefox** in Downshift's browser setup, or open `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on**.
+3. Paste the copied `manifest.json` path and open it.
+4. Approve the requested access and leave **Use Downshift for downloads** enabled.
+
+Firefox removes temporary add-ons when it closes. Permanent installation requires a Mozilla-signed add-on. This build excludes private windows; Firefox controls its own download panel.
+
+### Opera
+
+1. Select **Opera** in Downshift's browser setup, or open `opera://extensions`.
+2. Enable **Developer mode** and click **Load unpacked**.
+3. Paste the copied Opera extension folder and select it.
+4. Pin Downshift and leave **Use Downshift for downloads** enabled.
+
+For standalone ZIPs, extract the matching browser package first, then select its extracted folder (or `manifest.json` for Firefox). When updating an unpacked extension, click **Reload** on its extension card and refresh open video pages.
+
+Official loading guides: [Chrome](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked), [Edge](https://learn.microsoft.com/en-us/microsoft-edge/extensions/getting-started/extension-sideloading), [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/), [Opera](https://help.opera.com/en/extensions/testing/).
+
+The compact pink circular icon at the top of a detected video opens the existing quality/download flow. Hover over the icon to reveal **×** and hide it for that video. A new video or page reload restores the control. Download links and selected media metadata are shared with the local Downshift app; see [extension privacy](extension/PRIVACY.md) and the [browser setup guide](docs/BROWSER_EXTENSIONS.md). Protected or unavailable media may not be downloadable.
+
+---
+
 ## Tech Stack
 
 Downshift is built with:
@@ -178,3 +222,4 @@ Downshift-Downloader/
 ├── tests/
 ├── CMakeLists.txt
 └── README.md
+```

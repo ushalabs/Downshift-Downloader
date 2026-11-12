@@ -33,7 +33,11 @@ wchar_t module[32768]{};if(!GetModuleFileNameW(nullptr,module,32768))throw std::
 }
 int main(int argc,char** argv) {
     QCoreApplication app(argc,argv);using namespace downshift::browser;
-    if(argc<2 || QString::fromLatin1(argv[1])!="chrome-extension://"+QString::fromLatin1(extensionId)+"/")return 2;
+    const auto arguments=app.arguments();
+    const bool chromium=arguments.value(1)=="chrome-extension://"+QString::fromLatin1(extensionId)+"/";
+    const bool firefox=arguments.size()>=3 && arguments[2]==QString::fromLatin1(firefoxExtensionId) &&
+        QFileInfo(arguments[1]).isAbsolute() && QFileInfo(arguments[1]).suffix()=="json";
+    if(!chromium && !firefox)return 2;
 #ifdef DOWNSHIFT_TEST_HOST
     useIsolatedTestPipe();
 #endif

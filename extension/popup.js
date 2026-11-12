@@ -1,3 +1,4 @@
+import {api as chrome} from './platform.js';
 const $=id=>document.getElementById(id);
 $("version").textContent=chrome.runtime.getManifest().version;
 async function request(message){try{const answer=await chrome.runtime.sendMessage(message);if(!answer?.ok)throw Error(answer?.error || "The extension worker did not reply. Apply update, then refresh this page.");return answer;}catch(error){$("notice").textContent=error.message;$("applyUpdate").hidden=false;return null;}}

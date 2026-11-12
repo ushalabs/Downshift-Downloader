@@ -21,6 +21,8 @@
     <virtualization:RegistryWriteVirtualization>
       <virtualization:ExcludedKeys>
         <virtualization:ExcludedKey>HKEY_CURRENT_USER\Software\Google\Chrome\NativeMessagingHosts\org.ushalabs.downshift</virtualization:ExcludedKey>
+        <virtualization:ExcludedKey>HKEY_CURRENT_USER\Software\Microsoft\Edge\NativeMessagingHosts\org.ushalabs.downshift</virtualization:ExcludedKey>
+        <virtualization:ExcludedKey>HKEY_CURRENT_USER\Software\Mozilla\NativeMessagingHosts\org.ushalabs.downshift</virtualization:ExcludedKey>
       </virtualization:ExcludedKeys>
     </virtualization:RegistryWriteVirtualization>
   </Properties>

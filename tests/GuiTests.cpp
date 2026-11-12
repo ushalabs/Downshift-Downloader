@@ -60,7 +60,7 @@ int testFirstLaunch(bool testChrome) {
         "First launch verification requires an isolated installation");
     check(!tools.exists("installed-files.json"),"No media tools are installed before first launch");
     QTimer controls;
-    bool sawGate=false, sawDark=false, sawDownloadSize=false, sawChromeSteps=false, chromeStarted=false, chromeFinished=false, retryOffered=false, repeatedOpenBlocked=false;
+    bool sawGate=false, sawDark=false, sawDownloadSize=false, sawChromeSteps=false, chromeStarted=false, chromeFinished=false, retryOffered=false, repeatedOpenBlocked=false, sawBrowsers=false;
     controls.setInterval(30);
     QObject::connect(&controls,&QTimer::timeout,&controls,[&]{
         for(auto* window:QApplication::topLevelWidgets()){
@@ -74,6 +74,11 @@ int testFirstLaunch(bool testChrome) {
                 sawChromeSteps=text.contains("1. Click Open Chrome Extensions") && text.contains("2. Click Load unpacked") && text.contains("3. Press Ctrl+V");
             }
             if(!sawGate){
+                auto* browsers=widget<QComboBox>(*dialog,"setupBrowser");
+                sawBrowsers=browsers->count()==4 && browsers->findText("Edge")>=0 && browsers->findText("Opera")>=0;
+                browsers->setCurrentText("Firefox");
+                sawBrowsers=sawBrowsers && widget<QLabel>(*dialog,"chromeSetupSteps")->text().contains("Mozilla-signed") && widget<QLabel>(*dialog,"chromeSetupSteps")->text().contains("Temporary Add-on");
+                browsers->setCurrentText("Chrome");
                 dialog->reject();
                 sawGate=dialog->isVisible() && QApplication::activeModalWidget()==dialog;
                 repeatedOpenBlocked=!finishFirstLaunchSetup() && QApplication::activeModalWidget()==dialog;
@@ -95,6 +100,7 @@ int testFirstLaunch(bool testChrome) {
     controls.stop();
     check(sawGate && !retryOffered,"The setup screen was modal, visible and could not be dismissed");
     check(repeatedOpenBlocked,"Repeated tray or browser activation keeps a single first-launch setup dialog");
+    check(sawBrowsers,"Browser setup offers Chrome, Edge, Firefox and Opera with Firefox-specific installation steps");
     check(sawDark,"First-launch video setup uses the default dark appearance");
     check(sawDownloadSize && sawChromeSteps,"First launch shows download counts, remaining size and the three Chrome steps");
     if(testChrome){

@@ -5,6 +5,7 @@
 namespace downshift::browser {
 inline constexpr auto hostName="org.ushalabs.downshift";
 inline constexpr auto extensionId="empnpdkfnffpcgnfgdndkbielplcoioe";
+inline constexpr auto firefoxExtensionId="downshift@ushalabs";
 inline constexpr unsigned maximumMessage=65536;
 QJsonObject parse(const QByteArray& data);
 void validate(const QJsonObject& request);

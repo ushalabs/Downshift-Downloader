@@ -44,6 +44,13 @@ try {
     foreach($required in @('scripts/media-tools-lock.json','scripts/Uninstall-MediaTools.ps1','scripts/Open-ChromeSetup.ps1','scripts/chrome-setup-template.txt','Chrome-setup.txt')){if(!(Test-Path -LiteralPath (Join-Path $root $required))){throw "Missing setup helper: $required"}};$checks++
     $extension=Get-Content -LiteralPath (Join-Path $root 'extension/manifest.json') -Raw|ConvertFrom-Json
     if($extension.version -ne $manifest.version){throw 'Extension/product version mismatch.'};$checks++
+    foreach($browser in @('edge','firefox','opera')){
+        $folder=Join-Path $root ('browser-extensions/'+$browser)
+        $browserManifest=Get-Content -LiteralPath (Join-Path $folder 'manifest.json') -Raw | ConvertFrom-Json
+        if($browserManifest.version -ne $manifest.version -or !(Test-Path -LiteralPath (Join-Path $folder 'platform.js'))){throw "Missing or mismatched $browser extension."}
+        if($browser -eq 'firefox' -and $browserManifest.browser_specific_settings.gecko.id -ne 'downshift@ushalabs'){throw 'Firefox add-on identity differs.'}
+    };$checks++
+    foreach($helper in @('Register-BrowserHosts.ps1','Browser-Paths.ps1')){if(!(Test-Path -LiteralPath (Join-Path $root ('scripts/'+$helper)))){throw 'Browser setup helper missing.'}};$checks++
     $shortcut=Join-Path $testRoot 'Downshift.lnk';$shell=New-Object -ComObject WScript.Shell
     $oldLink=$shell.CreateShortcut($shortcut);$oldLink.TargetPath=Join-Path $env:WINDIR 'notepad.exe';$oldLink.Save()
     $oldBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($shortcut))

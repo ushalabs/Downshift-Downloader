@@ -1,5 +1,6 @@
 // Only explicit, trusted link activation opens the native file-selection dialog.
 (() => {
+  const chrome=globalThis.browser ?? globalThis.chrome;
   let enabled=false;
   chrome.storage.local.get('handoffState').then(value=>{enabled=value.handoffState?.enabled!==false;});
   chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.handoffState)enabled=changes.handoffState.newValue?.enabled!==false;});

@@ -59,13 +59,13 @@ try {
         Copy-Item -LiteralPath (Join-Path $portable $file) -Destination $packageRoot
     }
     Get-ChildItem -LiteralPath $portable -File -Filter '*.dll' | Copy-Item -Destination $packageRoot
-    foreach($folder in @('platforms','imageformats','tls','licenses','extension')){
+    foreach($folder in @('platforms','imageformats','tls','licenses','extension','browser-extensions')){
         Copy-Item -LiteralPath (Join-Path $portable $folder) -Destination $packageRoot -Recurse
     }
     if($LocalPreview){Copy-Item -LiteralPath (Join-Path $portable 'LOCAL-PREVIEW.txt') -Destination $packageRoot}
     $scripts=Join-Path $packageRoot 'scripts'
     New-Item -ItemType Directory -Path $scripts | Out-Null
-    foreach($script in @('media-tools-lock.json','Install-MediaTools.ps1','Setup-MsixChrome.ps1')){
+    foreach($script in @('media-tools-lock.json','Install-MediaTools.ps1','Setup-MsixChrome.ps1','Register-BrowserHosts.ps1','Browser-Paths.ps1')){
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $scripts
     }
     @{chromeWebStoreUrl=$ChromeWebStoreUrl} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $packageRoot 'msix-setup.json') -Encoding utf8

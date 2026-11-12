@@ -4,7 +4,8 @@ from PerformanceServer import ControlledServer, expected_sha256, file_sha256, lo
 HOST_ID="empnpdkfnffpcgnfgdndkbielplcoioe"
 def host(exe,request,origin=None,raw=None):
     data=json.dumps(request).encode() if raw is None else raw
-    result=subprocess.run([exe,origin or f"chrome-extension://{HOST_ID}/"],input=struct.pack("<I",len(data))+data,capture_output=True,timeout=20,env=local_environment())
+    arguments=origin if isinstance(origin,list) else [origin or f"chrome-extension://{HOST_ID}/"]
+    result=subprocess.run([exe,*arguments],input=struct.pack("<I",len(data))+data,capture_output=True,timeout=20,env=local_environment())
     if not result.stdout:return result.returncode,None
     size=struct.unpack("<I",result.stdout[:4])[0];assert size==len(result.stdout)-4 and size<=65536
     return result.returncode,json.loads(result.stdout[4:])
@@ -17,6 +18,8 @@ def close(p):p.stdin.write("exit\n");p.stdin.flush();p.communicate(timeout=15);a
 def main():
     exe,driver=sys.argv[1:3];checks=0;server=ControlledServer();server.configure(2*1024*1024,per_connection_bps=1024*1024);threading.Thread(target=server.serve_forever,daemon=True).start();url=f"http://127.0.0.1:{server.server_port}/range"
     assert host(exe,{"version":1,"command":"ping"},"chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/")[0]==2;checks+=1
+    assert host(exe,{"version":1,"command":"ping"},[str(pathlib.Path.cwd()/"host.json"),"other@ushalabs"])[0]==2;checks+=1
+    assert host(exe,{"version":1,"command":"ping"},["relative.json","downshift@ushalabs"])[0]==2;checks+=1
     for data in (b"[]",b"{broken",b'{"version":1,"command":"erase"}',b'{"version":1,"command":"ping","extra":1}',b'{"version":2,"command":"ping"}',b'{"version":1,"command":"media","url":"file:///C:/test.mp4","title":"Video"}',b'{"version":1,"command":"media","url":"https://name:secret@example.com/v.mp4","title":"Video"}',b'{"version":1,"command":"media","url":"https://example.com/v.mp4","title":"Video","arguments":"--exec evil"}'):
         assert not host(exe,{},raw=data)[1]["ok"];checks+=1
     p=subprocess.run([exe,f"chrome-extension://{HOST_ID}/"],input=struct.pack("<I",65537),capture_output=True,timeout=5);assert p.returncode==3;checks+=1
@@ -25,6 +28,9 @@ def main():
         root=pathlib.Path(tmp);p=start(driver,root)
         try:
             assert request(exe,"ping")["state"]=="ready";checks+=1
+            firefox_origin=[str(root/'org.ushalabs.downshift.test.json'),'downshift@ushalabs']
+            rc,answer=host(exe,dict(version=1,command='ping'),firefox_origin)
+            assert rc==0 and answer['ok'] and answer['state']=='ready';checks+=1
             assert not host(exe,dict(version=1,command="media",url="https://www.youtube.com/watch?v=undefined",title="Video"))[1]["ok"];checks+=1
             magnet='magnet:?xt=urn:btih:'+'0123456789abcdef'*2+'01234567'+'&dn=Private%20fixture'
             for invalid in ('https://example.com/file', 'magnet:?dn=missing', 'magnet:?xt=urn:btih:bad', magnet+'\n'):

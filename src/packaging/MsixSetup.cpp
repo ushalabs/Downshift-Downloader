@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QComboBox>
 #include <QCryptographicHash>
 #include <QDialog>
 #include <QDir>
@@ -93,11 +94,15 @@ void runScript(QProcess& process,const QString& script,const QStringList& argume
 
 class ChromeSetup final : public QGroupBox {
 public:
-    explicit ChromeSetup(QWidget* parent,bool allowDisconnect=false):QGroupBox("Chrome extension",parent) {
+    explicit ChromeSetup(QWidget* parent,bool allowDisconnect=false):QGroupBox("Browser extension",parent) {
         auto* layout=new QVBoxLayout(this);
-        auto* summary=new QLabel("Set up the extension to send Chrome downloads to Downshift.");
+        auto* summary=new QLabel("Set up the extension to send browser downloads to Downshift.");
         summary->setWordWrap(true);
         layout->addWidget(summary);
+        browser_=new QComboBox;
+        browser_->setObjectName("setupBrowser");
+        browser_->addItems({"Chrome","Edge","Firefox","Opera"});
+        layout->addWidget(browser_);
         const auto config=QJsonDocument::fromJson(readSetupFile(appDirectory().filePath("msix-setup.json"))).object();
         if(config.value("chromeWebStoreUrl").toString().isEmpty()){
             auto* instruction=new QLabel("1. Click Open Chrome Extensions below. Turn on Developer mode in Chrome.\n"
@@ -105,6 +110,7 @@ public:
                 "3. Press Ctrl+V to paste the folder path, then press Enter. If prompted, click Select Folder.\n\n"
                 "If Downshift is already installed in Chrome, click Reload on its extension card instead.");
             instruction->setObjectName("chromeSetupSteps");
+            steps_=instruction;
             instruction->setWordWrap(true);
             layout->addWidget(instruction);
         }
@@ -113,6 +119,12 @@ public:
             "Open Chrome Extensions" : "Open Chrome Web Store");
         connect_->setObjectName("setupChromeButton");
         connect_->setAutoDefault(false);
+        connect(browser_,&QComboBox::currentTextChanged,this,[this](const QString& browser){
+            connect_->setText(browser=="Firefox" ? "Open Firefox Add-on Debugging":"Open "+browser+" Extensions");
+            if(!steps_)return;
+            if(browser=="Firefox")steps_->setText("1. Click Open Firefox Add-on Debugging.\n2. Click Load Temporary Add-on.\n3. Press Ctrl+V to paste the manifest path, then press Enter.\n\nFor permanent installation, use the Mozilla-signed add-on. Temporary add-ons are removed when Firefox closes.");
+            else steps_->setText("1. Click Open "+browser+" Extensions below. Turn on Developer mode.\n2. Click Load unpacked.\n3. Press Ctrl+V to paste the folder path, then press Enter. If prompted, click Select Folder.");
+        });
         buttons->addWidget(connect_);
         if(allowDisconnect && !familyName().isEmpty()){
             disconnect_=new QPushButton("Disconnect Chrome");
@@ -139,9 +151,12 @@ public:
             }
             if(connecting_ && output.contains("DOWNSHIFT_UNPACKED_READY")){
                 const auto state=stateDirectory();
-                const auto folder=state.isEmpty() ? appDirectory().filePath("extension") : QDir(state).filePath("ChromeExtension");
+                QString folder;
+                if(browser_->currentText()=="Chrome")folder=state.isEmpty() ? appDirectory().filePath("extension"):QDir(state).filePath("ChromeExtension");
+                else folder=state.isEmpty() ? appDirectory().filePath("browser-extensions/"+browser_->currentText().toLower()):QDir(state).filePath("BrowserExtensions/"+browser_->currentText().toLower());
+                if(browser_->currentText()=="Firefox")folder=QDir(folder).filePath("manifest.json");
                 QApplication::clipboard()->setText(QDir::toNativeSeparators(folder));
-                finish("Chrome is open. The extension folder path is copied.");
+                finish(browser_->currentText()+" is open. The extension path is copied.");
             }else{
                 finish(connecting_ ? "Chrome is open. Select Add to Chrome and approve the extension." :
                     "Downshift disconnected. You can remove the extension in Chrome.");
@@ -156,26 +171,30 @@ private:
         connecting_=connecting;
         busy_=true;
         connect_->setEnabled(false);
+        browser_->setEnabled(false);
         if(disconnect_)disconnect_->setEnabled(false);
         status_->setText("Updating the Chrome connection…");
         const auto state=stateDirectory();
         if(familyName().isEmpty()){
-            runScript(process_,"Open-ChromeSetup.ps1",{"-OpenChrome"});
+            runScript(process_,"Open-ChromeSetup.ps1",{"-OpenChrome","-Browser",browser_->currentText()});
         }else if(state.isEmpty()){
             finish("Windows could not locate Downshift’s Chrome setup folder.");
         }else{
-            runScript(process_,"Setup-MsixChrome.ps1",{"-StateDirectory",state,connecting ? "-OpenChrome":"-Disconnect"});
+            runScript(process_,"Setup-MsixChrome.ps1",{"-StateDirectory",state,"-Browser",browser_->currentText(),connecting ? "-OpenChrome":"-Disconnect"});
         }
     }
     void finish(const QString& message) {
         status_->setText(message);
         busy_=false;
         connect_->setEnabled(true);
+        browser_->setEnabled(true);
         if(disconnect_)disconnect_->setEnabled(true);
         if(finished)finished();
     }
     QProcess process_;
     QPushButton* connect_;
+    QComboBox* browser_;
+    QLabel* steps_=nullptr;
     QPushButton* disconnect_=nullptr;
     QLabel* status_;
     bool busy_=false;
@@ -366,7 +385,7 @@ void showSetup(QWidget* parent) {
     if(!chromeSetupAvailable())return;
     auto* dialog=new QDialog(parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle("Connect Chrome — Downshift");
+    dialog->setWindowTitle("Connect browser — Downshift");
     auto* layout=new QVBoxLayout(dialog);
     layout->addWidget(new ChromeSetup(dialog,true));
     auto* close=new QPushButton("Done");

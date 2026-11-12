@@ -31,7 +31,7 @@ const until=async(test,timeout=120000)=>{const end=Date.now()+timeout;while(Date
   // A malformed player title link must not override the valid watch page.
   const malformedPlayerTitle=await page.evaluate(()=>{const player=document.querySelector('.html5-video-player');if(!player)return false;let link=player.querySelector('a.ytp-title-link');if(!link){link=document.createElement('a');link.className='ytp-title-link';player.append(link);}link.href='https://www.youtube.com/watch?v=undefined';return true;});assert(malformedPlayerTitle);
   await page.screenshot({path:path.join(output,'youtube-player.png')});
-  await page.locator('[data-downshift-video]').first().click({position:{x:65,y:17}});
+  await page.locator('[data-downshift-video]').first().click({position:{x:20,y:20}});
   await until(async()=>{const tasks=await command('media');return tasks[0]?.ready;});
   const task=(await command('media'))[0];assert.equal(task.button,'Download video',task.status);assert(task.qualities.includes(`${height}p`),task.qualities);assert(task.qualities.length>3);
   await command('media-height '+height);assert.equal((await command('media'))[0].selected,`${height}p`);

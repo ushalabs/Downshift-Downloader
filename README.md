@@ -42,21 +42,11 @@ The goal of Downshift is to provide a clean, fast, and reliable download experie
 
 ---
 
-## Main Interface
+## Demo
 
 <p align="center">
-  <img src="docs/Downshift%201.png" alt="Downshift downloads dashboard in Dark mode" width="100%" />
+  <img src="docs/media/downshift_demo.webp" alt="Downshift Live Demo" width="80%" />
 </p>
-
-The main dashboard gives a quick overview of:
-
-- total downloads
-- active transfers
-- total speed
-- downloaded data
-- in-progress, completed, and attention-needed items
-- torrent downloads
-- download controls and search
 
 ---
 
@@ -99,6 +89,24 @@ Torrent downloads are built directly into the application so users can manage no
 
 ### Browser integration
 Downshift is designed to work alongside browser download flows to make grabbing supported downloads easier.
+
+---
+
+## Main Interface
+
+<p align="center">
+  <img src="docs/Downshift%201.png" alt="Downshift downloads dashboard in Dark mode" width="100%" />
+</p>
+
+The main dashboard gives a quick overview of:
+
+- total downloads
+- active transfers
+- total speed
+- downloaded data
+- in-progress, completed, and attention-needed items
+- torrent downloads
+- download controls and search
 
 ---
 

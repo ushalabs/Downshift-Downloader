@@ -35,6 +35,61 @@
     if(/(^|\.)youtube\.com$/.test(location.hostname))return location.pathname+'?v='+(new URL(location.href).searchParams.get('v') || '');
     return clickedSource(target) || location.href;
   }
+  function syncIdentity(target, record) {
+    const current = identity(target, record.cardMode);
+    if (record.identity === current) return;
+    record.identity = current;
+    record.dismissed = false;
+    if (!record.cardMode) {
+      record.played = 0;
+      record.hideAfter = 15;
+      record.lastTime = target.currentTime;
+    }
+    clearTimeout(record.noticeTimer);
+    record.notice.textContent = '';
+  }
+  function trackPlayback(video, record) {
+    record.played = 0;
+    record.hideAfter = 15;
+    record.lastTime = video.currentTime;
+    const resetSample = () => {
+      syncIdentity(video, record);
+      record.lastTime = video.currentTime;
+      requestLayout();
+    };
+    for (const event of ['playing', 'seeking', 'seeked', 'loadedmetadata', 'emptied']) {
+      video.addEventListener(event, resetSample, {signal: record.events.signal});
+    }
+    video.addEventListener('timeupdate', () => {
+      syncIdentity(video, record);
+      const current = video.currentTime;
+      if (!video.paused && !video.seeking && record.played < record.hideAfter) {
+        // The media clock stops during buffering. Seeking resets the sample.
+        record.played += Math.max(0, current - record.lastTime);
+        if (record.played >= record.hideAfter) requestLayout();
+      }
+      record.lastTime = current;
+    }, {signal: record.events.signal});
+    video.addEventListener('pause', () => {
+      syncIdentity(video, record);
+      if (video.ended) return;
+      record.dismissed = false;
+      record.played = 0;
+      record.hideAfter = 5;
+      record.lastTime = video.currentTime;
+      requestLayout();
+    }, {signal: record.events.signal});
+  }
+  function thumbnailVisible(anchor, rect, left, top) {
+    const width = Math.max(0, Math.min(innerWidth, rect.right) - Math.max(0, rect.left));
+    const height = Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top));
+    if (width * height <= rect.width * rect.height * 0.9) return false;
+    // A fixed overlay would otherwise paint over sticky headers and clipped cards.
+    return [[left + 20, top + 1], [left + 20, top + 20], [left + 39, top + 20]].every(([x, y]) => {
+      const front = document.elementsFromPoint(x, y).find(node => !node.hasAttribute('data-downshift-video'));
+      return front && anchor.contains(front);
+    });
+  }
   function attach(target,cardMode=false) {
     if (players.has(target) || players.size >= 96) return;
     if(!cardMode && target.closest(cardSelector) && /(^|\.)youtube\.com$/.test(location.hostname))return;
@@ -92,10 +147,18 @@
       } catch(error) { notice.textContent = error?.message || "Reload this page after reloading the Downshift extension."; }
       button.disabled = false;
     });
-    if(!cardMode){target.addEventListener("loadedmetadata",requestLayout); target.addEventListener("emptied",requestLayout);}
+    if (!cardMode) {
+      record.events = new AbortController();
+      trackPlayback(target, record);
+    }
   }
   function discover() {
-    for (const [video, record] of players) if (!video.isConnected) { record.host.remove(); players.delete(video); }
+    for (const [video, record] of players) if (!video.isConnected) {
+      record.events?.abort();
+      clearTimeout(record.noticeTimer);
+      record.host.remove();
+      players.delete(video);
+    }
     // Include players inside open shadow roots without injecting code into the page's main world.
     function scan(root) {if(/(^|\.)youtube\.com$/.test(location.hostname))for(const card of root.querySelectorAll(cardSelector))if(!card.parentElement?.closest(cardSelector) && youtubeLink(card))attach(card,true);for (const video of root.querySelectorAll("video")) attach(video); for (const node of root.querySelectorAll("*")) if (node.shadowRoot) scan(node.shadowRoot); }
     scan(document); requestLayout();
@@ -104,18 +167,20 @@
     scheduled = false;
     for (const [target, record] of players) {
       const {host,cardMode}=record;
-      const currentIdentity=identity(target,cardMode);
-      if(record.identity!==currentIdentity){record.identity=currentIdentity;record.dismissed=false;clearTimeout(record.noticeTimer);record.notice.textContent='';}
+      syncIdentity(target, record);
       const anchor=cardMode ? target.querySelector('a#thumbnail,yt-thumbnail-view-model,yt-thumbnail-view-model a,a[href*="/watch?v="],a[href*="/shorts/"]') || target:target;
       const rect = anchor.getBoundingClientRect(), style = getComputedStyle(anchor);
-      const visible = !record.dismissed && target.isConnected && rect.width >= 120 && rect.height >= 70 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && style.visibility !== "hidden" && style.display !== "none";
+      const left = Math.max(8, Math.min(innerWidth - 48, rect.right - 48));
+      const top = Math.max(8, rect.top + 8);
+      const visible = !record.dismissed && target.isConnected && rect.width >= 120 && rect.height >= 70 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && style.visibility !== "hidden" && style.display !== "none"
+        && (cardMode ? thumbnailVisible(anchor, rect, left, top) : record.played < record.hideAfter);
       host.style.display = visible ? "block" : "none";
       if (!visible) continue;
       const fullscreen = document.fullscreenElement;
       const container = fullscreen && fullscreen.contains(target) && fullscreen !== target ? fullscreen : document.documentElement;
       if (host.parentNode !== container) container.append(host);
-      host.style.top = `${Math.max(8,rect.top + 8)}px`;
-      host.style.left = `${Math.max(8,Math.min(innerWidth - 48,rect.right - 48))}px`;
+      host.style.top = `${top}px`;
+      host.style.left = `${left}px`;
     }
   }
   const observer = new MutationObserver(mutations => { if (mutations.some(m => m.type === "childList" || m.target.tagName === "VIDEO")) { clearTimeout(discover.timer); discover.timer = setTimeout(discover,100); } });

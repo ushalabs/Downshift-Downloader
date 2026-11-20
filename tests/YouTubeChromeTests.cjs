@@ -95,6 +95,85 @@ const [chrome,out]=process.argv.slice(2).map(x=>path.resolve(x)),repo=path.resol
   assert.equal(await overlay.isVisible(),false);assert.equal((await service.evaluate(()=>globalThis.__packets)).length,beforeClose);checks+=2;
   await firstCard.locator('a#thumbnail').evaluate(a=>a.href='/watch?v=jNQXAC9IVRw');await firstButton.waitFor({state:'visible'});checks++;
   await firstButton.focus();await page.keyboard.press('Tab');assert(await dismiss.evaluate(button=>button===button.getRootNode().activeElement));await page.keyboard.press('Enter');assert.equal(await overlay.isVisible(),false);assert.equal((await service.evaluate(()=>globalThis.__packets)).length,beforeClose);checks+=3;
+  await page.evaluate(() => {
+    document.body.style.cssText = 'margin:0;padding-top:100px;min-height:200vh';
+    document.querySelector('a#thumbnail').href = '/watch?v=FQmqRVK3kHg';
+    scrollTo(0, 117); // 17 of 180 pixels out of view.
+  });
+  await firstButton.waitFor({state:'visible'});
+  await page.evaluate(() => scrollTo(0,118));
+  await firstButton.waitFor({state:'hidden'});
+  await page.evaluate(() => {
+    scrollTo(0,0);
+    const header = document.createElement('header');
+    header.style.cssText = 'position:fixed;inset:0 0 auto;height:140px;background:black;z-index:100';
+    document.body.append(header);
+  });
+  await firstButton.waitFor({state:'hidden'});
+  await page.locator('header').evaluate(header => header.remove());
+  await firstButton.waitFor({state:'visible'});
+  checks += 4;
+
+  const cdp = await context.newCDPSession(page);
+  const worlds = new Set();
+  cdp.on('Runtime.executionContextCreated', ({context:world}) => worlds.add(world.id));
+  cdp.on('Runtime.executionContextsCleared', () => worlds.clear());
+  await cdp.send('Runtime.enable');
+  mode = 'watch';
+  await page.goto('https://www.youtube.com/watch?v='+id);
+  const playbackButton = page.locator('[data-downshift-video] .download');
+  await playbackButton.waitFor({state:'visible'});
+  // Mock media properties in the content script's world, where Chrome reads them.
+  let overlayWorld;
+  for (const contextId of worlds) {
+    const probe = await cdp.send('Runtime.evaluate', {contextId,expression:'globalThis.__downshiftVideoButtons === true'});
+    if (probe.result.value) { overlayWorld = contextId; break; }
+  }
+  assert(overlayWorld, 'Downshift content script context is available');
+  const evaluateOverlay = async expression => {
+    const result = await cdp.send('Runtime.evaluate', {contextId:overlayWorld,expression});
+    assert(!result.exceptionDetails, JSON.stringify(result.exceptionDetails));
+  };
+  await evaluateOverlay('('+(() => {
+    const video = document.querySelector('video');
+    window.mediaTick = (event, time, paused = false, seeking = false) => {
+      Object.defineProperties(video, {
+        currentTime: {value:time, configurable:true},
+        paused: {value:paused, configurable:true},
+        seeking: {value:seeking, configurable:true}
+      });
+      video.dispatchEvent(new Event(event));
+    };
+  })+')()');
+  const tick = (event, time, paused, seeking) =>
+    evaluateOverlay('window.mediaTick(...'+JSON.stringify([event,time,paused ?? false,seeking ?? false])+')');
+  await tick('playing',0);
+  await tick('timeupdate',10);
+  await tick('seeking',100,false,true);
+  await tick('timeupdate',100,false,true);
+  await tick('seeked',100);
+  await tick('timeupdate',104.9);
+  assert(await playbackButton.isVisible());
+  await tick('timeupdate',105.1);
+  await playbackButton.waitFor({state:'hidden'});
+  await tick('pause',105.1,true);
+  await playbackButton.waitFor({state:'visible'});
+  await playbackButton.hover();
+  await page.locator('[data-downshift-video] .dismiss').click();
+  await playbackButton.waitFor({state:'hidden'});
+  await tick('playing',105.1);
+  await tick('timeupdate',106);
+  await tick('pause',106,true);
+  await playbackButton.waitFor({state:'visible'});
+  await tick('timeupdate',106,true);
+  await tick('playing',106);
+  await tick('timeupdate',110.9);
+  assert(await playbackButton.isVisible());
+  await tick('timeupdate',111.1);
+  await playbackButton.waitFor({state:'hidden'});
+  await tick('pause',111.1,true);
+  await playbackButton.waitFor({state:'visible'});
+  checks += 8;
   mode='linkedin';await service.evaluate(()=>globalThis.__packets=[]);await page.goto('https://www.linkedin.com/feed/');await page.waitForFunction(()=>document.querySelectorAll('[data-downshift-video]').length===2);await page.locator('[data-downshift-video] .download').nth(1).click();await page.waitForTimeout(100);const linked=(await service.evaluate(()=>globalThis.__packets))[0];assert.equal(linked.url,'https://cdn.example/2222222222222-large.mp4');assert.equal(linked.context.referer,'https://www.linkedin.com/feed/');assert(!JSON.stringify(linked).includes('1111111111111'));checks+=3;
   await page.evaluate(()=>{const post=document.querySelectorAll('article')[1];post.setAttribute('data-id',post.getAttribute('data-urn'));post.removeAttribute('data-urn');post.querySelector('video').removeAttribute('data-sources');});await page.locator('[data-downshift-video] .download').nth(1).click();await page.waitForTimeout(100);assert.equal((await service.evaluate(()=>globalThis.__packets)).at(-1).url,'https://www.linkedin.com/feed/update/urn:li:activity:2222222222222');checks++;
   mode='loom';await service.evaluate(()=>globalThis.__packets=[]);await page.goto('https://www.loom.com/share/0123456789abcdef0123456789abcdef');await page.locator('[data-downshift-video]:visible .download').click();await page.waitForTimeout(100);const loom=(await service.evaluate(()=>globalThis.__packets))[0];assert.equal(loom.url,'https://www.loom.com/share/0123456789abcdef0123456789abcdef');assert(!loom.context.detectedStream);checks+=2;

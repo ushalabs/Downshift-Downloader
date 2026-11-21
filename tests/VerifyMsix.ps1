@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$StorePackage,[Parameter(Mandatory=$true)][string]$CertificateThumbprint,[Parameter(Mandatory=$true)][string]$VerificationDirectory,[string]$VerifiedCache,[string]$ExpectedPublisher='CN=844280ED-152B-4FAB-A909-52765F3A4384')
+param([Parameter(Mandatory=$true)][string]$StorePackage,[Parameter(Mandatory=$true)][string]$CertificateThumbprint,[Parameter(Mandatory=$true)][string]$VerificationDirectory,[string]$VerifiedCache,[string]$ExpectedPublisher='CN=844280ED-152B-4FAB-A909-52765F3A4384',[string]$ExpectedVersion='1.0.0.0')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $verificationRoot=[IO.Path]::GetFullPath($VerificationDirectory)
@@ -59,7 +59,7 @@ Invoke-Sdk 'makeappx.exe' @('unpack','/p',$StorePackage,'/d',$payload)
 [xml]$manifest=Get-Content -LiteralPath (Join-Path $payload 'AppxManifest.xml') -Raw
 if($manifest.Package.Identity.Name -ne 'UshaLabs.Downshift' -or
    $manifest.Package.Identity.Publisher -ne $ExpectedPublisher -or
-   $manifest.Package.Identity.Version -ne '1.0.0.0'){throw 'The Partner Center identity differs.'}
+   $manifest.Package.Identity.Version -ne $ExpectedVersion){throw 'The expected package identity/version differs.'}
 if((Test-Path -LiteralPath (Join-Path $payload 'media-tools')) -or
    !(Test-Path -LiteralPath (Join-Path $payload 'scripts/Install-MediaTools.ps1'))){throw 'The MSIX video payload differs.'}
 foreach($browser in @('edge','firefox','opera')){

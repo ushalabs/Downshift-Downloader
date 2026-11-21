@@ -1,0 +1,29 @@
+Downshift 1.0.0 - Manual MSIX installation
+
+Download these files together into one folder
+  Downshift-1.0.0-windows-x64.msix
+  Downshift-local-signer.cer
+
+The manual package is signed with UshaLabs' local test certificate.
+Certificate thumbprint (SHA-1 identifier)
+A5450C6FA2450257A74172FC72D3A2AB823AE0A3
+
+1. Right-click Downshift-local-signer.cer and choose Install Certificate.
+2. Choose Local Machine and approve the Windows administrator prompt.
+3. Choose "Place all certificates in the following store".
+4. Browse and choose "Trusted People", then finish the wizard.
+5. Open Downshift-1.0.0-windows-x64.msix and choose Install.
+
+Windows installs the app in its managed Program Files\WindowsApps folder.
+Uninstall through Settings > Apps > Installed apps > Downshift.
+
+The first launch downloads and verifies video tools. Browser extension setup
+is available while this download runs. Sign-in startup runs in the system tray.
+
+The separate *-store.msix package is for Partner Center upload. Microsoft
+signs the package delivered through the Store. Do not use that unsigned
+submission package for manual installation.
+
+The manual certificate publisher is CN=UshaLabs. The Store publisher uses
+the separate Partner Center identity. Treat the manual and Store editions
+as separate installation channels when changing between them.

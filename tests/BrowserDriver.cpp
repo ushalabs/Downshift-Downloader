@@ -16,6 +16,7 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QEvent>
+#include <QTableWidget>
 #include <iostream>
 int main(int argc,char** argv) {
     QApplication app(argc,argv);if(argc!=2 && argc!=3)return 2;HiddenTestWindows hidden;
@@ -43,6 +44,22 @@ int main(int argc,char** argv) {
                 media.append(QJsonObject{{"status",dialog->findChild<QLabel*>("mediaStatus")->text()},{"rate",dialog->findChild<QLabel*>("mediaRate")->text()},{"ready",button->isEnabled()},{"button",button->text()},{"qualities",qualities},{"selected",quality->currentText()}});
                 if(line=="media-close")dialog->close();
             }},Qt::BlockingQueuedConnection);std::cout<<QJsonDocument(media).toJson(QJsonDocument::Compact).constData()<<std::endl;continue;
+        }
+        if(line=="visible-downloads") {
+            QJsonArray ids;
+            QMetaObject::invokeMethod(&window,[&] {
+                auto* table=window.findChild<QTableWidget*>("downloadTable");
+                for(int row=0;row<table->rowCount();++row)
+                    ids.append(table->item(row,0)->data(Qt::UserRole).toString());
+            },Qt::BlockingQueuedConnection);
+            std::cout<<QJsonDocument(ids).toJson(QJsonDocument::Compact).constData()<<std::endl;
+            continue;
+        }
+        if(line=="capture-close") {
+            QMetaObject::invokeMethod(&window,[&] {
+                for(auto* button:window.findChildren<QPushButton*>("captureStart"))
+                    qobject_cast<QDialog*>(button->window())->reject();
+            },Qt::BlockingQueuedConnection);
         }
         if(line.starts_with("remove "))queue.action(QString::fromStdString(line.substr(7)),downshift::QueueAction::Remove).get();
         if(line.starts_with("pause "))queue.action(QString::fromStdString(line.substr(6)),downshift::QueueAction::Pause).get();

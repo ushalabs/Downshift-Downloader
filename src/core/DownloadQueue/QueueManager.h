@@ -28,6 +28,7 @@ struct QueueEntry {
     bool media = false;
     bool browserTransfer = false;
     bool browserComplete = false;
+    bool awaitingConfirmation = false;
     QString browserFile;
     QString mediaTitle, mediaFolder;
     bool mediaStaged = false;
@@ -54,6 +55,7 @@ public:
     QueueManager& operator=(const QueueManager&) = delete;
     std::future<QString> add(QString url, QString destination, int priority = 0, bool start = true, QString sha256 = {}, std::uint64_t speedLimit = 0);
     std::future<void> action(QString id, QueueAction action);
+    std::future<void> dismissPrompt(QString id);
     std::future<void> rename(QString id, QString destination);
     std::future<void> deleteCompleted(QString id);
     std::future<void> configure(QueueSettings settings);

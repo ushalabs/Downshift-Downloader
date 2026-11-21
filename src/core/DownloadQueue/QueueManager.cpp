@@ -67,7 +67,7 @@ QueueSettings QueueSettings::fromJson(const QJsonObject& o) {
 QJsonObject QueueEntry::json() const { return {{"version",1},{"id",id},{"url",url},{"destination",destination},{"origin",origin},{"error",error},{"sha256",sha256},{"status",static_cast<int>(status)},{"priority",priority},{"created",QString::number(created)},{"updated",QString::number(updated)},{"existing",static_cast<int>(existing)},{"speedLimit",QString::number(speedLimit)},
     {"mediaIdentity",mediaIdentity},{"mediaStaged",mediaStaged},{"videoMetadata",videoMetadata},{"partialIdentity",partialIdentity},{"media",media},{"mediaTitle",mediaTitle},{"mediaFolder",mediaFolder},{"browserTransfer",browserTransfer},{"browserComplete",browserComplete},{"browserFile",browserFile},
     {"downloaded",QString::number(progress.downloadedBytes)},{"verified",QString::number(progress.verifiedBytes)},{"total",progress.totalBytes ? QString::number(*progress.totalBytes) : QString()},{"resumable",progress.resumable}, {"journal",destination+".part.resume"},
-    {"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)},
+    {"awaitingConfirmation",awaitingConfirmation},{"averageSpeed",progress.averageBytesPerSecond},{"elapsed",progress.elapsedSeconds},{"targetConnections",static_cast<int>(progress.targetConnections)},
     {"handoffKey",handoffKey},{"requiredEtag",requiredEtag},{"requiredResolvedUrl",requiredResolvedUrl},{"requiredTotal",requiredTotal ? QString::number(*requiredTotal):QString()}}; }
 QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     QueueEntry e; e.id=o.value("id").toString(); e.url=o.value("url").toString(); e.destination=o.value("destination").toString();e.browserTransfer=o.value("browserTransfer").toBool();e.browserComplete=o.value("browserComplete").toBool();e.browserFile=o.value("browserFile").toString();e.origin=e.browserTransfer ? browserOrigin(e.url):downshift::origin(e.url);
@@ -80,6 +80,9 @@ QueueEntry QueueEntry::fromJson(const QJsonObject& o) {
     const auto total=o.value("total").toString(); if(!total.isEmpty()) e.progress.totalBytes=total.toULongLong(); e.progress.resumable=o.value("resumable").toBool();
     e.progress.averageBytesPerSecond=o.value("averageSpeed").toDouble();e.progress.elapsedSeconds=o.value("elapsed").toDouble();e.progress.targetConnections=static_cast<std::uint32_t>(o.value("targetConnections").toInt(1));
     e.handoffKey=o.value("handoffKey").toString();e.requiredEtag=o.value("requiredEtag").toString();e.requiredResolvedUrl=o.value("requiredResolvedUrl").toString();if(!o.value("requiredTotal").toString().isEmpty())e.requiredTotal=o.value("requiredTotal").toString().toULongLong();
+    e.awaitingConfirmation=o.value("awaitingConfirmation").toBool(
+        !e.handoffKey.isEmpty() && e.status==QueueStatus::Paused &&
+        e.error=="Choose where to save this download." && !e.progress.downloadedBytes && !e.progress.verifiedBytes);
     if(e.progress.averageBytesPerSecond<0 || e.progress.averageBytesPerSecond>1e15 || e.progress.elapsedSeconds<0 || e.progress.elapsedSeconds>1e12 || e.progress.targetConnections<1 || e.progress.targetConnections>16) invalid("Invalid saved download metrics.");
     if(e.id.size()!=32 || e.status < QueueStatus::Queued || e.status > QueueStatus::Prepared || e.existing < ExistingDownload::New || e.existing > ExistingDownload::Restart || e.priority < -1 || e.priority > 1 || e.destination.isEmpty()) invalid("Damaged download record.");
     return e;
@@ -136,6 +139,10 @@ void QueueManager::initialize() {
         // Validate every encrypted record before publishing state or updating recovery statuses.
         store_=std::move(candidate);settings_=std::move(settings);receipts_=std::move(receipts);entries_=std::move(entries);budget_->configure(settings_.speedLimit);
         try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());}
+        // Unconfirmed prompts are not resumable tasks. Keep their receipts so a
+        // retried browser notification cannot recreate a dismissed prompt.
+        for(const auto& e:entries_)if(e.awaitingConfirmation)store_->erase(e.id);
+        std::erase_if(entries_,[](const auto& e){return e.awaitingConfirmation;});
         for(auto& e:entries_){
             if(!e.media && !e.browserTransfer && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
             if(e.media&&e.mediaStaged&&validMediaResume(e.videoMetadata.value("resumeRecipe").toObject())&&(e.status==QueueStatus::Running||e.status==QueueStatus::Queued)){e.status=QueueStatus::Paused;e.error="Video interrupted. Choose Resume to continue its retained partial files.";save(e);}
@@ -234,8 +241,19 @@ std::future<void> QueueManager::action(QString id,QueueAction action) { return s
     if(action==QueueAction::Pause) e.status=QueueStatus::Paused;
     else if(action==QueueAction::Cancel) {cleanup(e);e.status=QueueStatus::Cancelled;e.error="Cancelled. Incomplete data removed.";}
     else {if(action==QueueAction::Restart){cleanup(e);e.progress={};} e.existing=action==QueueAction::Restart ? ExistingDownload::New : QFileInfo::exists(e.destination+".part.resume") ? ExistingDownload::Resume : ExistingDownload::New; e.status=QueueStatus::Queued; e.error.clear(); }
+    if(action==QueueAction::Start || action==QueueAction::Restart)e.awaitingConfirmation=false;
     save(e);
 }); }
+std::future<void> QueueManager::dismissPrompt(QString id) {
+    return submit([this,id=std::move(id)] {
+        const auto found=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.id==id;});
+        if(found==entries_.end() || !found->awaitingConfirmation || workers_.contains(id))return;
+        // No destination bytes have been started. Preserve any original browser
+        // response file, which may be its only received copy.
+        store_->erase(id);
+        entries_.erase(found);
+    });
+}
 std::future<void> QueueManager::rename(QString id,QString dest) { return submit([this,id=std::move(id),dest=std::move(dest)] {
     auto& e=entry(id); if(e.media || workers_.contains(id) || e.status==QueueStatus::Completed || QFileInfo::exists(e.destination+".part")) invalid("Only an unstarted file download can be renamed.");
     const auto d=destination(dest);if(e.browserTransfer && !e.browserFile.isEmpty() && d.compare(e.browserFile,Qt::CaseInsensitive)==0)invalid("Choose a destination separate from the incoming browser file."); for(const auto& old:entries_) if(old.id!=id && old.destination.compare(d,Qt::CaseInsensitive)==0) invalid("Another download owns that destination.");
@@ -394,6 +412,7 @@ std::future<QJsonObject> QueueManager::handoff(QString key,QString command,bool 
     if(command!="status" && command!="commit" && command!="abort")invalid("Unsupported browser operation.");
     if(state=="prepared" && command!="status") {
         auto e=entry(id);e.status=command=="commit" ? (prompt ? QueueStatus::Paused:QueueStatus::Queued):QueueStatus::Cancelled;e.error=prompt && command=="commit" ? "Choose where to save this download.":QString();e.updated=QDateTime::currentSecsSinceEpoch();receipt["state"]=command=="commit" ? "committed":"aborted";
+        e.awaitingConfirmation=prompt && command=="commit";
         try{store_->handoff(e.id,QJsonDocument(e.json()).toJson(QJsonDocument::Compact),key,QJsonDocument(receipt).toJson(QJsonDocument::Compact));}catch(...){fatal_=std::current_exception();throw;}
         entry(id)=e;i->second=receipt;
     }

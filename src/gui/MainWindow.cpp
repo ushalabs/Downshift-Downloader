@@ -342,7 +342,7 @@ void MainWindow::refresh() {
 void MainWindow::apply(const QueueSnapshot& snapshot) {
     const bool keep=!exitRequested_&&snapshot.settings.closeToTray&&QSystemTrayIcon::isSystemTrayAvailable();QApplication::setQuitOnLastWindowClosed(!keep);
     tray_->setVisible(QSystemTrayIcon::isSystemTrayAvailable()&&!testAttribute(Qt::WA_DontShowOnScreen)&&!QApplication::arguments().contains("--smoke-test"));
-    for(const auto& e:snapshot.entries)if(!e.handoffKey.isEmpty() && e.status==QueueStatus::Paused && e.error=="Choose where to save this download."){
+    for(const auto& e:snapshot.entries)if(e.awaitingConfirmation){
         const auto old=std::find_if(current_.entries.begin(),current_.entries.end(),[&](const auto& row){return row.id==e.id;});
         if(old==current_.entries.end() || old->status==QueueStatus::Prepared)QTimer::singleShot(0,this,[this,e]{confirmDownload(e);});
         else if(old->progress.totalBytes!=e.progress.totalBytes)
@@ -356,7 +356,11 @@ void MainWindow::apply(const QueueSnapshot& snapshot) {
     }
     const auto scrollPosition=table_->verticalScrollBar()->value();
     current_=snapshot;ready_=true;retryHistory_->hide();const QSignalBlocker blocked(table_);
-    displayOrder_.clear();for(std::size_t n=0;n<current_.entries.size();++n)displayOrder_.push_back({false,n});for(std::size_t n=0;n<torrentRows_.size();++n)displayOrder_.push_back({true,n});
+    displayOrder_.clear();
+    for(std::size_t n=0;n<current_.entries.size();++n)
+        if(!current_.entries[n].awaitingConfirmation && current_.entries[n].status!=QueueStatus::Prepared)
+            displayOrder_.push_back({false,n});
+    for(std::size_t n=0;n<torrentRows_.size();++n)displayOrder_.push_back({true,n});
     std::sort(displayOrder_.begin(),displayOrder_.end(),[this](auto a,auto b){
         const auto size=[this](auto row)->quint64{return row.torrent?static_cast<quint64>(torrentRows_[row.index].selectedBytes):current_.entries[row.index].progress.totalBytes.value_or(0);};
         const auto created=[this](auto row){return row.torrent?torrentRows_[row.index].created:current_.entries[row.index].created;};

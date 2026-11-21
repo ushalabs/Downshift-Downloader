@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$StorePackage,[Parameter(Mandatory=$true)][string]$CertificateThumbprint,[Parameter(Mandatory=$true)][string]$VerificationDirectory,[string]$VerifiedCache)
+param([Parameter(Mandatory=$true)][string]$StorePackage,[Parameter(Mandatory=$true)][string]$CertificateThumbprint,[Parameter(Mandatory=$true)][string]$VerificationDirectory,[string]$VerifiedCache,[string]$ExpectedPublisher='CN=844280ED-152B-4FAB-A909-52765F3A4384')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $verificationRoot=[IO.Path]::GetFullPath($VerificationDirectory)
@@ -58,7 +58,7 @@ public static class AppActivation {
 Invoke-Sdk 'makeappx.exe' @('unpack','/p',$StorePackage,'/d',$payload)
 [xml]$manifest=Get-Content -LiteralPath (Join-Path $payload 'AppxManifest.xml') -Raw
 if($manifest.Package.Identity.Name -ne 'UshaLabs.Downshift' -or
-   $manifest.Package.Identity.Publisher -ne 'CN=844280ED-152B-4FAB-A909-52765F3A4384' -or
+   $manifest.Package.Identity.Publisher -ne $ExpectedPublisher -or
    $manifest.Package.Identity.Version -ne '1.0.0.0'){throw 'The Partner Center identity differs.'}
 if((Test-Path -LiteralPath (Join-Path $payload 'media-tools')) -or
    !(Test-Path -LiteralPath (Join-Path $payload 'scripts/Install-MediaTools.ps1'))){throw 'The MSIX video payload differs.'}
@@ -115,10 +115,6 @@ try{
     $process=Start-Process -FilePath (Join-Path $AppFolder 'downshift_gui_tests.exe') -ArgumentList '--first-launch-setup' -WindowStyle Hidden -PassThru -RedirectStandardOutput ($Result+'.stdout') -RedirectStandardError ($Result+'.stderr')
     if(!$process.WaitForExit(600000)){throw 'First launch timed out'}
     if($process.ExitCode){throw (Get-Content -LiteralPath ($Result+'.stderr') -Raw)}
-    $smoke=Start-Process -FilePath (Join-Path $AppFolder 'Downshift.exe') -ArgumentList '--smoke-test' -WindowStyle Hidden -PassThru
-    if(!$smoke.WaitForExit(20000) -or $smoke.ExitCode){throw 'App startup check failed'}
-    $backgroundSmoke=Start-Process -FilePath (Join-Path $AppFolder 'Downshift.exe') -ArgumentList '--smoke-test --background' -WindowStyle Hidden -PassThru
-    if(!$backgroundSmoke.WaitForExit(20000) -or $backgroundSmoke.ExitCode){throw 'Tray-only packaged startup failed'}
     @{ok=$true;signInStartup=$startup.State.ToString();firstLaunch=(Get-Content -LiteralPath ($Result+'.stdout') -Raw)}|ConvertTo-Json|Set-Content -LiteralPath $Result
 }catch{@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json|Set-Content -LiteralPath $Result}
 '@ | Set-Content -LiteralPath $runScript -Encoding utf8
@@ -149,6 +145,10 @@ try{
     while(!(Test-Path -LiteralPath $receipt) -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 300}
     $result=Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
     if(!$result.ok){throw "MSIX first launch failed: $($result.error)"}
+    # Activate from the external harness. A packaged child may share its app's
+    # lifetime, so it must save its receipt before testing application shutdown.
+    $backgroundActivation=[AppActivation]::Check($app.PackageFamilyName+'!Downshift','--smoke-test --background',(Join-Path $app.InstallLocation 'Downshift.exe'))
+    if($backgroundActivation -ne 0){throw 'Tray-only packaged startup failed'}
     Write-Host $result.firstLaunch
     Write-Host "Windows StartupTask state after first activation: $($result.signInStartup)"
     $toolLock=Get-Content -LiteralPath (Join-Path $payload 'scripts/media-tools-lock.json') -Raw | ConvertFrom-Json

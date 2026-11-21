@@ -100,6 +100,50 @@ def main():
                 if row["status"] in (3,4):break
                 time.sleep(.05)
             assert row["status"]==3 and file_sha256(root/"Docs"/"report.pdf")==expected_sha256(server.size);checks+=1
+            # Closing an unstarted capture must discard the prompt, including
+            # after restart. A confirmed task must retain its normal history.
+            closed=uuid.uuid4().hex
+            request(exe,"prepare",key=closed,url=url,filename="closed-prompt.bin")
+            request(exe,"commit",key=closed,browserNotStarted=True,prompt=True)
+            end=time.monotonic()+8
+            while time.monotonic()<end:
+                p.stdin.write('captures\n');p.stdin.flush()
+                if json.loads(p.stdout.readline()):break
+                time.sleep(.05)
+            assert any(r['handoffKey']==closed and r['awaitingConfirmation'] for r in rows(p));checks+=1
+            prompt_id=next(r['id'] for r in rows(p) if r['handoffKey']==closed)
+            p.stdin.write('visible-downloads\n');p.stdin.flush()
+            assert prompt_id not in json.loads(p.stdout.readline());checks+=1
+            p.stdin.write('capture-close\n');p.stdin.flush();json.loads(p.stdout.readline())
+            end=time.monotonic()+8
+            while time.monotonic()<end:
+                if request(exe,'status',key=closed)['downloadStatus']=='Removed':break
+                time.sleep(.05)
+            assert request(exe,'status',key=closed)['downloadStatus']=='Removed';checks+=1
+            abandoned=uuid.uuid4().hex
+            request(exe,'prepare',key=abandoned,url=url,filename='abandoned-prompt.bin')
+            request(exe,'commit',key=abandoned,browserNotStarted=True,prompt=True)
+            close(p);p=start(driver,root)
+            assert request(exe,'status',key=abandoned)['downloadStatus']=='Removed'
+            assert request(exe,'status',key=closed)['downloadStatus']=='Removed';checks+=2
+            assert not (root/'Programs'/'closed-prompt.bin.part').exists();checks+=1
+            confirmed=uuid.uuid4().hex
+            request(exe,'prepare',key=confirmed,url=url,filename='confirmed-prompt.bin')
+            request(exe,'commit',key=confirmed,browserNotStarted=True,prompt=True)
+            end=time.monotonic()+8
+            while time.monotonic()<end:
+                p.stdin.write('captures\n');p.stdin.flush()
+                if json.loads(p.stdout.readline()):break
+                time.sleep(.05)
+            p.stdin.write('confirm\n');p.stdin.flush();assert p.stdout.readline().strip()=='confirmed'
+            end=time.monotonic()+15
+            while time.monotonic()<end:
+                if request(exe,'status',key=confirmed)['downloadStatus']=='Completed':break
+                time.sleep(.05)
+            assert request(exe,'status',key=confirmed)['downloadStatus']=='Completed'
+            assert not next(r for r in rows(p) if r['handoffKey']==confirmed)['awaitingConfirmation'];checks+=2
+            close(p);p=start(driver,root)
+            assert request(exe,'status',key=confirmed)['downloadStatus']=='Completed';checks+=1
             close(p);p=None
             for file in root.glob("queue.sqlite*"):
                 if file.is_file():assert url.encode() not in file.read_bytes()

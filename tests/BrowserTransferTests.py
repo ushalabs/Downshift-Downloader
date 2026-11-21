@@ -24,6 +24,24 @@ def main():
                 time.sleep(.03)
             raise AssertionError('Import did not settle')
         try:
+            prompt_key=uuid.uuid4().hex
+            prompt_source=root/'unconfirmed.source'
+            prompt_source.write_bytes(b'only received browser copy')
+            request(exe,'browser-prepare',key=prompt_key,url='blob:https://example.com/unconfirmed',filename='unconfirmed.bin',total=str(prompt_source.stat().st_size))
+            request(exe,'commit',key=prompt_key,browserTransport=True,prompt=True)
+            request(exe,'browser-update',key=prompt_key,file=str(prompt_source),complete=True,total=str(prompt_source.stat().st_size),received=str(prompt_source.stat().st_size))
+            end=time.monotonic()+8
+            while time.monotonic()<end:
+                p.stdin.write('captures\n');p.stdin.flush()
+                if json.loads(p.stdout.readline()):break
+                time.sleep(.05)
+            command('capture-close')
+            end=time.monotonic()+8
+            while time.monotonic()<end:
+                if request(exe,'status',key=prompt_key)['downloadStatus']=='Removed':break
+                time.sleep(.05)
+            assert request(exe,'status',key=prompt_key)['downloadStatus']=='Removed'
+            assert prompt_source.read_bytes()==b'only received browser copy';checks+=2
             assert request(exe,'ping')['capabilities']['browserTransfer'];checks+=1
             for source,payload in [('blob:https://example.com/'+uuid.uuid4().hex,bytes(range(256))*16385),('data:application/octet-stream',b''),('https://example.com/authorized-post',b'original POST response\0'*8192)]:
                 key,identifier,spool,target=add(source,'received-'+uuid.uuid4().hex[:5]+'.rbxmx',payload)
@@ -50,8 +68,8 @@ def main():
             assert not host(exe,dict(version=1,command='commit',key=key,browserCancelled=True))[1]['ok'];checks+=1
             assert not host(exe,dict(version=1,command='browser-update',key=key,file='../bad',complete=True,total='0',received='0'))[1]['ok'];checks+=1
             assert not host(exe,dict(version=1,command='browser-update',key=key,file='',complete=True,total='-1'))[1]['ok'];checks+=1
-            # A full received source survives cancellation/removal decisions and
-            # can complete locally after restart without the browser worker.
+            # An unconfirmed received response retains its source bytes, while
+            # its abandoned prompt must not become a resumable history task.
             local_key=uuid.uuid4().hex;local_source=root/'retained.source';local_source.write_bytes(b'received data to retain')
             local_id=request(exe,'browser-prepare',key=local_key,url='blob:https://example.com/retained',filename='retained.bin',total='-1',mime='application/octet-stream')['downloadId']
             request(exe,'commit',key=local_key,browserTransport=True,prompt=True)
@@ -67,7 +85,9 @@ def main():
                 time.sleep(.05)
             assert capture_size() not in ('','Size unavailable');checks+=1
             command('cancel '+local_id)
-            close(p);p=start(driver,root);command('resume '+local_id);retained=finished(local_id);assert pathlib.Path(retained['destination']).read_bytes()==local_source.read_bytes();checks+=1
+            close(p);p=start(driver,root)
+            assert request(exe,'status',key=local_key)['downloadStatus']=='Removed'
+            assert local_source.read_bytes()==b'received data to retain';checks+=1
         finally:close(p)
     print(f'Native browser transfer checks passed: {checks}')
 if __name__=='__main__':main()

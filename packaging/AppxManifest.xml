@@ -43,7 +43,7 @@
           <desktop:StartupTask TaskId="DownshiftStartup" Enabled="true" DisplayName="Downshift" />
         </desktop:Extension>
         <desktop7:Extension Category="windows.shortcut">
-          <desktop7:Shortcut File="$(Desktop)\Downshift (Microsoft Store).lnk" Icon="Downshift.exe"
+          <desktop7:Shortcut File="$(Desktop)\Downshift.lnk" Icon="Downshift.exe"
                              Description="Open Downshift" />
         </desktop7:Extension>
         <uap3:Extension Category="windows.appExecutionAlias" Executable="DownshiftNativeHost.exe" EntryPoint="Windows.FullTrustApplication">

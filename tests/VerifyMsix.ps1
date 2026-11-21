@@ -88,7 +88,8 @@ if(!$startup -or $startup.GetAttribute('TaskId') -ne 'DownshiftStartup' -or
 }
 
 $shortcut=$manifest.SelectSingleNode('//shortcut:Shortcut',$ns)
-$shortcut.SetAttribute('File',$shortcut.GetAttribute('File').Replace('Downshift (Microsoft Store)','Downshift Setup Validation'))
+if($shortcut.GetAttribute('File') -cne '$(Desktop)\Downshift.lnk'){throw 'The production Desktop shortcut must be named Downshift.'}
+$shortcut.SetAttribute('File','$(Desktop)\Downshift Setup Validation.lnk')
 $manifest.SelectSingleNode('//alias:ExecutionAlias',$ns).SetAttribute('Alias','DownshiftSetupValidationBridge.exe')
 $manifest.Save((Join-Path $payload 'AppxManifest.xml'))
 Copy-Item -LiteralPath (Join-Path $root 'build/windows-msvc/Release/downshift_gui_tests.exe') -Destination $payload

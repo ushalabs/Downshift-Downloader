@@ -129,51 +129,52 @@ def main():
                 for reader in readers:reader.join(timeout=5)
             assert not read_errors,read_errors
             print(''.join(stdout),end='');assert code==0,''.join(stderr)
-            browser_files=list((destination/'browser-youtube').glob('*.mkv'));assert len(browser_files)==1,browser_files
-            info=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(browser_files[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
-            assert {'audio','video'}<={s['codec_type'] for s in info['streams']} and 1.8<float(info['format']['duration'])<2.3
-            print('Browser-resolved YouTube independently verified: separate audio/video merged with native YouTube network unavailable.')
-            assert any(json.loads(line)['start']>0 for line in (source/'browser-ranges.jsonl').read_text().splitlines()),'Browser-supplied large track did not use continuation chunks'
-            assert not list((destination/'browser-denied').glob('*.mp4')),'Rejected browser source must not publish a completed file'
-            hls_files=list((destination/'browser-youtube-hls').glob('*'));assert len(hls_files)==1,hls_files
-            info=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(hls_files[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
-            assert {'audio','video'}<={s['codec_type'] for s in info['streams']} and 1.8<float(info['format']['duration'])<2.3
-            print('Browser-resolved HLS independently verified with required media headers and full expected duration.')
-            for height in (120,240):
-                selected=list((destination/f'browser-quality-{height}').glob('*'));assert len(selected)==1,selected
-                streams=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(selected[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
-                assert any(s.get('codec_type')=='video' and s.get('height')==height for s in streams['streams']),streams
-                assert any(s.get('codec_type')=='audio' for s in streams['streams'])
-            print('Browser-resolved master playlist independently verified at both selected resolutions with audio.')
-            files=[file for file in (destination/'Videos').iterdir() if file.suffix in ('.mp4','.mkv') and not file.name.startswith('broken')];assert len(files)==3,files
-            assert (destination/'Videos'/'broken [broken].mp4').read_bytes()==b'<html>No video here</html>','Existing output must remain untouched'
-            original=hashlib.sha256((source/'fixture.mp4').read_bytes()).hexdigest()
-            assert sum(hashlib.sha256(file.read_bytes()).hexdigest()==original for file in files)==2,'Each duplicate direct download must remain intact'
-            for file in files:
-                metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(file)],capture_output=True,text=True,check=True,timeout=20).stdout)
-                assert {'audio','video'}<={stream['codec_type'] for stream in metadata['streams']},metadata
-                assert 1.8<float(metadata['format']['duration'])<2.3,metadata
-            assert not list(destination.glob('*.part')),'Completed media left partials'
-            quality_files=list((destination/'quality copies').glob('*.mkv'));assert len(quality_files)==2,quality_files
-            heights=set()
-            for file in quality_files:
-                metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(file)],capture_output=True,text=True,check=True,timeout=20).stdout)
-                assert any(stream['codec_type']=='audio' for stream in metadata['streams'])
-                heights.update(stream['height'] for stream in metadata['streams'] if stream['codec_type']=='video')
-            assert heights=={120,240},heights
-            print('Quality checks: separate 120p and 240p files, each with audio, independently probed.')
-            print('Independent checks: direct SHA-256 and both files have audio/video and expected duration.')
-            hls=list((destination/'default hls').glob('*'));assert len(hls)==1,hls
-            metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(hls[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
-            assert {'audio','video'}<={stream['codec_type'] for stream in metadata['streams']}
-            assert 1.8<float(metadata['format']['duration'])<2.3
-            print('Default HLS independently verified with required Referer, Origin and User-Agent.')
-            background=destination/'lifecycle'/'Renamed 100% video (1).mp4'
-            assert hashlib.sha256(background.read_bytes()).hexdigest()==original,'Background transfer changed bytes'
-            assert (destination/'lifecycle'/'Renamed 100% video.mp4').read_bytes()==b'preserve existing file','Renaming overwrote another file'
-            renamed=list((destination/'lifecycle').rglob('Edited picture.png'));assert len(renamed)==1,renamed
-            assert hashlib.sha256(renamed[0].read_bytes()).hexdigest()==original,'Browser filename edit changed bytes'
-            print('Background/renamed outputs independently SHA-256 verified; existing destination preserved.')
+            if not os.environ.get("DOWNSHIFT_MEDIA_PAUSE_ONLY"):
+                browser_files=list((destination/'browser-youtube').glob('*.mkv'));assert len(browser_files)==1,browser_files
+                info=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(browser_files[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
+                assert {'audio','video'}<={s['codec_type'] for s in info['streams']} and 1.8<float(info['format']['duration'])<2.3
+                print('Browser-resolved YouTube independently verified: separate audio/video merged with native YouTube network unavailable.')
+                assert any(json.loads(line)['start']>0 for line in (source/'browser-ranges.jsonl').read_text().splitlines()),'Browser-supplied large track did not use continuation chunks'
+                assert not list((destination/'browser-denied').glob('*.mp4')),'Rejected browser source must not publish a completed file'
+                hls_files=list((destination/'browser-youtube-hls').glob('*'));assert len(hls_files)==1,hls_files
+                info=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(hls_files[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
+                assert {'audio','video'}<={s['codec_type'] for s in info['streams']} and 1.8<float(info['format']['duration'])<2.3
+                print('Browser-resolved HLS independently verified with required media headers and full expected duration.')
+                for height in (120,240):
+                    selected=list((destination/f'browser-quality-{height}').glob('*'));assert len(selected)==1,selected
+                    streams=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(selected[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
+                    assert any(s.get('codec_type')=='video' and s.get('height')==height for s in streams['streams']),streams
+                    assert any(s.get('codec_type')=='audio' for s in streams['streams'])
+                print('Browser-resolved master playlist independently verified at both selected resolutions with audio.')
+                files=[file for file in (destination/'Videos').iterdir() if file.suffix in ('.mp4','.mkv') and not file.name.startswith('broken')];assert len(files)==3,files
+                assert (destination/'Videos'/'broken [broken].mp4').read_bytes()==b'<html>No video here</html>','Existing output must remain untouched'
+                original=hashlib.sha256((source/'fixture.mp4').read_bytes()).hexdigest()
+                assert sum(hashlib.sha256(file.read_bytes()).hexdigest()==original for file in files)==2,'Each duplicate direct download must remain intact'
+                for file in files:
+                    metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(file)],capture_output=True,text=True,check=True,timeout=20).stdout)
+                    assert {'audio','video'}<={stream['codec_type'] for stream in metadata['streams']},metadata
+                    assert 1.8<float(metadata['format']['duration'])<2.3,metadata
+                assert not list(destination.glob('*.part')),'Completed media left partials'
+                quality_files=list((destination/'quality copies').glob('*.mkv'));assert len(quality_files)==2,quality_files
+                heights=set()
+                for file in quality_files:
+                    metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(file)],capture_output=True,text=True,check=True,timeout=20).stdout)
+                    assert any(stream['codec_type']=='audio' for stream in metadata['streams'])
+                    heights.update(stream['height'] for stream in metadata['streams'] if stream['codec_type']=='video')
+                assert heights=={120,240},heights
+                print('Quality checks: separate 120p and 240p files, each with audio, independently probed.')
+                print('Independent checks: direct SHA-256 and both files have audio/video and expected duration.')
+                hls=list((destination/'default hls').glob('*'));assert len(hls)==1,hls
+                metadata=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(hls[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
+                assert {'audio','video'}<={stream['codec_type'] for stream in metadata['streams']}
+                assert 1.8<float(metadata['format']['duration'])<2.3
+                print('Default HLS independently verified with required Referer, Origin and User-Agent.')
+                background=destination/'lifecycle'/'Renamed 100% video (1).mp4'
+                assert hashlib.sha256(background.read_bytes()).hexdigest()==original,'Background transfer changed bytes'
+                assert (destination/'lifecycle'/'Renamed 100% video.mp4').read_bytes()==b'preserve existing file','Renaming overwrote another file'
+                renamed=list((destination/'lifecycle').rglob('Edited picture.png'));assert len(renamed)==1,renamed
+                assert hashlib.sha256(renamed[0].read_bytes()).hexdigest()==original,'Browser filename edit changed bytes'
+                print('Background/renamed outputs independently SHA-256 verified; existing destination preserved.')
             direct=list((destination/'pause-direct').glob('*.mp4'));assert len(direct)==1,direct
             assert hashlib.sha256(direct[0].read_bytes()).digest()==hashlib.sha256((source/'pause.mp4').read_bytes()).digest(),'Resumed direct video checksum mismatch'
             requests=[json.loads(line) for line in (source/'pause-requests.jsonl').read_text().splitlines()]

@@ -30,6 +30,7 @@
 #include <source_location>
 namespace {
 int checks=0;
+qint64 diskSize(const QFileInfo& info){QFile file(info.absoluteFilePath());return file.open(QIODevice::ReadOnly)?file.size():-1;}
 void check(bool value,const char* message){if(!value)throw std::runtime_error(message);++checks;std::cerr<<"Media check "<<checks<<": "<<message<<'\n';}
 template<class F> void wait(F condition,int timeout=90000,const std::source_location location=std::source_location::current()){const auto end=std::chrono::steady_clock::now()+std::chrono::milliseconds(timeout);while(std::chrono::steady_clock::now()<end){QApplication::processEvents();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);if(condition())return;QThread::msleep(5);}throw std::runtime_error("Video test timed out at line "+std::to_string(location.line()));}
 downshift::QueueEntry waitForVideo(downshift::QueueManager& queue,int expectedCount=0){
@@ -54,6 +55,8 @@ int main(int argc,char** argv) {
     const QString root=QString::fromLocal8Bit(argv[1]),base=QString::fromLatin1(argv[2]),shots=QString::fromLocal8Bit(argv[3]);
     try {
         downshift::CurlRuntime curl;QString interrupted;
+        const bool pauseOnly=qEnvironmentVariableIsSet("DOWNSHIFT_MEDIA_PAUSE_ONLY");
+        if(!pauseOnly){
         {downshift::QueueManager queue(QDir(root).filePath("queue.sqlite"));downshift::MainWindow window(queue);window.show();wait([&]{return window.ready();});
         auto settings=window.current().settings;settings.directory=root;auto configured=queue.configure(settings);wait([&]{return configured.wait_for(std::chrono::seconds(0))==std::future_status::ready;});configured.get();
         for(const auto& address:QStringList{"file:///C:/video.mp4","https://name:password@example.com/video.mp4","javascript:alert(1)"}) {bool rejected=false;try{downshift::browser::validate({{"version",1},{"command","media"},{"url",address},{"title","Video"}});}catch(...){rejected=true;}check(rejected,"Unsafe media address must be rejected");}
@@ -133,6 +136,7 @@ int main(int argc,char** argv) {
         auto* quality=dialog->findChild<QComboBox*>("mediaQuality");check(quality->count()==1 && quality->currentData().toInt()==0 && !quality->isEnabled(),"Unknown resolution can download at default quality");
         submit->click();checkCompleted(queue);wait([&]{return !window.findChild<QDialog*>("mediaDialog");});
         const auto entry=queue.snapshot().get().entries.back();check(entry.videoMetadata.value("requestContext").toObject()==context,"Retry context retained in encrypted history");}
+        }
         for(const auto kind:QStringList{"direct","hls"}){
             const auto folder=QDir(root).filePath("pause-"+kind),database=QDir(root).filePath("pause-"+kind+".sqlite");QDir().mkpath(folder);
             auto queue=std::make_unique<downshift::QueueManager>(database);auto window=std::make_unique<downshift::MainWindow>(*queue);window->show();wait([&]{return window->ready();});auto settings=window->current().settings;settings.directory=folder;settings.notifications=false;settings.automatic=false;settings.connections=1;queue->configure(settings).get();
@@ -141,21 +145,26 @@ int main(int argc,char** argv) {
             // Current upstream Python can buffer the first reported 64 KiB
             // entirely in memory. A byte-range continuation assertion needs a
             // nonempty on-disk partial, not only a progress notification.
+            // Windows directory metadata can keep reporting zero while the
+            // writer is open, so query the partial through an open file handle.
+            auto checkpointLog=std::chrono::steady_clock::now();
             wait([&]{const auto rows=queue->snapshot().get().entries;if(rows.size()!=1)return false;
                 if(rows[0].status==downshift::QueueStatus::Failed||rows[0].status==downshift::QueueStatus::Completed)throw std::runtime_error("Pause fixture terminated before a disk checkpoint: "+rows[0].error.toStdString());
                 if(rows[0].progress.downloadedBytes<=32768||!media->canPause())return false;
                 if(kind!="direct")return true;const QDir stage(QDir(folder).filePath(".downshift-video-"+rows[0].id));
-                for(const auto& file:stage.entryInfoList({"*.part"},QDir::Files|QDir::Hidden))if(file.size()>=128*1024)return true;return false;
+                if(pauseOnly&&std::chrono::steady_clock::now()-checkpointLog>std::chrono::seconds(1)){checkpointLog=std::chrono::steady_clock::now();std::cerr<<"Checkpoint bytes "<<rows[0].progress.downloadedBytes<<'\n';for(const auto& file:stage.entryInfoList(QDir::Files|QDir::Hidden|QDir::System))std::cerr<<file.fileName().toStdString()<<": directory="<<file.size()<<", handle="<<diskSize(file)<<'\n';}
+                for(const auto& file:stage.entryInfoList({"*.part"},QDir::Files|QDir::Hidden))if(diskSize(file)>=128*1024)return true;return false;
             });const auto id=queue->snapshot().get().entries[0].id;auto* table=window->findChild<QTableWidget*>("downloadTable");wait([&]{return table->rowCount()==1;});table->selectRow(0);wait([&]{return window->findChild<QPushButton*>("pauseButton")->isEnabled();});
             window->findChild<QPushButton*>("pauseButton")->click();wait([&]{return queue->snapshot().get().entries[0].status==downshift::QueueStatus::Paused;});
             const auto paused=queue->snapshot().get().entries[0];check(paused.id==id&&paused.progress.downloadedBytes>0&&paused.progress.smoothedBytesPerSecond==0,"Pause retains received count and clears speed on same task");
-            const auto stage=QDir(folder).filePath(".downshift-video-"+id);const auto files=[&]{QMap<QString,qint64> result;for(const auto& file:QDir(stage).entryInfoList(QDir::Files|QDir::Hidden))result[file.fileName()]=file.size();return result;};const auto held=files();check(!held.isEmpty(),"Video partial files retained on pause");
+            const auto stage=QDir(folder).filePath(".downshift-video-"+id);const auto files=[&]{QMap<QString,qint64> result;for(const auto& file:QDir(stage).entryInfoList(QDir::Files|QDir::Hidden))result[file.fileName()]=diskSize(file);return result;};const auto held=files();check(!held.isEmpty(),"Video partial files retained on pause");
             if(kind=="direct"){bool received=false;for(auto file=held.cbegin();file!=held.cend();++file)if(file.key().endsWith(".part")&&file.value()>=128*1024)received=true;check(received,"Direct resume fixture retains real on-disk bytes before restart");}
             for(int tick=0;tick<80;++tick){QApplication::processEvents();QThread::msleep(5);}check(files()==held,"Paused helper stops writing partial files");wait([&]{return window->current().entries[0].status==downshift::QueueStatus::Paused;});check(window->findChild<QPushButton*>("startButton")->text()=="Resume"&&window->findChild<QPushButton*>("startButton")->isEnabled(),"Main toolbar offers Resume instead of Retry video");
             wait([&]{return !window->findChild<QDialog*>("mediaDialog");});window.reset();queue.reset();
             queue=std::make_unique<downshift::QueueManager>(database);window=std::make_unique<downshift::MainWindow>(*queue);window->show();wait([&]{return window->ready();});check(queue->snapshot().get().entries[0].status==downshift::QueueStatus::Paused&&files()==held,"Paused media and its partial files survive queue/app-owner restart");table=window->findChild<QTableWidget*>("downloadTable");wait([&]{return table->rowCount()==1;});table->selectRow(0);window->findChild<QPushButton*>("startButton")->click();
             wait([&]{const auto rows=queue->snapshot().get().entries;return rows[0].status==downshift::QueueStatus::Completed||rows[0].status==downshift::QueueStatus::Failed;});const auto result=queue->snapshot().get().entries[0];check(result.status==downshift::QueueStatus::Completed,result.error.toUtf8().constData());check(result.id==id&&queue->snapshot().get().entries.size()==1,"Resume completes the same history entry without duplicating it");check(!QFileInfo::exists(stage),"Verified resumed completion removes only owned staging");
         }
+        if(!pauseOnly){
         {
         const auto folder=QDir(root).filePath("browser-youtube");QDir().mkpath(folder);downshift::QueueManager queue(QDir(root).filePath("browser-youtube.sqlite"));downshift::MainWindow window(queue);window.show();
         const QJsonArray formats{QJsonObject{{"url",base+"/browser-video.mp4"},{"format_id","137"},{"ext","mp4"},{"vcodec","unknown"},{"acodec","none"},{"height",240},{"filesize",static_cast<double>(QFileInfo(QDir(root).filePath("../source/browser-video.mp4")).size())}},QJsonObject{{"url",base+"/browser-audio.m4a"},{"format_id","140"},{"ext","m4a"},{"vcodec","none"},{"acodec","unknown"},{"filesize",static_cast<double>(QFileInfo(QDir(root).filePath("../source/browser-audio.m4a")).size())}}};
@@ -226,6 +235,7 @@ int main(int argc,char** argv) {
         for(int n=0;n<60;++n){QApplication::processEvents();QThread::msleep(5);}check(!panel->isVisible(),"Background refresh cannot reopen right-clicked details");
         QMouseEvent left(QEvent::MouseButtonPress,QPointF(point),QPointF(table->viewport()->mapToGlobal(point)),Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);QApplication::sendEvent(table->viewport(),&left);QMouseEvent up(QEvent::MouseButtonRelease,QPointF(point),QPointF(table->viewport()->mapToGlobal(point)),Qt::LeftButton,Qt::NoButton,Qt::NoModifier);QApplication::sendEvent(table->viewport(),&up);check(panel->isVisible(),"Left click opens details even on the same context-selected row");
         window.openSettings();auto* config=window.findChild<QDialog*>("settingsDialog");auto* tray=config->findChild<QCheckBox*>("settingsCloseToTray");check(tray&&tray->isChecked(),"General settings offers enabled close-to-tray option");tray->setChecked(false);config->findChild<QPushButton*>("settingsSave")->click();wait([&]{return !window.current().settings.closeToTray;});check(!downshift::QueueSettings::fromJson(queue.snapshot().get().settings.json()).closeToTray,"Tray option round-trips through encrypted settings");window.requestExit();wait([&]{return !window.isVisible();});
+        }
         }
         std::cout<<"Media GUI checks passed: "<<checks<<'\n';return 0;
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}

@@ -25,7 +25,10 @@ Package lifecycle/media acceptance is recorded separately with the built setup.
 With the current upstream helper, the first 64 KiB progress notification can
 precede any on-disk partial bytes. The resume fixture now waits for a real
 128 KiB partial before pausing, then still requires a nonzero HTTP byte range,
-the exact final SHA-256 and intact decoded HLS frames. This changes only the
+the exact final SHA-256 and intact decoded HLS frames. Windows directory metadata
+can also report zero for a growing open partial, so the checkpoint is measured
+through an open file handle. The focused direct/HLS restart run passed all 17
+GUI checks and independent payload/range/frame checks. This changes only the
 test's pause trigger; application transfer and pause behavior are unchanged.
 
 The supplied NiaziTV episode played in the verification browser, but anonymous

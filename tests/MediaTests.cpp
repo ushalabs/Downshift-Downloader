@@ -136,11 +136,14 @@ int main(int argc,char** argv) {
         for(const auto kind:QStringList{"direct","hls"}){
             const auto folder=QDir(root).filePath("pause-"+kind),database=QDir(root).filePath("pause-"+kind+".sqlite");QDir().mkpath(folder);
             auto queue=std::make_unique<downshift::QueueManager>(database);auto window=std::make_unique<downshift::MainWindow>(*queue);window->show();wait([&]{return window->ready();});auto settings=window->current().settings;settings.directory=folder;settings.notifications=false;settings.automatic=false;settings.connections=1;queue->configure(settings).get();
-            const auto address=base+(kind=="direct"?"/pause.mp4":"/pause-stream.m3u8");window->openVideo(address,"Pause test",folder);auto* media=dynamic_cast<downshift::MediaDialog*>(window->findChild<QDialog*>("mediaDialog"));auto* submit=media->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});submit->click();
+            const auto address=base+(kind=="direct"?"/pause.mp4":"/pause-stream.m3u8");window->openVideo(address,"Pause test",folder);auto* media=dynamic_cast<downshift::MediaDialog*>(window->findChild<QDialog*>("mediaDialog"));auto* submit=media->findChild<QPushButton*>("mediaDownload");wait([&]{return submit->isEnabled();});
+            if(submit->text()!="Download video")throw std::runtime_error("Pause fixture metadata failed: "+media->findChild<QLabel*>("mediaStatus")->text().toStdString());submit->click();
             // Current upstream Python can buffer the first reported 64 KiB
             // entirely in memory. A byte-range continuation assertion needs a
             // nonempty on-disk partial, not only a progress notification.
-            wait([&]{const auto rows=queue->snapshot().get().entries;if(rows.size()!=1||rows[0].progress.downloadedBytes<=32768||!media->canPause())return false;
+            wait([&]{const auto rows=queue->snapshot().get().entries;if(rows.size()!=1)return false;
+                if(rows[0].status==downshift::QueueStatus::Failed||rows[0].status==downshift::QueueStatus::Completed)throw std::runtime_error("Pause fixture terminated before a disk checkpoint: "+rows[0].error.toStdString());
+                if(rows[0].progress.downloadedBytes<=32768||!media->canPause())return false;
                 if(kind!="direct")return true;const QDir stage(QDir(folder).filePath(".downshift-video-"+rows[0].id));
                 for(const auto& file:stage.entryInfoList({"*.part"},QDir::Files|QDir::Hidden))if(file.size()>=128*1024)return true;return false;
             });const auto id=queue->snapshot().get().entries[0].id;auto* table=window->findChild<QTableWidget*>("downloadTable");wait([&]{return table->rowCount()==1;});table->selectRow(0);wait([&]{return window->findChild<QPushButton*>("pauseButton")->isEnabled();});

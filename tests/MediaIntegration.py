@@ -29,7 +29,9 @@ def main():
         subprocess.run([ffmpeg,'-v','error','-i',str(source/'fixture.mp4'),'-an','-c:v','copy',str(source/'browser-video.mp4')],check=True,timeout=30,capture_output=True)
         subprocess.run([ffmpeg,'-v','error','-i',str(source/'fixture.mp4'),'-vn','-c:a','copy',str(source/'browser-audio.m4a')],check=True,timeout=30,capture_output=True)
         with (source/'browser-video.mp4').open('ab') as large_video:large_video.write(struct.pack('>I4s',12*1024*1024+8,b'free')+bytes(12*1024*1024))
-        (source/'pause.mp4').write_bytes((source/'fixture.mp4').read_bytes()+struct.pack('>I4s',1024*1024+8,b'free')+bytes(1024*1024))
+        # Leave ample data beyond the helper's file buffer so the GUI can
+        # observe an on-disk partial before this controlled transfer finishes.
+        (source/'pause.mp4').write_bytes((source/'fixture.mp4').read_bytes()+struct.pack('>I4s',8*1024*1024+8,b'free')+bytes(8*1024*1024))
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=320x240:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=44100','-t','8','-c:v','mpeg2video','-b:v','1600k','-g','24','-c:a','mp2','-f','hls','-hls_time','1','-hls_playlist_type','vod','-hls_segment_filename','pause-seg%02d.ts','pause-stream.m3u8'],cwd=source,check=True,timeout=30,capture_output=True)
         (source/'collection.html').write_text('<html><title>Video collection</title><video src="fixture.mp4"></video><video src="broken.mp4"></video></html>',encoding='utf-8')
         (destination/'Videos'/'broken [broken].mp4').write_bytes(b'<html>No video here</html>')
@@ -76,7 +78,7 @@ def main():
                     try:
                         with file.open('rb') as body:
                             body.seek(start)
-                            while data:=body.read(4096):self.wfile.write(data);self.wfile.flush();time.sleep(.035)
+                            while data:=body.read(4096):self.wfile.write(data);self.wfile.flush();time.sleep(.005 if file.name=='pause.mp4' else .035)
                     except (BrokenPipeError,ConnectionResetError,OSError):pass
                     return
                 if self.path.startswith('/hls-') and (self.headers.get('Referer')!=f'http://127.0.0.1:{self.server.server_port}/embed/player' or self.headers.get('Origin')!='https://player.fixture.test' or self.headers.get('User-Agent')!='DownshiftMediaFixture/1.0'):

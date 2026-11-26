@@ -196,6 +196,9 @@ public static class DownshiftSetupManifest {
     Copy-Item -LiteralPath (Join-Path $install 'scripts/Video-Extractor.ps1') -Destination $failureScripts
     $failureLock=Get-Content -LiteralPath (Join-Path $install 'scripts/media-tools-lock.json') -Raw|ConvertFrom-Json
     foreach($asset in $failureLock.assets){$asset.url='https://127.0.0.1:9/no-upstream'}
+    # Fail a pinned dependency first; latest yt-dlp discovery deliberately ignores
+    # the historical extractor URL and must not start a real download here.
+    $failureLock.assets=@($failureLock.assets | Sort-Object name)
     $failureLock|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $failureScripts 'media-tools-lock.json') -Encoding utf8
     $failureDestination=Join-Path $failure 'media-tools';New-Item -ItemType Directory -Path $failureDestination | Out-Null
     $failureFile=Join-Path $failureDestination 'yt-dlp.exe';[IO.File]::WriteAllText($failureFile,'Existing helper must survive failed downloads.')

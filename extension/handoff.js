@@ -143,15 +143,14 @@ export class HandoffController {
     }
     // Check terminal native receipts before waking/opening the app. Recovery of
     // a discarded pre-Start request must not activate any window at sign-in.
-    try{
-      const receipt=await this.native('status',{key:record.key});
-      if(receipt.state==='aborted' || (receipt.state==='committed' && receipt.downloadStatus==='Removed')){
+    let previous;
+    try{previous=await this.native('status',{key:record.key});}catch{}
+      if(previous?.state==='aborted' || (previous?.state==='committed' && previous.downloadStatus==='Removed')){
         const item=await this.api.item(Number(id));
         if(this.state.enabled && item?.state==='in_progress')await this.api.cancel(Number(id));
         if(this.api.erase && item)await this.api.erase(Number(id));
         await this.finish(id,'Download dismissed.');return;
       }
-    }catch{}
     if(record.transport==='browser'){
       try{await this.api.browserCapture(id,record,await this.api.item(Number(id)),this);}
       catch{const item=await this.api.item(Number(id));if(item?.state==='in_progress' && !item.paused)try{await this.api.pause(Number(id));}catch{}this.state.notice='Connecting your download to Downshift…';await this.save();}

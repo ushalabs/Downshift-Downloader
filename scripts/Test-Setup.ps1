@@ -167,7 +167,7 @@ public static class DownshiftSetupManifest {
     $mediaOutput=Join-Path $testRoot 'media-output.txt';$mediaError=Join-Path $testRoot 'media-error.txt'
     $fixture=Join-Path (Split-Path $PSScriptRoot -Parent) 'tests/MediaIntegration.py'
     $process=Start-Process -FilePath $PythonExecutable -ArgumentList ('"'+$fixture+'" "'+$driver+'" "'+(Join-Path $testRoot 'media-shots')+'"') -WindowStyle Hidden -RedirectStandardOutput $mediaOutput -RedirectStandardError $mediaError -PassThru
-    if(!$process.WaitForExit(480000)){throw 'Installed video fixture timed out.'}
+    if(!$process.WaitForExit(780000)){throw 'Installed video fixture timed out.'}
     $videoLog=Get-Content -LiteralPath $mediaOutput -Raw
     if($process.ExitCode -ne 0){throw "Installed video acceptance failed: $videoLog $(Get-Content -LiteralPath $mediaError -Raw)"}
     Write-Host $videoLog

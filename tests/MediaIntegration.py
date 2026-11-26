@@ -117,7 +117,10 @@ def main():
             # Many real helper startups, pause/restart and two independent
             # browser-source transfers run sequentially. Keep each GUI wait
             # bounded while allowing the complete acceptance group to finish.
-            try:code=child.wait(timeout=420)
+            # Current upstream extractor startup plus the installed-update check
+            # adds work to this many-dialog suite. Individual GUI/transfer waits
+            # and every output hash/stream/duration assertion remain bounded.
+            try:code=child.wait(timeout=660)
             except subprocess.TimeoutExpired:
                 child.kill();child.wait();raise RuntimeError('Media driver timeout; last checkpoints: '+''.join(stderr[-8:]))
             finally:

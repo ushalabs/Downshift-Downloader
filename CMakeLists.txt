@@ -256,7 +256,7 @@ if(BUILD_TESTING)
     add_test(NAME gui.media COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/MediaIntegration.py" "$<TARGET_FILE:downshift_media_tests>"
         "${CMAKE_CURRENT_BINARY_DIR}/media-shots/$<CONFIG>")
-    set_tests_properties(gui.media PROPERTIES TIMEOUT 480 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
+    set_tests_properties(gui.media PROPERTIES TIMEOUT 780 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
     # Opt-in real Internet acceptance; never part of offline/CI fixture tests.
     add_executable(downshift_youtube_live_tests tests/YouTubeLiveTests.cpp)
     target_link_libraries(downshift_youtube_live_tests PRIVATE downshift_gui)

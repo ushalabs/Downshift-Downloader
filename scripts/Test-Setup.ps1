@@ -73,10 +73,13 @@ public static class DownshiftSetupManifest {
         # Verification-only cache seeding avoids re-downloading immutable archives
         # while still exercising the application's first-launch extraction/hash path.
         $archiveLock=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'media-tools-lock.json') -Raw | ConvertFrom-Json
+        . (Join-Path $PSScriptRoot 'Video-Extractor.ps1')
+        $currentExtractor=Get-LatestVideoExtractor
         $cache=Join-Path $videoHome 'media-cache';New-Item -ItemType Directory -Path $cache -Force | Out-Null
         foreach($asset in $archiveLock.assets){
             $source=Join-Path $MediaArchiveCache $asset.name
-            if((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLower() -ne $asset.sha256){throw 'Fixture archive checksum differs.'}
+            $expected=if($asset.name -eq 'yt-dlp.exe'){$currentExtractor.sha256}else{$asset.sha256}
+            if((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLower() -ne $expected){throw 'Fixture archive checksum differs.'}
             Copy-Item -LiteralPath $source -Destination $cache
         }
     }
@@ -104,7 +107,9 @@ public static class DownshiftSetupManifest {
         [IO.File]::WriteAllBytes($chromeScript,$chromeOriginal)
         Remove-Item -LiteralPath $firstLaunch -Force
     };$checks++
-    foreach($file in $mediaLock.files){if((Get-FileHash -LiteralPath (Join-Path $videoTools $file.name) -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "First-launch video install differs: $($file.name)"}};$checks++
+    $installedReceipt=Get-Content -LiteralPath (Join-Path $videoTools 'installed-files.json') -Raw | ConvertFrom-Json
+    if($installedReceipt.schema -ne 2 -or $installedReceipt.extractor.version -notmatch '^\d{4}\.\d{2}\.\d{2}' -or $installedReceipt.files.Count -ne $mediaLock.files.Count){throw 'Verified current video extractor receipt missing.'}
+    foreach($file in $installedReceipt.files){if((Get-FileHash -LiteralPath (Join-Path $videoTools $file.name) -Algorithm SHA256).Hash.ToLower() -ne $file.sha256){throw "First-launch video install differs: $($file.name)"}};$checks++
     if(Test-Path -LiteralPath (Join-Path $videoHome 'media-cache')){throw 'Successful first launch retained the download cache.'};$checks++
     # Standalone media drivers use app-local tools. Also create an older-install
     # receipt here to exercise legacy cleanup without touching per-user helpers.
@@ -188,6 +193,7 @@ public static class DownshiftSetupManifest {
     $failure=Join-Path $testRoot 'failed-bootstrap';$failureScripts=Join-Path $failure 'scripts'
     New-Item -ItemType Directory -Path $failureScripts | Out-Null
     Copy-Item -LiteralPath (Join-Path $install 'scripts/Install-MediaTools.ps1') -Destination $failureScripts
+    Copy-Item -LiteralPath (Join-Path $install 'scripts/Video-Extractor.ps1') -Destination $failureScripts
     $failureLock=Get-Content -LiteralPath (Join-Path $install 'scripts/media-tools-lock.json') -Raw|ConvertFrom-Json
     foreach($asset in $failureLock.assets){$asset.url='https://127.0.0.1:9/no-upstream'}
     $failureLock|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $failureScripts 'media-tools-lock.json') -Encoding utf8

@@ -45,7 +45,11 @@ def main():
             assert not host(exe,dict(version=1,command="prepare",**{**values,"url":url+"?other"}))[1]["ok"];checks+=1
             assert not host(exe,dict(version=1,command="commit",key=key,browserCancelled=False))[1]["ok"];checks+=1
             assert not host(exe,dict(version=1,command="commit",key=key,browserCancelled=True,browserNotStarted=True))[1]["ok"];checks+=1
-            close(p);p=start(driver,root);assert request(exe,"status",key=key)["state"]=="prepared";checks+=1
+            close(p);p=start(driver,root)
+            assert request(exe,"status",key=key)["state"]=="aborted" and rows(p)==[];checks+=1
+            assert request(exe,"prepare",**values)["state"]=="aborted" and rows(p)==[];checks+=1
+            # A new user download has a new identity and may proceed normally.
+            key=uuid.uuid4().hex;values['key']=key;accepted=request(exe,'prepare',**values)
             request(exe,"commit",key=key,browserCancelled=True);request(exe,"commit",key=key,browserCancelled=True)
             end=time.monotonic()+15
             while time.monotonic()<end:

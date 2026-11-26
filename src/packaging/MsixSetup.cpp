@@ -71,7 +71,7 @@ bool toolsReady(const QDir& destination) {
     const auto lock=readSetupFile(appDirectory().filePath("scripts/media-tools-lock.json"));
     const auto files=QJsonDocument::fromJson(lock).object().value("files").toArray();
     const auto receipt=QJsonDocument::fromJson(readSetupFile(destination.filePath("installed-files.json"))).object();
-    if(files.isEmpty() || receipt.value("schema").toInt()!=1 ||
+    if(files.isEmpty() || (receipt.value("schema").toInt()!=1 && receipt.value("schema").toInt()!=2) ||
         QDir::cleanPath(QDir::fromNativeSeparators(receipt.value("root").toString())).compare(destination.path(),Qt::CaseInsensitive)!=0 ||
         receipt.value("lockSha256").toString().toLatin1()!=QCryptographicHash::hash(lock,QCryptographicHash::Sha256).toHex())return false;
     for(const auto& file:files){
@@ -363,6 +363,10 @@ QString mediaToolsDirectory() {
 bool chromeSetupAvailable() {
     return installedSetup();
 }
+QString mediaToolsInstaller() {
+    return installedSetup() ? appDirectory().filePath("scripts/Install-MediaTools.ps1") : QString();
+}
+QString systemPowerShell() {return powershell();}
 
 bool finishFirstLaunchSetup() {
     static QPointer<QDialog> activeSetup;

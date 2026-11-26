@@ -36,7 +36,7 @@ Copy-Item -LiteralPath (Join-Path $root 'extension') -Destination $portable -Rec
 Copy-Item -Path (Join-Path $root 'packaging\*.cmd'),(Join-Path $root 'packaging\Read-me.txt') -Destination $portable
 Copy-Item -LiteralPath (Join-Path $root 'packaging/NSIS-LICENSE.txt') -Destination $portable
 $scripts=Join-Path $portable 'scripts';New-Item -ItemType Directory -Path $scripts | Out-Null
-foreach($script in @('Install-Portable.ps1','Uninstall-Portable.ps1','Register-BrowserHosts.ps1','Browser-Paths.ps1','Install-MediaTools.ps1','Uninstall-MediaTools.ps1','media-tools-lock.json','Open-ChromeSetup.ps1','chrome-setup-template.txt')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $scripts}
+foreach($script in @('Install-Portable.ps1','Uninstall-Portable.ps1','Register-BrowserHosts.ps1','Browser-Paths.ps1','Install-MediaTools.ps1','Video-Extractor.ps1','Uninstall-MediaTools.ps1','media-tools-lock.json','Open-ChromeSetup.ps1','chrome-setup-template.txt')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $scripts}
 $chromeInstructions=Get-Content -LiteralPath (Join-Path $scripts 'chrome-setup-template.txt') -Raw -Encoding utf8
 [IO.File]::WriteAllText((Join-Path $portable 'Chrome-setup.txt'),$chromeInstructions.Replace('{{EXTENSION_PATH}}','extension (inside the folder where you extracted Downshift)'),[Text.UTF8Encoding]::new($true))
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE'),(Join-Path $build 'build-source.json'),(Join-Path $root 'docs/TORRENTS.md') -Destination $portable

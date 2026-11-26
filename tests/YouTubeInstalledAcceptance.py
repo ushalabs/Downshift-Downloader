@@ -19,6 +19,11 @@ def main():
     driver, output = map(lambda value: pathlib.Path(value).resolve(), sys.argv[1:])
     tools = driver.parent / 'media-tools'
     lock = json.loads((driver.parent / 'scripts/media-tools-lock.json').read_text(encoding='utf-8-sig'))
+    receipt_path = tools / 'installed-files.json'
+    if receipt_path.exists():
+        receipt = json.loads(receipt_path.read_text(encoding='utf-8-sig'))
+        if receipt.get('schema') == 2:
+            lock['files'] = receipt['files']
     for entry in lock['files']:
         assert digest(tools / entry['name']) == entry['sha256'], entry['name']
     output.parent.mkdir(parents=True, exist_ok=True)

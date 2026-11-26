@@ -141,6 +141,17 @@ export class HandoffController {
         return;
       }
     }
+    // Check terminal native receipts before waking/opening the app. Recovery of
+    // a discarded pre-Start request must not activate any window at sign-in.
+    try{
+      const receipt=await this.native('status',{key:record.key});
+      if(receipt.state==='aborted' || (receipt.state==='committed' && receipt.downloadStatus==='Removed')){
+        const item=await this.api.item(Number(id));
+        if(this.state.enabled && item?.state==='in_progress')await this.api.cancel(Number(id));
+        if(this.api.erase && item)await this.api.erase(Number(id));
+        await this.finish(id,'Download dismissed.');return;
+      }
+    }catch{}
     if(record.transport==='browser'){
       try{await this.api.browserCapture(id,record,await this.api.item(Number(id)),this);}
       catch{const item=await this.api.item(Number(id));if(item?.state==='in_progress' && !item.paused)try{await this.api.pause(Number(id));}catch{}this.state.notice='Connecting your download to Downshift…';await this.save();}
@@ -224,10 +235,12 @@ export class HandoffController {
     }
   }
   candidate(item, event='change') {
+    const timestamp=Date.parse(item.startTime);
+    const restored=Number.isFinite(timestamp) && timestamp<this.startedAt-5000;
     if(item.filename){this.filenameHints.set(item.id,item.filename);if(this.filenameHints.size>1000)this.filenameHints.delete(this.filenameHints.keys().next().value);}
     // Wake outside the serialized receipt/preflight work, before awaiting Pause.
     // Never wake the app just because old completed history was restored.
-    if(this.api.wake && ['created','filename'].includes(event) && item.state==='in_progress')void (this.api.captureEnabled ? this.api.captureEnabled():Promise.resolve(this.state?.enabled!==false)).then(enabled=>enabled ? this.api.wake():undefined).catch(()=>{});
+    if(!restored && this.api.wake && ['created','filename'].includes(event) && item.state==='in_progress')void (this.api.captureEnabled ? this.api.captureEnabled():Promise.resolve(this.state?.enabled!==false)).then(enabled=>enabled ? this.api.wake():undefined).catch(()=>{});
     const early=this.strict && this.api.captureEnabled && this.state?.pending[item.id]?.transport!=='browser' && item.state==="in_progress" && !item.paused ? this.api.captureEnabled().then(async enabled=>{if(enabled)try{await this.api.pause(item.id);return true;}catch{}return false;}):Promise.resolve(false);
     return this.serial(async()=>{
     const held=await early;
@@ -236,11 +249,15 @@ export class HandoffController {
       await this.detachReused(String(item.id));
     if(this.state.pending[item.id]?.transport==='browser'){await this.run(String(item.id));return;}if(!this.state.enabled){if(held)try{await this.api.resume(item.id);}catch{}return;}
     if(!this.state.pending[item.id] && (this.state.finished || []).some(value=>value.id===item.id && value.startTime===item.startTime))return;
+    // Startup/filename restoration is not a new download request. Durable owned
+    // transfers still recover above/below; unknown older requests stay held and
+    // cannot create native prompts. Explicitly turning capture on can adopt them.
+    if(!this.state.pending[item.id] && restored && !this.captureExisting)return;
     // Chrome may announce restored history or update metadata for files saved
     // long ago. Completion is not evidence of a new download. Adopt a tiny
     // completed response only from its fresh creation/filename event; durable
     // pending receipts still recover independently of this gate.
-    const fresh=event==='filename' || (event==='created' && Number.isFinite(Date.parse(item.startTime)) && Date.parse(item.startTime)>=this.startedAt-5000);
+    const fresh=!restored && (event==='filename' || (event==='created' && Number.isFinite(timestamp)));
     if(item.state==='complete' && !this.state.pending[item.id] && !fresh)return;
     if(!this.state.enabled || (item.state!=="in_progress" && !(this.api.browserCapture && item.state==='complete')))return;
     if(this.state.pending[item.id]){await this.run(String(item.id));return;}
@@ -257,7 +274,7 @@ export class HandoffController {
     const discovered=this.api.active ? this.api.active().then(items=>Promise.all(items.map(item=>this.candidate(item)))):Promise.resolve();
     return discovered.then(()=>this.serial(async()=>{for(const id of Object.keys(this.state.pending))await this.run(id);await this.reconcileDirect();await this.cleanHistory();}));
   }
-  configure(enabled) {this.requestedEnabled=!!enabled;return this.serial(async()=>{this.state.enabled=!!enabled;await this.save();if(!enabled){for(const id of Object.keys(this.state.pending))try{await this.keep(id);}catch{}for(const id of this.state.overflow || [])try{await this.api.resume(id);}catch{}this.state.overflow=[];await this.save();}return this.summary();});}
+  configure(enabled) {this.requestedEnabled=!!enabled;this.captureExisting=!!enabled;return this.serial(async()=>{this.state.enabled=!!enabled;await this.save();if(!enabled){for(const id of Object.keys(this.state.pending))try{await this.keep(id);}catch{}for(const id of this.state.overflow || [])try{await this.api.resume(id);}catch{}this.state.overflow=[];await this.save();}return this.summary();});}
   summary() {return {enabled:this.state.enabled,pending:Object.keys(this.state.pending).length+(this.state.direct || []).length,notice:this.state.notice};}
   status() {return this.serial(async()=>{let connected=false,appVersion="";try{const app=await this.native("ping");connected=app.state==="ready";appVersion=app.appVersion || "";}catch{}return {...this.summary(),connected,appVersion};});}
   leave() {return this.configure(false);}

@@ -30,10 +30,20 @@ export class BrowserTransfers {
     if(!item){await controller.finish(id,'Download removed.');return;}
     if(item.danger && !['safe','accepted','allowlistedByPolicy','deepScannedSafe'].includes(item.danger))throw Error('Waiting for Chrome’s security check.');
     if(record.phase!=='browser-streaming'){
+      const old=await controller.native('status',{key:record.key});
+      if(old.state==='aborted' || (old.state==='committed' && old.downloadStatus==='Removed')){
+        if(item.state==='in_progress')await this.api.cancel(Number(id));
+        await this.api.erase(Number(id));await controller.finish(id,'Download dismissed.');return;
+      }
       const app=await this.api.ensureApp();if(!app.capabilities?.browserTransfer)throw Error('Open the updated Downshift app to receive this download.');
       const filename=safeFilename(item.filename || controller.filenameHints.get(Number(id)) || 'download.bin');
       const receipt=await controller.native('browser-prepare',{key:record.key,url:browserSource(item),filename,total:String(item.totalBytes ?? -1),mime:String(item.mime || '').slice(0,120)});
-      if(receipt.state==='aborted'){record.key=this.api.key();record.phase='browser-preparing';await controller.save();return;}
+      if(receipt.state==='aborted' || receipt.downloadStatus==='Removed'){
+        // A closed/recovered prompt is terminal. A fresh key would resurrect it
+        // on every browser/app restart without another user download click.
+        if(item.state==='in_progress')await this.api.cancel(Number(id));
+        await this.api.erase(Number(id));await controller.finish(id,'Download dismissed.');return;
+      }
       record.browserCommitSent=true;await controller.save();
       const committed=await controller.native('commit',{key:record.key,browserTransport:true,prompt:true});
       if(committed.state!=='committed')throw Error('Waiting for Downshift to confirm this transfer.');

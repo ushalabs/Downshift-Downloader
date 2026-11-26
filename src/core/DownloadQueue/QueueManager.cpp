@@ -141,8 +141,12 @@ void QueueManager::initialize() {
         try{store_->backup();backupWarning_.clear();}catch(const std::exception& error){backupWarning_=QString::fromUtf8(error.what());}
         // Unconfirmed prompts are not resumable tasks. Keep their receipts so a
         // retried browser notification cannot recreate a dismissed prompt.
-        for(const auto& e:entries_)if(e.awaitingConfirmation)store_->erase(e.id);
-        std::erase_if(entries_,[](const auto& e){return e.awaitingConfirmation;});
+        for(const auto& e:entries_)if(e.awaitingConfirmation || e.status==QueueStatus::Prepared){
+            auto receipt=receipts_.at(e.handoffKey);receipt["state"]="aborted";
+            store_->dismissHandoff(e.id,e.handoffKey,QJsonDocument(receipt).toJson(QJsonDocument::Compact));
+            receipts_[e.handoffKey]=receipt;
+        }
+        std::erase_if(entries_,[](const auto& e){return e.awaitingConfirmation || e.status==QueueStatus::Prepared;});
         for(auto& e:entries_){
             if(!e.media && !e.browserTransfer && !youtubeVideo(e.url).isEmpty() && e.status!=QueueStatus::Failed && e.status!=QueueStatus::Cancelled) {e.status=QueueStatus::Failed;e.error="This earlier attempt used a YouTube webpage rather than video streams. Choose Retry video. Existing files are preserved.";save(e);}
             if(e.media&&e.mediaStaged&&validMediaResume(e.videoMetadata.value("resumeRecipe").toObject())&&(e.status==QueueStatus::Running||e.status==QueueStatus::Queued)){e.status=QueueStatus::Paused;e.error="Video interrupted. Choose Resume to continue its retained partial files.";save(e);}
@@ -250,7 +254,9 @@ std::future<void> QueueManager::dismissPrompt(QString id) {
         if(found==entries_.end() || !found->awaitingConfirmation || workers_.contains(id))return;
         // No destination bytes have been started. Preserve any original browser
         // response file, which may be its only received copy.
-        store_->erase(id);
+        auto receipt=receipts_.at(found->handoffKey);receipt["state"]="aborted";
+        store_->dismissHandoff(id,found->handoffKey,QJsonDocument(receipt).toJson(QJsonDocument::Compact));
+        receipts_[found->handoffKey]=receipt;
         entries_.erase(found);
     });
 }

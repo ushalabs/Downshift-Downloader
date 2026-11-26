@@ -4,9 +4,10 @@ Developed by UshaLabs
 WINDOWS SETUP
 Run Downshift-1.0.0-Setup-x64.exe. It installs the app for all Windows
 users. Open Downshift from the Desktop or Start menu. On the first launch,
-Downshift automatically downloads and verifies about 135 MiB of required
-video tools. If setup fails, check your connection and choose Retry.
-Later launches reuse the installed tools. Downloads and history are kept.
+Downshift automatically downloads and verifies the latest stable yt-dlp and
+required video tools. If setup fails, check your connection and choose Retry.
+Before opening a video, Downshift checks for extractor updates at most once
+per day. Downloads and history are kept.
 
 Choose "Set up Chrome" while the tools download. Downshift opens Chrome
 Extensions and copies the exact folder path. Turn on Developer mode, choose

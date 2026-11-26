@@ -219,11 +219,11 @@ It is being developed as both a usable application and a strong portfolio projec
 
 ## Code signing policy
 
-Downshift is preparing an application for free open-source signing through
-SignPath Foundation. Publicly trusted signing is pending approval. The current
-manual MSIX uses a local UshaLabs signing certificate. See the
+The manual Windows installer is an unsigned NSIS EXE. Publicly trusted signing
+is not currently available. The older manual MSIX uses a local UshaLabs signing
+certificate. See the
 [code signing policy](docs/CODE_SIGNING.md) for maintainer roles, release provenance,
-privacy information, and the proposed SignPath attribution.
+and privacy information.
 
 ## Repository Structure
 

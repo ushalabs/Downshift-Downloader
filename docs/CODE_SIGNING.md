@@ -2,12 +2,14 @@
 
 ## Current status
 
-Downshift is preparing an application to SignPath Foundation for its free
-open-source signing program. Acceptance and publicly trusted signing are pending.
+The free SignPath Foundation application was declined. Downshift is not signed
+by SignPath Foundation and does not currently have publicly trusted code signing.
+The manual NSIS installer is unsigned; Windows may show a SmartScreen warning.
 The current manual MSIX uses a local UshaLabs certificate and requires explicit
 certificate trust on each computer, as explained in the release instructions.
 
-If accepted, the signing attribution will be:
+The previous application proposed this attribution, which does not describe
+the current unsigned distribution:
 
 Free code signing provided by [SignPath.io](https://about.signpath.io), certificate
 by [SignPath Foundation](https://signpath.org).

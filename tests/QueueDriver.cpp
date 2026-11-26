@@ -18,6 +18,9 @@ int main(int argc,char** argv) {
             else if(op=="add") response["id"]=queue.add(command.value("url").toString(),command.value("destination").toString(),command.value("priority").toInt(),command.value("start").toBool(true),command.value("sha256").toString(),command.value("speedLimit").toString().toULongLong()).get();
             else if(op=="action") queue.action(command.value("id").toString(),static_cast<downshift::QueueAction>(command.value("action").toInt())).get();
             else if(op=="rename") queue.rename(command.value("id").toString(),command.value("destination").toString()).get();
+            else if(op=="prepare")response=queue.prepare(command.value("key").toString(),command.value("url").toString(),command.value("filename").toString(),{}).get();
+            else if(op=="handoff")response=queue.handoff(command.value("key").toString(),command.value("command").toString(),command.value("prompt").toBool()).get();
+            else if(op=="dismiss")queue.dismissPrompt(command.value("id").toString()).get();
             else if(op=="configure") queue.configure(downshift::QueueSettings::fromJson(command.value("settings").toObject())).get();
             else if(op=="snapshot") {
                 const auto snapshot=queue.snapshot().get(); QJsonArray rows;

@@ -18,6 +18,7 @@ public:
     void settings(const QByteArray& json);
     std::vector<QByteArray> receipts();
     void handoff(const QString& id,const QByteArray& entry,const QString& key,const QByteArray& receipt);
+    void dismissHandoff(const QString& id,const QString& key,const QByteArray& receipt);
     void backup();
     void verifyEmptyHistory();
 private:

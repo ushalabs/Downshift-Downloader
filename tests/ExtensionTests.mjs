@@ -113,7 +113,7 @@ for(const event of ['change','created']){
  await f.controller.candidate(f.item,'filename');check(imports===1,'A delayed duplicate event after worker restart cannot recapture a finished response');
 }
 for(const previous of [1,{id:1,startTime:'2026-11-03T10:00:00Z'}]){
- const f=fixture();f.api.strict=true;f.item.startTime='2026-11-04T10:00:00Z';f.saved.finished=[previous];
+ const f=fixture();f.api.strict=true;f.item.startTime=new Date().toISOString();f.saved.finished=[previous];
  f.controller=new HandoffController(f.api);
  await f.controller.candidate(f.item,'created');
  check(f.commits===1,'A reused Chrome ID hands off the new download on its first event');
@@ -129,7 +129,7 @@ for(const previous of [1,{id:1,startTime:'2026-11-03T10:00:00Z'}]){
  check(f.commits===1,'A released download can be captured when capture is turned back on');
 }
 {
- const f=fixture();f.api.strict=true;f.item.startTime='2026-11-04T10:00:00Z';
+ const f=fixture();f.api.strict=true;f.item.startTime=new Date().toISOString();
  f.saved.pending[1]={key:'f'.repeat(32),phase:'browser-streaming',transport:'browser',startTime:'2026-11-03T10:00:00Z'};
  f.saved.cleanup=[{id:1,startTime:'2026-11-03T10:00:00Z'}];
  let erased=0;f.api.erase=async()=>{erased++;};
@@ -160,5 +160,11 @@ for(const previous of [1,{id:1,startTime:'2026-11-03T10:00:00Z'}]){
 }
 {
  let calls=0;const launcher=new AppLauncher(async()=>{calls++;return {ok:false,error:'not installed'};},'1.0.0');await assert.rejects(launcher.ensure());check(calls===1,'A missing installation fails promptly instead of blocking configuration for a minute');
+}
+for(const event of ['created','filename','change']){
+ const f=fixture();f.api.strict=true;f.item.startTime='2025-08-14T05:17:36Z';f.item.paused=true;
+ let wake=0;f.api.wake=async()=>{wake++;};f.api.active=async()=>[structuredClone(f.item)];f.controller=new HandoffController(f.api);
+ await f.controller.candidate(f.item,event);await f.controller.reconcile();
+ check(f.commits===0 && wake===0 && !Object.keys(f.saved.pending).length,'An unknown restored paused request never reopens a native save dialog');
 }
 console.log(`Extension state checks passed: ${checks}`);

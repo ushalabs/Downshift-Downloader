@@ -112,6 +112,16 @@ void QueueStore::handoff(const QString& id,const QByteArray& entry,const QString
     try { save(id,entry);Statement s(db_,"INSERT INTO handoffs(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload");s.text(1,key);s.blob(2,protect(receipt,true));s.done();exec(db_,"COMMIT"); }
     catch(...) { sqlite3_exec(db_,"ROLLBACK",nullptr,nullptr,nullptr);throw; }
 }
+void QueueStore::dismissHandoff(const QString& id,const QString& key,const QByteArray& receipt) {
+    exec(db_,"BEGIN IMMEDIATE");
+    try {
+        Statement row(db_,"DELETE FROM downloads WHERE id=?1");row.text(1,id);row.done();
+        Statement count(db_,"SELECT count(*) FROM downloads");if(sqlite3_step(count.value)!=SQLITE_ROW)failure();
+        if(sqlite3_column_int64(count.value,0)==0){Statement marker(db_,"INSERT OR REPLACE INTO queue_meta(key,payload) VALUES('empty_intent',?1)");marker.blob(1,protect("{\"version\":1,\"intentional\":true}",true));marker.done();}
+        Statement s(db_,"INSERT INTO handoffs(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload");s.text(1,key);s.blob(2,protect(receipt,true));s.done();exec(db_,"COMMIT");
+    }
+    catch(...) { sqlite3_exec(db_,"ROLLBACK",nullptr,nullptr,nullptr);throw; }
+}
 void QueueStore::backup() {
     const auto folder=path_+".backups";
     if(!QDir().mkpath(folder))throw std::runtime_error("History is saved, but its backup folder is unavailable.");

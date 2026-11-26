@@ -10,5 +10,7 @@ QString stateDirectory();
 QString mediaToolsDirectory();
 bool finishFirstLaunchSetup();
 bool chromeSetupAvailable();
+QString mediaToolsInstaller();
+QString systemPowerShell();
 void showSetup(QWidget* parent);
 }

@@ -1,5 +1,33 @@
 # Downshift development progress
 
+## Startup prompt recovery and current video extractor (2026-11-26)
+
+Recovery previously discarded only committed prompts. A browser request still in
+Prepared state could survive app exit, then be committed again at sign-in. The
+response bridge also minted another key for an aborted request, while startup
+discovery could adopt older paused browser items. Unstarted entries now leave an
+atomic aborted receipt, including Prepared entries recovered at startup. The
+extension checks terminal receipts before opening the app and does not turn old
+restoration events into new save prompts. Confirmed transfers and their files
+retain their existing recovery behavior.
+
+First launch now resolves the current official stable yt-dlp release and checks
+its official SHA-256 before installing it. A video-open update check refreshes
+existing installations at most once per day without running inside a transfer.
+Verified working installations remain usable during an offline check. Dynamic
+extractor hashes/version are recorded alongside the pinned Deno/FFmpeg inventory.
+The real fresh install resolved and ran yt-dlp 2026.11.23. Upgrade/hash-failure,
+daily-cache and offline fixtures passed in Windows PowerShell and PowerShell 7.
+Native queue, GUI, storage and browser recovery tests passed, including replay of
+closed and pre-Commit requests; extension and browser compatibility tests passed.
+Package lifecycle/media acceptance is recorded separately with the built setup.
+
+The supplied NiaziTV episode played in the verification browser, but anonymous
+native page/stream checks returned HTTP 403 even with the new extractor and media
+request headers. This is a separate source-access limitation; the updater repair
+does not establish a successful native download of that episode. No DRM, cookie
+export, certificate or rate-limit bypass was added.
+
 ## NSIS release verification (2026-11-13)
 
 The first two remote release-verification attempts failed at the torrent recovery fixture's Pause assertion, which counted relay socket accepts after requesting asynchronous native Pause. As with the existing completion check, Qt can accept an already-started connection late. The fixture now waits for native paused/disconnected state, then monitors paused intent, peers and both payload counters throughout the accelerated recovery window. It retains verified-progress, resumed final SHA-256 and other-torrent checks, and reports late relay accepts diagnostically. The corrected fixture passed locally. Application, HTTP/media and torrent engine source are unchanged; publication remains gated on remote Release/Debug verification.

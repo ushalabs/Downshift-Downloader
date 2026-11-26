@@ -31,6 +31,10 @@
 namespace downshift {
 namespace {
 QString redacted(QString text) {
+    // Prefer the actual site failure over ancillary warnings and CLI help.
+    const auto lines=text.split('\n');QStringList failures;
+    for(const auto& line:lines)if(line.trimmed().startsWith("ERROR:"))failures.append(line.trimmed());
+    if(!failures.isEmpty())text=failures.join('\n');
     // Helper stderr may contain signed links. Keep errors in memory and redact addresses.
     const auto words=text.split(' ');QStringList safe;
     for(const auto& word:words)safe.append(word.contains("http://") || word.contains("https://") ? "[address]":word);
@@ -110,7 +114,26 @@ QByteArray MediaDialog::browserInfo() const {
     const auto json=QString::fromUtf8(QJsonDocument(QJsonObject{{"_type","video"},{"id",video.value("id")},{"title",title_->text()},{"duration",video.value("duration")},{"extractor","DownshiftBrowser"},{"extractor_key","Generic"},{"formats",formats}}).toJson(QJsonDocument::Compact));
     QByteArray ascii;for(const auto c:json){if(c.unicode()<128)ascii.append(static_cast<char>(c.unicode()));else ascii.append(QString("\\u%1").arg(static_cast<unsigned>(c.unicode()),4,16,QChar('0')).toLatin1());}return ascii;
 }
-void MediaDialog::inspect(){inspectSource(false);}
+void MediaDialog::inspect(){
+    if(updater_.state()!=QProcess::NotRunning)return;
+    const auto installer=msix::mediaToolsInstaller();
+    if(!extractorChecked_ && !installer.isEmpty()){
+        extractorChecked_=true;
+        updater_.disconnect(this);
+        status_->setText("Checking for video support updates…");progress_->setRange(0,0);download_->setEnabled(false);
+        updater_.setProcessChannelMode(QProcess::MergedChannels);
+        updater_.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* values){values->flags|=CREATE_NO_WINDOW;});
+        connect(&updater_,&QProcess::readyRead,this,[this]{const auto text=QString::fromUtf8(updater_.readAll());if(text.contains("Downloading"))status_->setText("Updating video support…");});
+        connect(&updater_,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this](int code,QProcess::ExitStatus result){
+            if(result!=QProcess::NormalExit || code!=0){extractorChecked_=false;retryable("Video support could not be updated safely. Check your connection, close other video downloads if needed, and retry.");return;}
+            inspectSource(false);
+        });
+        connect(&updater_,&QProcess::errorOccurred,this,[this](QProcess::ProcessError error){if(error==QProcess::FailedToStart){extractorChecked_=false;retryable("Windows could not start the video support update. Retry the check.");}});
+        updater_.start(msix::systemPowerShell(),{"-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",installer,"-Destination",tools_,"-CacheDirectory",QDir(tools_).absoluteFilePath("../media-cache"),"-RemoveDownloadCache","-RefreshExtractorOnly"});
+        return;
+    }
+    inspectSource(false);
+}
 void MediaDialog::inspectSource(bool browserSource){
     if(process_.state()!=QProcess::NotRunning || persisting_)return;
     browserSource_=browserSource;

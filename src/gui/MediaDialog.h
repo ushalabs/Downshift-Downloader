@@ -12,7 +12,7 @@ class QProgressBar;
 class QPushButton;
 namespace downshift {
 class DownloadSizeProbe;
-// Site extraction and stream merging are delegated to pinned, local media helpers.
+// Site extraction uses the verified current stable yt-dlp and local media tools.
 // QProcess is asynchronous: no network or file work blocks the desktop event loop.
 class MediaDialog final : public QDialog {
 public:
@@ -25,7 +25,7 @@ public:
     bool canPause() const {return !metadata_&&!verifying_&&!transferFinished_&&!paused_&&!pauseRequested_&&!persisting_&&!historyId_.isEmpty()&&process_.state()==QProcess::Running;}
     bool paused() const {return paused_;}
     void present(){if(!historyId_.isEmpty()||retained_)return;closeAfter_=false;showNormal();raise();activateWindow();}
-    bool active() const {return persisting_||(!paused_&&!historyId_.isEmpty())||process_.state()!=QProcess::NotRunning;}
+    bool active() const {return persisting_||(!paused_&&!historyId_.isEmpty())||process_.state()!=QProcess::NotRunning||updater_.state()!=QProcess::NotRunning;}
     void setDownloadName(const QString& name);
     void refreshBrowserSource(const QJsonObject& context);
     void reject() override {if(active()){closeAfter_=true;hide();}else QDialog::reject();}
@@ -55,6 +55,8 @@ private:
     QJsonObject metadataInfo_,context_;
     QJsonArray sizeFormats_;
     QProcess process_;
+    QProcess updater_;
+    bool extractorChecked_=false;
     QTimer deadline_;
     QByteArray output_,errors_,helperInput_;
     bool metadata_=true,cancelled_=false,closeAfter_=false,ready_=false,verifying_=false,persisting_=false;

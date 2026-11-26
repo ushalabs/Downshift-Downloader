@@ -41,6 +41,22 @@ def main():
     url=f"http://127.0.0.1:{server.server_port}/range"
     with workspace() as tmp:
         root=pathlib.Path(tmp); db=root/"queue.sqlite"
+        # A crash before Commit is also an unconfirmed request. Neither native
+        # replay nor a reopened browser may recreate its prompt with the same key.
+        prompts=root/'prompts.sqlite';p=Driver(exe,prompts)
+        p.call('configure',settings={**p.call('snapshot')['settings'],'directory':str(root)})
+        key='a'*32
+        pending=p.call('prepare',key=key,url=url,filename='unstarted.bin')['downloadId']
+        p.close();p=Driver(exe,prompts)
+        assert p.rows()==[] and p.call('handoff',key=key,command='commit',prompt=True)['state']=='aborted'
+        assert p.call('prepare',key=key,url=url,filename='unstarted.bin')['state']=='aborted';checks+=2
+        key='b'*32
+        pending=p.call('prepare',key=key,url=url,filename='dismissed.bin')['downloadId']
+        p.call('handoff',key=key,command='commit',prompt=True);p.call('dismiss',id=pending)
+        assert p.rows()==[] and p.call('handoff',key=key,command='commit',prompt=True)['state']=='aborted'
+        p.close();p=Driver(exe,prompts)
+        assert p.rows()==[] and p.call('prepare',key=key,url=url,filename='dismissed.bin')['state']=='aborted'
+        p.close();checks+=2
         # Unlimited must start more than the former sixteen-task maximum, including
         # same-site downloads queued while a user-selected limit was enabled.
         unlimited_db=root/'unlimited.sqlite'

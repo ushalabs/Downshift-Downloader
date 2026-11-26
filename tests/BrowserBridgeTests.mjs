@@ -41,6 +41,12 @@ check(browserSource({url:'data:application/octet-stream;base64,'+'A'.repeat(1000
  let onMessage,onDisconnect;const sent=[];const port={onMessage:{addListener:f=>{onMessage=f;}},onDisconnect:{addListener:f=>{onDisconnect=f;}},postMessage:m=>{sent.push(m.number);queueMicrotask(()=>onMessage({ok:true,number:m.number}));},disconnect:()=>onDisconnect()};
  const connection=new NativeConnection(()=>port);const replies=await Promise.all([connection.request({number:1}),connection.request({number:2})]);clearTimeout(connection.idle);check(sent.join(',')==='1,2' && replies.map(r=>r.number).join(',')==='1,2','Persistent native connection preserves request/reply order');
 }
+{
+ const f=fixture();const key=f.record.key;
+ f.controller.native=async command=>{f.log.push(command);return {state:'aborted',downloadStatus:'Removed'};};
+ await f.bridge.run('7',f.record,f.item,f.controller);
+ check(f.record.key===key && f.finished==='Download dismissed.' && f.log.includes('cancel') && !f.log.includes('commit'),'A discarded receipt cancels the owned browser transport without minting a new request');
+}
 console.log(`Browser bridge checks passed: ${checks}`);
 
 {

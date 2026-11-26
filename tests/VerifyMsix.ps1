@@ -153,6 +153,8 @@ try{
     Write-Host $result.firstLaunch
     Write-Host "Windows StartupTask state after first activation: $($result.signInStartup)"
     $toolLock=Get-Content -LiteralPath (Join-Path $payload 'scripts/media-tools-lock.json') -Raw | ConvertFrom-Json
+    $toolReceipt=Get-Content -LiteralPath (Join-Path $state 'media-tools/installed-files.json') -Raw | ConvertFrom-Json
+    if($toolReceipt.schema -eq 2){$toolLock.files=$toolReceipt.files}
     foreach($file in $toolLock.files){
         if((Get-FileHash -LiteralPath (Join-Path $state ('media-tools/'+$file.name)) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256){throw "MSIX helper differs: $($file.name)"}
     }

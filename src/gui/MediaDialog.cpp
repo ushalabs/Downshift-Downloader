@@ -206,7 +206,12 @@ void MediaDialog::finished(int code,QProcess::ExitStatus exitStatus) {
         // Some extractors expose one real stream with no formats/resolution list.
         // Accept that stream as default; missing quality metadata is not a failure.
         if(formats.isEmpty() && !info.value("url").toString().isEmpty())formats.append(info);
-        for(const auto& value:formats) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString(),audio=format.value("acodec").toString();const QUrl source(format.value("url").toString());if(format.value("has_drm").toBool() || codec=="images" || format.value("protocol")=="mhtml" || !source.isValid() || source.host().isEmpty() || !source.userInfo().isEmpty() || (source.scheme()!="https" && source.scheme()!="http"))continue;sizeFormats_.append(format);if(!audio.isEmpty() && audio!="none")audioAvailable=true;if(codec=="none")continue;playable=true;if(!codec.isEmpty() && audio=="none")silentVideo=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
+        for(const auto& value:formats) {const auto format=value.toObject();const auto codec=format.value("vcodec").toString(),audio=format.value("acodec").toString();const QUrl source(format.value("url").toString());if(format.value("has_drm").toBool() || codec=="images" || format.value("protocol")=="mhtml" || !source.isValid() || source.host().isEmpty() || !source.userInfo().isEmpty() || (source.scheme()!="https" && source.scheme()!="http"))continue;sizeFormats_.append(format);
+            // HLS EXT-X-MEDIA audio renditions can omit the codec label.
+            // vcodec=none still identifies an audio-only track; only the
+            // explicit acodec=none value means there is no audio.
+            if(audio!="none" && (codec=="none" || !audio.isEmpty()))audioAvailable=true;
+            if(codec=="none")continue;playable=true;if(!codec.isEmpty() && audio=="none")silentVideo=true;const auto height=format.value("height").toInt();if(height>0)heights.insert(height);}
         if(info.isEmpty() || info.value("_type")=="playlist" || info.value("_type")=="multi_video" || !playable || info.value("has_drm").toBool() || info.value("is_live").toBool()) {
             retryable(info.value("_type")=="playlist" || info.contains("entries") ? "This address is a feed or playlist, not one video. Open the video and use its player button, or paste its watch link.":"No downloadable video formats were found. Try a public recorded video link.");
         }
@@ -288,7 +293,7 @@ void MediaDialog::updateSize() {
             const auto f=value.toObject();
             if(hls && !f.value("protocol").toString().startsWith("m3u8"))continue;
             const auto v=f.value("vcodec").toString(),a=f.value("acodec").toString();
-            if(v=="none"){if(!a.isEmpty() && a!="none")audio=f;continue;}
+            if(v=="none"){if(a!="none")audio=f;continue;}
             if(height && f.value("height").toInt()!=height)continue;
             video=f;
             if(a!="none" && !a.isEmpty())combined=f;

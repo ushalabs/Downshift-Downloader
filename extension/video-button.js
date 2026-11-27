@@ -141,7 +141,8 @@
           if(prepared){videoPage='https://www.youtube.com/watch?v='+prepared.id;browserPrepared=true;}
         }
         const playerCount=[...document.querySelectorAll('video')].filter(v=>v.isConnected && v.getBoundingClientRect().width>=120 && v.getBoundingClientRect().height>=70).length;
-        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, browserPrepared, source:clickedSource(video), userAgent:navigator.userAgent, playerCount, protected:!!video?.mediaKeys, title:document.title.slice(0,200)});
+        const referrerPolicy=(video?.getAttribute('referrerpolicy')||document.referrerPolicy||'').toLowerCase();
+        const answer = await chrome.runtime.sendMessage({type:"media", page:location.href, videoPage, browserPrepared, source:clickedSource(video), referrerPolicy:referrerPolicy==='no-referrer'?'no-referrer':undefined, userAgent:navigator.userAgent, playerCount, protected:!!video?.mediaKeys, title:document.title.slice(0,200)});
         notice.textContent = answer?.ok ? "Choose quality in Downshift." : answer?.error || "Open Downshift and try again.";
         if(answer?.ok)record.noticeTimer=setTimeout(()=>{notice.textContent='';},4000);
       } catch(error) { notice.textContent = error?.message || "Reload this page after reloading the Downshift extension."; }

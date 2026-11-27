@@ -43,6 +43,9 @@ def main():
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i',str(source/'fixture.mp4'),'-an','-c:v','copy','-f','dash','-remove_at_exit','0','stream.mpd'],cwd=silent,check=True,timeout=30,capture_output=True)
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-c:v','mpeg2video','-c:a','mp2','-f','hls','-hls_playlist_type','vod','-hls_segment_filename','hls-%03d.ts','hls-default.txt'],cwd=source,check=True,timeout=30,capture_output=True)
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-vf','scale=160:120','-c:v','mpeg2video','-c:a','mp2','-f','hls','-hls_playlist_type','vod','-hls_segment_filename','hls-small-%03d.ts','hls-small.txt'],cwd=source,check=True,timeout=30,capture_output=True)
+        subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-an','-c:v','copy','-f','hls','-hls_segment_type','fmp4','-hls_playlist_type','vod','-hls_segment_filename','separate-video-%03d.m4s','separate-video.m3u8'],cwd=source,check=True,timeout=30,capture_output=True)
+        subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-i','fixture.mp4','-vn','-c:a','aac','-f','hls','-hls_playlist_type','vod','-hls_segment_filename','separate-audio-%03d.ts','separate-audio.m3u8'],cwd=source,check=True,timeout=30,capture_output=True)
+        (source/'separate-master.m3u8').write_text('#EXTM3U\n#EXT-X-MEDIA:NAME="Audio",TYPE=AUDIO,GROUP-ID="audio",AUTOSELECT=YES,URI="separate-audio.m3u8"\n#EXT-X-STREAM-INF:BANDWIDTH=500000,RESOLUTION=320x240,CODECS="mp4a.40.2,mp4v.20.9",AUDIO="audio"\nseparate-video.m3u8\n',encoding='utf-8')
         (source/'hls-master.txt').write_text('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100000,RESOLUTION=160x120\nhls-small.txt\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=320x240\nhls-default.txt\n',encoding='utf-8')
         # A long manifest expands to megabytes of extractor fragment metadata,
         # even though quality selection needs only a few format fields.
@@ -106,6 +109,10 @@ def main():
             old_failure=subprocess.run([str(tools/'yt-dlp.exe'),'--ignore-config','--no-plugin-dirs','--check-formats','--skip-download','--load-info-json','-'],input=json.dumps(old_info),capture_output=True,text=True,encoding='utf-8',timeout=30,env=environment)
             assert old_failure.returncode!=0 and "KeyError: 'extractor'" in old_failure.stderr,old_failure.stderr[-800:]
             print('Original descriptor failure independently reproduced: rejected format causes missing-extractor KeyError.')
+            separate=subprocess.run([str(tools/'yt-dlp.exe'),'--ignore-config','--no-plugin-dirs','--skip-download','--print','%(formats.:.{vcodec,acodec,height})j',f'http://127.0.0.1:{server.server_port}/separate-master.m3u8'],capture_output=True,text=True,encoding='utf-8',check=True,timeout=30,env=environment)
+            separate_formats=json.loads(separate.stdout)
+            assert any(f.get('vcodec')=='none' and not f.get('acodec') for f in separate_formats),'Fixture must reproduce codec-unlabeled HLS audio'
+            assert any(f.get('height')==240 and f.get('vcodec') not in (None,'none') for f in separate_formats),'Fixture video codec must be recognized'
             child=subprocess.Popen([str(exe),str(destination),f'http://127.0.0.1:{server.server_port}',sys.argv[2]],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',env=environment)
             stdout=[];stderr=[];read_errors=[]
             def drain(pipe,lines,live):
@@ -130,6 +137,10 @@ def main():
             assert not read_errors,read_errors
             print(''.join(stdout),end='');assert code==0,''.join(stderr)
             if not os.environ.get("DOWNSHIFT_MEDIA_PAUSE_ONLY"):
+                separate_files=list((destination/'separate-hls').glob('*.mkv'));assert len(separate_files)==1,separate_files
+                separate_info=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(separate_files[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
+                assert {'audio','video'}<={s['codec_type'] for s in separate_info['streams']} and 1.8<float(separate_info['format']['duration'])<2.3
+                print('Separate HLS audio with an unknown codec label is merged and independently verified with video.')
                 browser_files=list((destination/'browser-youtube').glob('*.mkv'));assert len(browser_files)==1,browser_files
                 info=json.loads(subprocess.run([probe,'-v','error','-show_streams','-show_format','-of','json',str(browser_files[0])],capture_output=True,text=True,check=True,timeout=20).stdout)
                 assert {'audio','video'}<={s['codec_type'] for s in info['streams']} and 1.8<float(info['format']['duration'])<2.3

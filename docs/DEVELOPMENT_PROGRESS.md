@@ -1,5 +1,37 @@
 # Downshift development progress
 
+## Preserve no-referrer video requests (2026-11-27)
+
+The NiaziPlay player explicitly uses no-referrer playback. For the same freshly
+resolved stream URL, a native request with an invented page Referer returned
+HTTP 403; omitting that header returned HTTP 200 and a valid HLS master. Origin
+alone did not cause the refusal. This was a request-context bug, separate from
+the outdated extractor. The previous diagnosis below did not isolate it.
+
+Media capture now distinguishes an observed missing header from unavailable
+request headers. An absent Referer in a successful browser request stays absent
+through manifest observation and native handoff. Before playback, the clicked
+video's no-referrer policy supplies the same bounded hint. An observed real
+Referer still takes precedence for players that require it. No site names,
+cookies, authorization headers or signed-link rewriting are added.
+
+The first complete public transfer then exposed a separate audio-selection bug:
+the HLS master declares audio-only renditions with vcodec=none but no acodec
+label. The form treated that missing label as missing audio and selected only
+video. Audio-only renditions with an unknown codec are now retained in format
+selection and size calculation; acodec=none still means no audio. The same shape
+is covered by a real local HLS master with separate tracks, followed by independent
+audio/video/container/duration verification. Genuine silent sources remain
+supported. Final public acceptance requires both audio and video.
+
+Unit coverage includes absent/present/unknown headers, manifest replay, policy
+hints, and replacing a previous header with an observed absence. An isolated
+Chrome fixture exercises the production video button, worker, native message,
+Qt dialog and HLS transfer against a server that rejects any Referer; its real
+quality, audio/video, duration and persisted context are independently checked.
+Public full-episode verification and final package acceptance are recorded
+separately with their generated reports.
+
 ## Startup prompt recovery and current video extractor (2026-11-26)
 
 Recovery previously discarded only committed prompts. A browser request still in
@@ -31,11 +63,10 @@ through an open file handle. The focused direct/HLS restart run passed all 17
 GUI checks and independent payload/range/frame checks. This changes only the
 test's pause trigger; application transfer and pause behavior are unchanged.
 
-The supplied NiaziTV episode played in the verification browser, but anonymous
-native page/stream checks returned HTTP 403 even with the new extractor and media
-request headers. This is a separate source-access limitation; the updater repair
-does not establish a successful native download of that episode. No DRM, cookie
-export, certificate or rate-limit bypass was added.
+Initial NiaziTV checks returned HTTP 403 even with the new extractor and copied
+page headers. The November 27 investigation above isolated the invented Referer
+as the stream refusal's cause. No DRM, cookie export, certificate or rate-limit
+bypass was added.
 
 ## NSIS release verification (2026-11-13)
 

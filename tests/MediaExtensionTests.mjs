@@ -87,4 +87,25 @@ const disabled=new HandoffController({load:async()=>({enabled:false})});await di
  check(sources.resolveRequest({page:feed,videoPage:post,source:'https://cdn.example/clicked.mp4',playerCount:8},linkedin).url==='https://cdn.example/clicked.mp4');
  check(!linkedinPage(post.replace('linkedin.com','linkedin.com.evil.test')));check(!sources.resolveRequest({page:feed,videoPage:post,protected:true},linkedin));
 }
+{
+ const page='https://player.example/play?id=1',url='https://cdn.example/no-referrer.m3u8';
+ const sender={url:page,frameId:3,documentId:'player',tab:{id:500}},sources=new MediaSources();
+ const request=headers=>sources.request({requestId:'policy',url,tabId:500,frameId:3,documentId:'player',method:'GET',requestHeaders:headers});
+ const response=()=>sources.observe({requestId:'policy',url,tabId:500,frameId:3,documentId:'player',documentUrl:page,statusCode:200,responseHeaders:[{name:'Content-Type',value:'application/x-mpegURL'}]});
+ const resolve=extra=>sources.resolveRequest({page,source:url,playerCount:1,userAgent:'Playing browser',...extra},sender);
+ request([{name:'Origin',value:'https://player.example'}]);response();
+ check(!Object.hasOwn(resolve().context,'referer'));
+ check(resolve().context.origin==='https://player.example'&&resolve().context.userAgent==='Playing browser');
+ sources.probe({page,url,format:'hls',master:true},sender);
+ check(!Object.hasOwn(resolve().context,'referer'));
+ request([{name:'Referer',value:page}]);response();
+ check(resolve({referrerPolicy:'no-referrer'}).context.referer===page);
+ request([]);response();
+ check(!Object.hasOwn(resolve().context,'referer'));
+ sources.forget(500);
+ check(!Object.hasOwn(resolve({referrerPolicy:'no-referrer'}).context,'referer'));
+ check(resolve().context.referer===page);
+ request(undefined);response();
+ check(resolve().context.referer===page);
+}
 console.log(`Media extension checks passed: ${checks}`);

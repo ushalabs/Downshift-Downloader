@@ -28,7 +28,7 @@ export class MediaSources {
       const name={referer:"referer",origin:"origin","user-agent":"userAgent"}[h.name.toLowerCase()];
       if(name && typeof h.value==="string" && h.value.length<=2048 && !/[\x00-\x1f\x7f]/.test(h.value))headers[name]=h.value;
     }
-    this.requests.set(details.requestId,{url:publicUrl(details.url),document:details.documentId||"",headers,tab:details.tabId,frame:details.frameId,at:this.now()});
+    this.requests.set(details.requestId,{url:publicUrl(details.url),document:details.documentId||"",headers,headersObserved:Array.isArray(details.requestHeaders),tab:details.tabId,frame:details.frameId,at:this.now()});
     if(this.requests.size>1024)this.requests.delete(this.requests.keys().next().value);
   }
   forget(tab) { this.tabs.delete(tab);this.youtube.delete(tab);this.youtubeMedia.delete(tab);for(const [id,value] of this.requests)if(value.tab===tab)this.requests.delete(id); }
@@ -54,7 +54,7 @@ export class MediaSources {
     if(!page || !url || sender.tab?.id===undefined || sender.tab.incognito || !["hls","dash"].includes(message.format))return;
     const previous=(this.tabs.get(sender.tab.id)||[]).find(x=>x.url===url && x.frame===sender.frameId && x.document===(sender.documentId||""));
     const request=[...this.requests.values()].reverse().find(x=>x.url===url && x.tab===sender.tab.id && x.frame===sender.frameId && (!x.document||!sender.documentId||x.document===sender.documentId) && this.now()-x.at<600000);
-    this.remember(sender.tab.id,{...previous,url,frame:sender.frameId,document:sender.documentId||"",page,pageExact:true,kind:message.format,master:message.master===true||previous?.master===true,headers:request?.headers||previous?.headers||{},at:this.now()});
+    this.remember(sender.tab.id,{...previous,url,frame:sender.frameId,document:sender.documentId||"",page,pageExact:true,kind:message.format,master:message.master===true||previous?.master===true,headers:request?.headers||previous?.headers||{},headersObserved:request?.headersObserved??previous?.headersObserved??false,at:this.now()});
   }
   observe(details) {
     if (details.tabId < 0 || details.statusCode < 200 || details.statusCode >= 400) return;
@@ -74,7 +74,7 @@ export class MediaSources {
       return;
     }
     const request=this.requests.get(details.requestId);this.requests.delete(details.requestId);
-    this.remember(details.tabId,{url,frame:details.frameId,document:details.documentId||"",page:previous?.pageExact?previous.page:publicUrl(details.documentUrl)||publicUrl(details.initiator)||"",pageExact:previous?.pageExact||!!publicUrl(details.documentUrl),kind:previous?.kind||kind,master:previous?.master===true,headers:request?.headers||previous?.headers||{},at:this.now()});
+    this.remember(details.tabId,{url,frame:details.frameId,document:details.documentId||"",page:previous?.pageExact?previous.page:publicUrl(details.documentUrl)||publicUrl(details.initiator)||"",pageExact:previous?.pageExact||!!publicUrl(details.documentUrl),kind:previous?.kind||kind,master:previous?.master===true,headers:request?.headers||previous?.headers||{},headersObserved:request?.headersObserved??previous?.headersObserved??false,at:this.now()});
   }
   resolve(message, sender) {
     const original = publicUrl(sender.url) || publicUrl(sender.origin) || publicUrl(sender.tab?.url);
@@ -123,7 +123,11 @@ export class MediaSources {
       return {url,context};
     }
     if(candidate || publicUrl(message.source)===url){
-      const referer=candidate?.headers.referer||page;
+      // An observed missing Referer is meaningful: no-referrer players can
+      // receive HTTP 403 if we invent the page header for the native request.
+      // Actual successful request headers take precedence over DOM hints.
+      const referer=candidate?.headersObserved ? candidate.headers.referer :
+        message.referrerPolicy==='no-referrer' ? undefined : candidate?.headers.referer||page;
       if(referer?.length<=8192)context.referer=referer;
       if(publicUrl(candidate?.headers.origin))context.origin=candidate.headers.origin;
       if(candidate?.headers.userAgent)context.userAgent=candidate.headers.userAgent;

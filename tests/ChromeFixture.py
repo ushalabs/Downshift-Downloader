@@ -12,6 +12,18 @@ class ChromeHandler(Handler):
     def do_GET(self):
         import sys
         print("Chrome fixture request range="+str(self.headers.get("Range")),file=sys.stderr,flush=True)
+        if self.path=='/no-referrer-root':
+            payload=f'<!doctype html><title>No-referrer media fixture</title><iframe style="width:650px;height:400px" src="http://localhost:{self.server.server_port}/no-referrer-embed"></iframe>'.encode()
+            self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
+        if self.path=='/no-referrer-embed':
+            payload=b'''<!doctype html><meta name="referrer" content="no-referrer"><title>Private policy player</title><video referrerpolicy="no-referrer" style="width:480px;height:270px" controls><source src="/no-referrer-master.m3u8" type="application/x-mpegURL"></video><script>document.querySelector('video').src=URL.createObjectURL(new Blob([],{type:'video/mp4'}));fetch('/no-referrer-master.m3u8',{referrerPolicy:'no-referrer'}).then(r=>r.text());</script>'''
+            self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
+        if self.path in ('/no-referrer-master.m3u8','/no-referrer-variant.m3u8','/no-referrer-segment.ts'):
+            if self.headers.get('Referer'):self.send_error(403,'This player forbids a referrer');return
+            if self.path=='/no-referrer-master.m3u8':payload=b'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000,RESOLUTION=320x240\n/no-referrer-variant.m3u8\n'
+            elif self.path=='/no-referrer-variant.m3u8':payload=b'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:3\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXTINF:2.0,\n/no-referrer-segment.ts\n#EXT-X-ENDLIST\n'
+            else:payload=self.server.segment_file.read_bytes()
+            self.send_response(200);self.send_header('Content-Type','video/mp2t' if self.path.endswith('.ts') else 'application/x-mpegURL');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return
         if self.path.startswith('/media-root'):
             payload=f'<!doctype html><title>Embedded media fixture</title><iframe style="width:650px;height:400px" src="http://localhost:{self.server.server_port}/media-embed"></iframe>'.encode()
             self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload);return

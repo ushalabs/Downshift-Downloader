@@ -81,6 +81,21 @@ Build-Portable.ps1 -RequireClean produces application/source/extension archives,
 
 ## YouTube regression and opt-in Internet verification
 
+The native live driver also accepts `--media-context=<private JSON file>` as its
+optional last argument for a public non-YouTube stream. The file contains only
+the production allowed media context, not credentials or helper arguments.
+Context-mode acceptance uses eight fragment connections in its private queue and
+a 30-minute full-transfer allowance. Independently check the completed file's
+audio/video, resolution and full duration; resolving qualities alone is not a
+successful download. The supplied NiaziPlay case additionally compares the same
+fresh stream with and without Referer to reproduce its HTTP 403 boundary.
+
+Controlled media acceptance includes a real HLS master with separate audio whose
+codec label is unknown. Its final merged container must contain both tracks.
+The real Chrome fixture also has a player that rejects any Referer header; the
+ordinary referrer-required player remains alongside it, so capture must preserve
+both policies. Tests use private profiles, queues and the separate native host.
+
 The 0.3.1 regressions cover stale sender URLs after same-origin navigation, preview-card resolution, invalid origins and unresolved feeds, playlist metadata rejection, preventing watch-page file downloads, preserved legacy files with corrected history, and branding/selector images under the actual shipped Qt features. Native cancellation, destination, merging and final-file verification regressions remain required.
 
 `tests/LiveYouTubeCheck.cjs` is an explicitly invoked real Internet test, separate from CTest's controlled fixtures. It loads the extension in isolated Chrome, attempts YouTube search-to-watch navigation, records whether the document actually survived navigation, clicks the player action, checks all expected qualities, selects 144p, downloads the full user-reported 713-second public video, and independently checks audio/video streams, duration, persisted completion and SHA-256. If search navigation is unavailable it uses the direct watch URL and explicitly records `sameDocumentNavigation: false`; that result cannot establish actual SPA coverage. Its output directory retains the video, screenshots and source/binary fingerprints. Registry state is restored and the normal profile/history are untouched. Close the idle normal app first because its pipe is exclusive. Use the same executable/runtime arguments as ChromeTests.cjs with the installed pinned media tools; this opt-in check is deliberately not a mandatory network-dependent CI test.
